@@ -104,24 +104,28 @@ const register = async (req, res) => {
 const login = async (req, res) => {
     try {
         let { email, password } = req.body;
-        console.log(`Admin login attempt for: [${email}]`);
-
         const trimmedEmail = email ? email.trim().toLowerCase() : "";
+        console.log(`[AUTH_DEBUG] Admin login attempt for: [${trimmedEmail}]`);
+
         let user = await Admin.findOne({ email: trimmedEmail });
 
         if (!user) {
-            console.log(`Admin not found: [${trimmedEmail}]`);
+            console.log(`[AUTH_DEBUG] FAILURE: Admin email not found in DB: [${trimmedEmail}]`);
             return res.status(401).json({ error: true, msg: "Please try to login with correct credentials" });
         }
 
+        console.log(`[AUTH_DEBUG] User found in DB for [${trimmedEmail}]. Comparing passwords...`);
+
         const passwordCompare = await bcrypt.compare(password, user.password);
         if (!passwordCompare) {
-            console.log(`Admin password mismatch for: [${trimmedEmail}]`);
+            console.log(`[AUTH_DEBUG] FAILURE: Password mismatch for: [${trimmedEmail}]`);
+            console.log(`[AUTH_DEBUG] Input password length: ${password?.length}, DB hash length: ${user.password?.length}`);
             return res
                 .status(401)
                 .json({ error: true, msg: "Please try to login with correct credentials" });
         }
-        console.log(`Admin login successful: [${trimmedEmail}]`);
+
+        console.log(`[AUTH_DEBUG] SUCCESS: Admin login successful for: [${trimmedEmail}]`);
         const data = {
             user: {
                 id: user.id,
@@ -132,10 +136,9 @@ const login = async (req, res) => {
         const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: '1d' });
         setAdminCookie(res, authtoken);
         res.json({ error: false, authtoken });
-        // res.status(200).json({ error: false, email, password })
     } catch (error) {
+        console.error("[AUTH_DEBUG] ERROR during login:", error);
         res.status(400).json({ error: true, msg: "Something went wrong..!" })
-
     }
 }
 
