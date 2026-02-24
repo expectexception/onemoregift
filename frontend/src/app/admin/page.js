@@ -68,10 +68,16 @@ export default function AdminLoginForm() {
                 });
             }
         } catch (error) {
+            const errorMsg = error.response?.data?.msg || "An unexpected error occurred. Please try again.";
             toast({
                 title: "Login Failed",
                 variant: "destructive",
-                description: "An unexpected error occurred. Please try again."
+                description: (
+                    <div className="flex items-center space-x-2">
+                        <XCircle className="text-white w-5 h-5" />
+                        <span>{errorMsg}</span>
+                    </div>
+                )
             });
         } finally {
             setLoading(false);

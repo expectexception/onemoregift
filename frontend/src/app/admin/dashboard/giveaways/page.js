@@ -150,7 +150,7 @@ function GiveawaysDashboardPage() {
     };
 
     return (
-        <div ref={containerRef} className="flex flex-col min-h-screen bg-black relative overflow-hidden cursor-glow-container p-6 md:p-10">
+        <div ref={containerRef} className="flex flex-col min-h-screen bg-black relative overflow-hidden cursor-glow-container p-4 md:p-10">
             <div className="absolute inset-0 section-gradient opacity-30 pointer-events-none" />
 
             <div className="relative z-10 space-y-10 animate-fade-in">
@@ -160,11 +160,11 @@ function GiveawaysDashboardPage() {
                         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-xl shadow-red-900/20 shadow-inner border border-red-500/20">
                             <Gift className="text-white w-8 h-8" />
                         </div>
-                        <div>
-                            <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
                                 Event <span className="text-gradient">Registry</span>
                             </h2>
-                            <p className="text-[10px] text-neutral-600 font-black uppercase tracking-[0.3em] mt-1 flex items-center gap-2">
+                            <p className="text-[9px] md:text-[10px] text-neutral-600 font-black uppercase tracking-[0.3em] mt-1 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                 Monitoring Active Contests
                             </p>
@@ -172,9 +172,9 @@ function GiveawaysDashboardPage() {
                     </div>
                     <Button
                         onClick={() => router.push('/admin/dashboard/add')}
-                        className="h-14 px-8 btn-gradient rounded-2xl font-black text-xs uppercase tracking-[0.2em] italic shadow-2xl shadow-red-900/20 hover:scale-105 active:scale-95 transition-all group"
+                        className="h-12 md:h-14 px-6 md:px-8 btn-gradient rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] italic shadow-2xl shadow-red-900/20 hover:scale-105 active:scale-95 transition-all group"
                     >
-                        <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
+                        <Plus className="w-3 h-3 md:w-4 md:h-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
                         Deploy New Event
                     </Button>
                 </div>
@@ -184,8 +184,10 @@ function GiveawaysDashboardPage() {
                 {/* Main Table Content */}
                 <div className="relative rounded-[2.5rem] border border-white/[0.06] bg-white/[0.01] backdrop-blur-3xl overflow-hidden shadow-2xl group">
                     <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-red-600/40 to-transparent group-hover:via-red-600 transition-all duration-1000" />
-                    <div className="p-4 md:p-8 overflow-x-auto custom-scrollbar">
-                        <DataTable columns={columns} data={data} />
+                    <div className="p-0 md:p-8 overflow-x-auto custom-scrollbar">
+                        <div className="min-w-[800px] md:min-w-0">
+                            <DataTable columns={columns} data={data} />
+                        </div>
                     </div>
 
                     {/* Footer Controls */}

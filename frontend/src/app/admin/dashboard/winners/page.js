@@ -62,11 +62,11 @@ function Page() {
 
     return (
         <div className="min-h-screen bg-black">
-            <div className="max-w-7xl mx-auto p-4 md:p-8 animate-fade-in">
+            <div className="max-w-7xl mx-auto p-4 md:p-10 animate-fade-in">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Giveaways & Winners</h1>
-                        <p className="text-sm text-neutral-500 mt-1">Track victorious participants and reward distributions</p>
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">Giveaways & Winners</h1>
+                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">Track victorious participants and reward distributions</p>
                     </div>
                 </div>
 
@@ -78,10 +78,10 @@ function Page() {
                             placeholder="Search by title or prize..."
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
-                            className="premium-input pl-10 h-11 bg-white/[0.03] border-white/[0.08] text-white rounded-xl"
+                            className="premium-input pl-10 h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-xl text-xs"
                         />
                     </div>
-                    <div className="text-xs font-semibold text-neutral-600 uppercase tracking-widest pl-1">
+                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] pl-1">
                         {loading ? 'Refreshing data...' : `${filtered.length} Contests Found`}
                     </div>
                 </div>

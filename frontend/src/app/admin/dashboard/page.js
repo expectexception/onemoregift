@@ -132,13 +132,13 @@ function DashboardPage() {
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-xl shadow-red-900/20 border border-red-500/20">
                             <ShieldCheck className="text-white w-7 h-7" />
                         </div>
-                        <div>
-                            <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
+                        <div className="flex flex-col">
+                            <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
                                 Admin <span className="text-gradient">Control</span>
                             </h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">
+                                <p className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-widest leading-none">
                                     System Online • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </p>
                             </div>
@@ -149,9 +149,9 @@ function DashboardPage() {
                             await logoutAdmin();
                             router.push('/admin/');
                         }}
-                        className="self-start md:self-center flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-red-600/10 hover:border-red-600/40 transition-all duration-300 text-neutral-400 hover:text-red-400 font-bold text-xs uppercase tracking-widest group"
+                        className="self-start md:self-center flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-red-600/10 hover:border-red-600/40 transition-all duration-300 text-neutral-400 hover:text-red-400 font-bold text-[10px] md:text-xs uppercase tracking-widest group leading-none"
                     >
-                        <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                        <LogOut className="w-3 h-3 md:w-4 md:h-4 group-hover:-translate-x-1 transition-transform" />
                         <span>Terminate Session</span>
                     </button>
                 </div>

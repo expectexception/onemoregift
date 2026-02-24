@@ -185,30 +185,30 @@ const UsersPage = () => {
     return (
         <div className="min-h-screen bg-black p-4 md:p-8">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-white">User Management</h1>
-                    <p className="text-sm text-neutral-500 mt-1">
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">User Management</h1>
+                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">
                         {total} total user{total !== 1 ? "s" : ""}
                     </p>
                 </div>
                 <button
                     onClick={() => fetchUsers()}
                     disabled={loading}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-sm"
+                    className="self-start md:self-center flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest"
                 >
-                    <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                    <span className="hidden md:block">Refresh</span>
+                    <RefreshCw className={`w-3 h-3 md:w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                    <span>Refresh Registry</span>
                 </button>
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-8 w-fit">
+            <div className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-8 w-full md:w-fit">
                 {TABS.map((tab) => (
                     <button
                         key={tab.key}
                         onClick={() => handleTabChange(tab.key)}
-                        className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === tab.key
+                        className={`flex-1 md:flex-none px-4 md:px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${activeTab === tab.key
                             ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
                             : "text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.03]"
                             }`}
@@ -219,140 +219,144 @@ const UsersPage = () => {
             </div>
 
             {/* Search */}
-            <div className="flex items-center gap-2 mb-5 max-w-md">
-                <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 max-w-md w-full">
+                <div className="relative w-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                     <Input
                         placeholder="Search by email or phone..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        className="pl-9 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 h-10"
+                        className="pl-9 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 h-11 rounded-xl text-xs"
                     />
                 </div>
                 <Button
                     onClick={handleSearch}
                     disabled={loading}
-                    className="bg-white/[0.06] hover:bg-white/[0.1] text-white border-0 h-10"
+                    className="w-full sm:w-auto px-8 bg-red-600 hover:bg-red-700 text-white border-0 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20"
                 >
-                    Search
+                    Initialize Search
                 </Button>
             </div>
 
             {/* Table */}
-            <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow className="border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.02]">
-                            <TableHead className="text-neutral-400 font-medium">User</TableHead>
-                            <TableHead className="text-neutral-400 font-medium hidden md:table-cell">Phone</TableHead>
-                            <TableHead className="text-neutral-400 font-medium">Status</TableHead>
-                            <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Auth</TableHead>
-                            <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Joined</TableHead>
-                            <TableHead className="text-neutral-400 font-medium text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                            Array.from({ length: 5 }).map((_, i) => (
-                                <TableRow key={i} className="border-white/[0.04]">
-                                    <TableCell colSpan={6}>
-                                        <div className="h-5 w-full bg-white/[0.04] rounded animate-pulse" />
-                                    </TableCell>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] backdrop-blur-3xl overflow-hidden mb-6">
+                <div className="overflow-x-auto custom-scrollbar">
+                    <div className="min-w-[600px]">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.02]">
+                                    <TableHead className="text-neutral-400 font-medium">User</TableHead>
+                                    <TableHead className="text-neutral-400 font-medium hidden md:table-cell">Phone</TableHead>
+                                    <TableHead className="text-neutral-400 font-medium">Status</TableHead>
+                                    <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Auth</TableHead>
+                                    <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Joined</TableHead>
+                                    <TableHead className="text-neutral-400 font-medium text-right">Actions</TableHead>
                                 </TableRow>
-                            ))
-                        ) : users.length > 0 ? (
-                            users.map((user) => (
-                                <TableRow
-                                    key={user._id}
-                                    className="border-white/[0.04] hover:bg-white/[0.02] transition-colors"
-                                >
-                                    <TableCell>
-                                        <div>
-                                            <div className="text-sm font-medium text-white">{user.name}</div>
-                                            <div className="text-xs text-neutral-500 mt-0.5">{user.email}</div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell text-sm text-neutral-400">
-                                        {user.phone && !user.phone.startsWith("google_") ? user.phone : (
-                                            <span className="text-neutral-600 italic text-xs">not set</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.blocked
-                                            ? "bg-red-500/10 text-red-500 border border-red-500/20"
-                                            : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                            }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${user.blocked ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} />
-                                            {user.blocked ? "Blocked" : "Active"}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="hidden lg:table-cell">
-                                        {user.isGoogleAuth ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-600/10 text-amber-400 border border-amber-600/20">
-                                                <Chrome className="w-3 h-3" />
-                                                Google
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-neutral-500">Email</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="hidden lg:table-cell text-xs text-neutral-500">
-                                        {user.createdAt
-                                            ? new Date(user.createdAt).toLocaleDateString("en-IN", {
-                                                day: "numeric", month: "short", year: "numeric"
-                                            })
-                                            : "—"}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center justify-end gap-1">
-                                            <button
-                                                onClick={() => router.push(`/admin/dashboard/users/${user._id}`)}
-                                                title="View Profile"
-                                                className="p-2 rounded-lg hover:bg-white/[0.06] text-neutral-500 hover:text-white transition-all"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </button>
-                                            {user.blocked ? (
-                                                <button
-                                                    onClick={() => setDialog({ open: true, type: "unban", user })}
-                                                    title="Unblock User"
-                                                    className="p-2 rounded-lg hover:bg-emerald-600/10 text-neutral-500 hover:text-emerald-400 transition-all"
-                                                >
-                                                    <Shield className="w-4 h-4" />
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setDialog({ open: true, type: "ban", user })}
-                                                    title="Block User"
-                                                    className="p-2 rounded-lg hover:bg-amber-600/10 text-neutral-500 hover:text-amber-400 transition-all"
-                                                >
-                                                    <ShieldOff className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => setDialog({ open: true, type: "delete", user })}
-                                                title="Delete User"
-                                                className="p-2 rounded-lg hover:bg-red-600/10 text-neutral-500 hover:text-red-400 transition-all"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-12">
-                                    <div className="flex flex-col items-center gap-3">
-                                        <Users className="w-10 h-10 text-neutral-700" />
-                                        <span className="text-neutral-500 text-sm">No users found</span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i} className="border-white/[0.04]">
+                                            <TableCell colSpan={6}>
+                                                <div className="h-5 w-full bg-white/[0.04] rounded animate-pulse" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : users.length > 0 ? (
+                                    users.map((user) => (
+                                        <TableRow
+                                            key={user._id}
+                                            className="border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+                                        >
+                                            <TableCell>
+                                                <div>
+                                                    <div className="text-sm font-medium text-white">{user.name}</div>
+                                                    <div className="text-xs text-neutral-500 mt-0.5">{user.email}</div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="hidden md:table-cell text-sm text-neutral-400">
+                                                {user.phone && !user.phone.startsWith("google_") ? user.phone : (
+                                                    <span className="text-neutral-600 italic text-xs">not set</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.blocked
+                                                    ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                                                    : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                                    }`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${user.blocked ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} />
+                                                    {user.blocked ? "Blocked" : "Active"}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="hidden lg:table-cell">
+                                                {user.isGoogleAuth ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-600/10 text-amber-400 border border-amber-600/20">
+                                                        <Chrome className="w-3 h-3" />
+                                                        Google
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-neutral-500">Email</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="hidden lg:table-cell text-xs text-neutral-500">
+                                                {user.createdAt
+                                                    ? new Date(user.createdAt).toLocaleDateString("en-IN", {
+                                                        day: "numeric", month: "short", year: "numeric"
+                                                    })
+                                                    : "—"}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => router.push(`/admin/dashboard/users/${user._id}`)}
+                                                        title="View Profile"
+                                                        className="p-2 rounded-lg hover:bg-white/[0.06] text-neutral-500 hover:text-white transition-all"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    {user.blocked ? (
+                                                        <button
+                                                            onClick={() => setDialog({ open: true, type: "unban", user })}
+                                                            title="Unblock User"
+                                                            className="p-2 rounded-lg hover:bg-emerald-600/10 text-neutral-500 hover:text-emerald-400 transition-all"
+                                                        >
+                                                            <Shield className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setDialog({ open: true, type: "ban", user })}
+                                                            title="Block User"
+                                                            className="p-2 rounded-lg hover:bg-amber-600/10 text-neutral-500 hover:text-amber-400 transition-all"
+                                                        >
+                                                            <ShieldOff className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => setDialog({ open: true, type: "delete", user })}
+                                                        title="Delete User"
+                                                        className="p-2 rounded-lg hover:bg-red-600/10 text-neutral-500 hover:text-red-400 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-12">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Users className="w-10 h-10 text-neutral-700" />
+                                                <span className="text-neutral-500 text-sm">No users found</span>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
             </div>
 
             {/* Pagination */}
