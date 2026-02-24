@@ -19,7 +19,7 @@ const createAdmin = async () => {
         }), 'admins');
 
         const email = "expectexception@gmail.com";
-        const password = "ExpExc@1998$"; // CHANGE THIS BEFORE RUNNING
+        const password = "OneMoreGift@2026"; // CHANGE THIS BEFORE RUNNING
 
         if (password === "admin_password_here") {
             console.error("ERROR: Please change the password in create-admin.js before running!");

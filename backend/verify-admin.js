@@ -19,7 +19,7 @@ const verifyAdmin = async () => {
         }), 'admins');
 
         const testEmail = "expectexception@gmail.com";
-        const testPass = "ExpExc@1998$";
+        const testPass = "OneMoreGift@2026";
 
         const admin = await Admin.findOne({ email: testEmail });
 

@@ -10,7 +10,7 @@ async function createAdmin() {
         await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/giveaway');
 
         const email = 'expectexception@gmail.com';
-        const password = 'Admin@123'; // Temporary password
+        const password = 'OneMoreGift@2026'; // Temporary password
         const username = 'RootAdmin';
 
         const existingAdmin = await Admin.findOne({ email });
