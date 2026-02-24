@@ -198,7 +198,7 @@ const UsersPage = () => {
                     className="self-start md:self-center flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest"
                 >
                     <RefreshCw className={`w-3 h-3 md:w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                    <span>Refresh Registry</span>
+                    <span>Refresh</span>
                 </button>
             </div>
 
@@ -235,7 +235,7 @@ const UsersPage = () => {
                     disabled={loading}
                     className="w-full sm:w-auto px-8 bg-red-600 hover:bg-red-700 text-white border-0 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20"
                 >
-                    Initialize Search
+                    Search
                 </Button>
             </div>
 

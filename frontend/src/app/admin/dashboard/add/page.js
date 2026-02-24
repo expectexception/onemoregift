@@ -87,14 +87,14 @@ function AddGiveawayPage() {
                     description: (
                         <div className="flex items-center space-x-2">
                             <CheckCircle className="text-green-500 w-5 h-5" />
-                            <span>Vault upload completed successfully.</span>
+                            <span>Image uploaded successfully.</span>
                         </div>
                     )
                 });
             } else {
                 setUploadProgress(null);
                 toast({
-                    title: "Security Breach",
+                    title: "Upload Error",
                     variant: "destructive",
                     description: (
                         <div className="flex items-center space-x-2">
@@ -107,9 +107,9 @@ function AddGiveawayPage() {
         } catch (error) {
             setUploadProgress(null);
             toast({
-                title: "Critcal Failure",
+                title: "Server Error",
                 variant: "destructive",
-                description: "Image processing server is currently unreachable."
+                description: "Image server is currently unreachable."
             });
         }
     }
@@ -133,18 +133,18 @@ function AddGiveawayPage() {
             });
             if (data.error == false) {
                 toast({
-                    title: "Mission Successful",
+                    title: "Success",
                     description: (
                         <div className="flex items-center space-x-2">
                             <CheckCircle className="text-green-500 w-5 h-5" />
-                            <span>Giveaway event has been initialized.</span>
+                            <span>Giveaway created successfully.</span>
                         </div>
                     )
                 });
                 router.push('/admin/dashboard/giveaways');
             } else {
                 toast({
-                    title: "System Rejection",
+                    title: "Failed",
                     variant: "destructive",
                     description: (
                         <div className="flex items-center space-x-2">
@@ -156,9 +156,9 @@ function AddGiveawayPage() {
             }
         } catch (error) {
             toast({
-                title: "Error Detected",
+                title: "Error",
                 variant: "destructive",
-                description: "An unexpected error occurred during transmission."
+                description: "An unexpected error occurred while saving."
             });
         }
     };
@@ -179,12 +179,12 @@ function AddGiveawayPage() {
                         </div>
                         <div>
                             <h2 className="text-3xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
-                                Initialize <span className="text-gradient">Giveaway</span>
+                                Create <span className="text-gradient">Giveaway</span>
                             </h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                                 <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">
-                                    Event Creation Protocol Active
+                                    Set up your giveaway details
                                 </p>
                             </div>
                         </div>
@@ -205,7 +205,7 @@ function AddGiveawayPage() {
                             className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-red-600/10 hover:border-red-600/40 transition-all duration-300 text-neutral-400 hover:text-red-400 font-bold text-xs uppercase tracking-widest group"
                         >
                             <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                            <span>Terminate</span>
+                            <span>Logout</span>
                         </button>
                     </div>
                 </div>
@@ -220,7 +220,7 @@ function AddGiveawayPage() {
                                 <div className="absolute inset-0 bg-gradient-to-r from-red-600/0 via-red-600/[0.02] to-red-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                                 <CardTitle className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest">
                                     <LucideImage className="w-4 h-4 text-red-500" />
-                                    Visual Identity
+                                    Giveaway Image
                                 </CardTitle>
                                 <CardDescription className="text-neutral-500 text-[10px] uppercase font-bold tracking-tighter">Event Promotional Display</CardDescription>
                             </CardHeader>
@@ -334,15 +334,15 @@ function AddGiveawayPage() {
                             <CardHeader className="border-b border-white/[0.04] bg-white/[0.01] py-7">
                                 <CardTitle className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-[0.2em]">
                                     <Sparkles className="w-4 h-4 text-blue-500" />
-                                    Deployment Matrix
+                                    Giveaway Details
                                 </CardTitle>
-                                <CardDescription className="text-neutral-500 text-[10px] uppercase font-bold tracking-tighter">Core Event Parameters & Synchronization</CardDescription>
+                                <CardDescription className="text-neutral-500 text-[10px] uppercase font-bold tracking-tighter">Enter giveaway rules and timing</CardDescription>
                             </CardHeader>
                             <CardContent className="p-8 space-y-8">
                                 {/* Title & Description Section */}
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <Label htmlFor="title" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Event Directive</Label>
+                                        <Label htmlFor="title" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Title</Label>
                                         <Input
                                             id="title"
                                             value={title}
@@ -354,7 +354,7 @@ function AddGiveawayPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="desc" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Contextual Brief</Label>
+                                        <Label htmlFor="desc" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Description</Label>
                                         <Input
                                             id="desc"
                                             value={description}
@@ -385,7 +385,7 @@ function AddGiveawayPage() {
                                             </div>
                                         </div>
                                         <TimePicker
-                                            label="Start Chronology"
+                                            label="Start Time"
                                             value={startTime}
                                             onChange={setStartTime}
                                         />
@@ -408,7 +408,7 @@ function AddGiveawayPage() {
                                             </div>
                                         </div>
                                         <TimePicker
-                                            label="Termination Date"
+                                            label="End Time"
                                             value={endTime}
                                             onChange={setEndTime}
                                         />
@@ -418,7 +418,7 @@ function AddGiveawayPage() {
                                 {/* Prize Configuration */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="prize" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Asset Designation</Label>
+                                        <Label htmlFor="prize" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Prize Name</Label>
                                         <Input
                                             id="prize"
                                             value={prize}
@@ -429,7 +429,7 @@ function AddGiveawayPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="prizeValue" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Market Valuation</Label>
+                                        <Label htmlFor="prizeValue" className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] ml-1">Prize Value</Label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-600 font-bold">₹</span>
                                             <Input
@@ -453,7 +453,7 @@ function AddGiveawayPage() {
                                         className="w-full h-16 btn-gradient rounded-2xl font-black text-sm uppercase tracking-[0.3em] italic shadow-2xl shadow-red-900/20 active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
                                         disabled={!title || !description || !startDate || !startTime || !endDate || !endTime || !prize || !prizeValue || !winnerCount || !image}
                                     >
-                                        Initiate Deployment
+                                        Create Giveaway
                                     </Button>
                                     <div className="flex items-center justify-center gap-2 text-[8px] font-bold text-neutral-700 uppercase tracking-widest">
                                         <ShieldCheck className="w-2.5 h-2.5" />
@@ -471,20 +471,20 @@ function AddGiveawayPage() {
                         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                             <Info className="w-5 h-5 text-blue-500" />
                         </div>
-                        <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Administrative Guidance</h4>
+                        <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Helpful Tips</h4>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div className="space-y-2">
-                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Timeline Integrity</span>
-                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">Ensure the termination date is strictly chronologically subsequent to the initiation timestamp to prevent system data conflicts.</p>
+                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Date & Time</span>
+                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">Make sure the end date is after the start date.</p>
                         </div>
                         <div className="space-y-2">
-                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Asset Security</span>
-                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">Verification of winner count against maximum participants is auto-validated during selection protocol phase.</p>
+                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Selection Rules</span>
+                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">The number of winners will be checked against the participant count.</p>
                         </div>
                         <div className="space-y-2">
-                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Public Visibility</span>
-                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">Immediate propagation to all user terminals occurs post-deployment activation. Recheck all identity assets before submission.</p>
+                            <span className="text-[9px] font-black text-neutral-600 uppercase tracking-tighter">Visibility</span>
+                            <p className="text-[10px] text-neutral-500 leading-relaxed uppercase italic">Giveaways appear on the site immediately after you create them.</p>
                         </div>
                     </div>
                 </div>

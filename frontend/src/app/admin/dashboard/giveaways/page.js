@@ -128,7 +128,7 @@ function GiveawaysDashboardPage() {
             );
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
-            toast({ title: "System Error", description: "Telemetry sync failed.", variant: "destructive" });
+            toast({ title: "System Error", description: "Data loading failed.", variant: "destructive" });
         }
     };
 
@@ -141,7 +141,7 @@ function GiveawaysDashboardPage() {
             await api.delete(`giveaway/${selectedGiveawayId}`, {
                 meta: { auth: "admin" },
             });
-            toast({ title: "Purged", description: "Target asset removed from matrix.", variant: "success" });
+            toast({ title: "Deleted", description: "Giveaway has been deleted.", variant: "success" });
             setIsDeleteDialogOpen(false);
             getData();
         } catch (error) {
@@ -162,11 +162,11 @@ function GiveawaysDashboardPage() {
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
-                                Event <span className="text-gradient">Registry</span>
+                                Giveaway <span className="text-gradient">Management</span>
                             </h2>
                             <p className="text-[9px] md:text-[10px] text-neutral-600 font-black uppercase tracking-[0.3em] mt-1 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                Monitoring Active Contests
+                                Manage your giveaways and prizes
                             </p>
                         </div>
                     </div>
@@ -175,7 +175,7 @@ function GiveawaysDashboardPage() {
                         className="h-12 md:h-14 px-6 md:px-8 btn-gradient rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] italic shadow-2xl shadow-red-900/20 hover:scale-105 active:scale-95 transition-all group"
                     >
                         <Plus className="w-3 h-3 md:w-4 md:h-4 mr-2 group-hover:rotate-90 transition-transform duration-500" />
-                        Deploy New Event
+                        Create Giveaway
                     </Button>
                 </div>
 
@@ -194,7 +194,7 @@ function GiveawaysDashboardPage() {
                     <div className="px-8 py-6 border-t border-white/[0.04] bg-white/[0.01] flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-3">
                             <div className="px-4 py-2 rounded-xl bg-white/[0.02] border border-white/5 flex items-center gap-2">
-                                <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">Protocol Page</span>
+                                <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">Page</span>
                                 <span className="text-xs font-black text-white italic">{currentPage} <span className="text-neutral-700">/</span> {totalPages}</span>
                             </div>
                         </div>
@@ -235,18 +235,18 @@ function GiveawaysDashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
                     <div className="p-6 rounded-3xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] transition-colors group">
                         <ShieldCheck className="w-5 h-5 text-blue-500 mb-4 group-hover:scale-110 transition-transform" />
-                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Security Verified</h4>
-                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">Every event in this registry is cryptographically signed and tracked for participant integrity.</p>
+                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Verified</h4>
+                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">All giveaways are securely tracked for fairness.</p>
                     </div>
                     <div className="p-6 rounded-3xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] transition-colors group">
                         <Clock className="w-5 h-5 text-amber-500 mb-4 group-hover:scale-110 transition-transform" />
-                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Chronos Sync</h4>
-                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">System execution triggers are synchronized with global server time every 60 seconds.</p>
+                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">System Time</h4>
+                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">Giveaway timings are synchronized with global server time.</p>
                     </div>
                     <div className="p-6 rounded-3xl border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.02] transition-colors group">
                         <Target className="w-5 h-5 text-emerald-500 mb-4 group-hover:scale-110 transition-transform" />
-                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Participant Flow</h4>
-                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">Real-time load balancing is active for all high-traffic deployment scenarios.</p>
+                        <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center md:text-left">Activity</h4>
+                        <p className="text-[9px] text-neutral-700 leading-relaxed uppercase italic">Real-time monitoring is active for all contest participants.</p>
                     </div>
                 </div>
             </div>
@@ -258,9 +258,9 @@ function GiveawaysDashboardPage() {
                         <div className="w-12 h-12 rounded-2xl bg-red-600/10 flex items-center justify-center mx-auto mb-2 border border-red-500/20">
                             <Trash2 className="w-6 h-6 text-red-500" />
                         </div>
-                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-center">Terminate <span className="text-red-600">Asset</span></DialogTitle>
+                        <DialogTitle className="text-2xl font-black uppercase italic tracking-tighter text-center">Delete <span className="text-red-600">Giveaway</span></DialogTitle>
                         <DialogDescription className="text-center text-neutral-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed px-6">
-                            This operation will permanently purge the giveaway event and all associated participant telemetry from the matrix.
+                            This will permanently delete the giveaway and all participant data.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-3 mt-8">

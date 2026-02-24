@@ -93,8 +93,8 @@ function Page({ params }) {
                 setImage(data.url)
                 setUploadProgress(null);
                 toast({
-                    title: "Status: Updated",
-                    description: "Media resource replaced successfully."
+                    title: "Success",
+                    description: "Image updated successfully."
                 });
             } else {
                 setUploadProgress(null);
@@ -102,7 +102,7 @@ function Page({ params }) {
             }
         } catch (error) {
             setUploadProgress(null);
-            toast({ title: "System Error", variant: "destructive" });
+            toast({ title: "Server Error", variant: "destructive" });
         }
     }
 
@@ -126,15 +126,15 @@ function Page({ params }) {
 
             if (!data.error) {
                 toast({
-                    title: "Modification Successful",
-                    description: "Giveaway configuration has been updated."
+                    title: "Success",
+                    description: "Giveaway updated successfully."
                 });
             } else {
                 throw new Error(data.msg || "Update failed");
             }
         } catch (error) {
             toast({
-                title: "Modification Refused",
+                title: "Failed",
                 variant: "destructive",
                 description: error.message
             });
@@ -150,8 +150,8 @@ function Page({ params }) {
             <div className="flex-col space-y-8 p-4 md:p-8 bg-black min-h-screen">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Modify Giveaway</h1>
-                        <p className="text-sm text-neutral-500 mt-1">Adjusting configuration for: <span className="text-red-400 font-semibold">{title || 'Loading...'}</span></p>
+                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Edit Giveaway</h1>
+                        <p className="text-sm text-neutral-500 mt-1">Editing: <span className="text-red-400 font-semibold">{title || 'Loading...'}</span></p>
                     </div>
                 </div>
 
@@ -165,7 +165,7 @@ function Page({ params }) {
                                 <div className="w-8 h-8 rounded-lg bg-red-600/10 flex items-center justify-center">
                                     <BadgePlus className="w-4 h-4 text-red-500" />
                                 </div>
-                                Update Media
+                                Image
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-8">
@@ -205,7 +205,7 @@ function Page({ params }) {
                                 <div className="w-8 h-8 rounded-lg bg-blue-600/10 flex items-center justify-center">
                                     <LayoutDashboard className="w-4 h-4 text-blue-500" />
                                 </div>
-                                Configurations
+                                Settings
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-8">
@@ -230,14 +230,14 @@ function Page({ params }) {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider ml-1">Start Timeline</Label>
+                                            <Label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider ml-1">Start Date & Time</Label>
                                             <div className="flex gap-2">
                                                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="premium-input bg-white/[0.03] border-white/[0.08] text-white rounded-xl" />
                                                 <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="premium-input bg-white/[0.03] border-white/[0.08] text-white rounded-xl w-32" />
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider ml-1">End Timeline</Label>
+                                            <Label className="text-neutral-400 text-xs font-semibold uppercase tracking-wider ml-1">End Date & Time</Label>
                                             <div className="flex gap-2">
                                                 <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="premium-input bg-white/[0.03] border-white/[0.08] text-white rounded-xl" />
                                                 <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="premium-input bg-white/[0.03] border-white/[0.08] text-white rounded-xl w-32" />
@@ -260,7 +260,7 @@ function Page({ params }) {
                                     </div>
                                 </div>
                                 <Button type="submit" className="w-full h-12 btn-gradient rounded-xl font-bold text-base mt-6 shadow-xl shadow-red-600/10">
-                                    Update Configuration
+                                    Update Giveaway
                                 </Button>
                             </form>
                         </CardContent>

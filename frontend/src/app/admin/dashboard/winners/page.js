@@ -66,7 +66,7 @@ function Page() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
                         <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">Giveaways & Winners</h1>
-                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">Track victorious participants and reward distributions</p>
+                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">View past giveaways and their winners</p>
                     </div>
                 </div>
 
@@ -82,7 +82,7 @@ function Page() {
                         />
                     </div>
                     <div className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] pl-1">
-                        {loading ? 'Refreshing data...' : `${filtered.length} Contests Found`}
+                        {loading ? 'Refreshing data...' : `${filtered.length} Giveaways Found`}
                     </div>
                 </div>
 
@@ -155,7 +155,7 @@ function Page() {
                                 <Link href={`/admin/dashboard/giveaways/${g._id}`} className="block mt-6">
                                     <Button className="w-full h-10 btn-outline-premium rounded-xl text-xs font-bold gap-2">
                                         <Eye className="w-3.5 h-3.5" />
-                                        Manage Contest
+                                        Manage Giveaway
                                     </Button>
                                 </Link>
                             </CardContent>
