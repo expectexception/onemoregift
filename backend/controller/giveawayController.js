@@ -4,7 +4,7 @@ const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
 // Create a new giveaway
-const createGivewaway = async (req, res) => {
+const createGiveaway = async (req, res) => {
     try {
         const { title, description, startDate, endDate, prize, winnerCount, image, maxParticipants, prizeValue } = req.body;
         if (!title || !description || !startDate || !endDate || !prize || !winnerCount || !maxParticipants) {
@@ -346,4 +346,4 @@ const setWinners = async (req, res) => {
 
     }
 }
-module.exports = { createGivewaway, editGiveaway, deleteGiveaway, getAllGiveaways, getSingleGiveaway, participate, getWinners, setWinners, getGiveaways, getWinnersForAdmin };
+module.exports = { createGiveaway, editGiveaway, deleteGiveaway, getAllGiveaways, getSingleGiveaway, participate, getWinners, setWinners, getGiveaways, getWinnersForAdmin };

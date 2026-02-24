@@ -33,17 +33,24 @@ const clearAdminCookie = (res) => {
 
 const register = async (req, res) => {
     try {
+        let { email, password, username, role } = req.body
+        if (!email || !password) {
+            return res.status(400).json({ error: true, msg: "Email, Username, Password required." })
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
         let createAdmin = async () => {
             try {
                 const salt = await bcrypt.genSalt(10);
-                const secPass = await bcrypt.hash(req.body.password, salt);
+                const secPass = await bcrypt.hash(password, salt);
                 // Create a new user
                 const newAdmin = await Admin.create({
-                    username: req.body.username,
-                    email: req.body.email,
+                    username: username,
+                    email: normalizedEmail,
                     password: secPass,
                     isAdmin: true,
-                    role: req.body.role
+                    role: role
                 });
                 const data = {
                     user: {
@@ -55,26 +62,22 @@ const register = async (req, res) => {
                 };
 
                 const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: '1d' });
-                return res.status(200).json({ error: false, authtoken, role: req.body.role });
+                setAdminCookie(res, authtoken);
+                return res.status(200).json({ error: false, authtoken, role: role });
 
             } catch (error) {
+                console.error("createAdmin internal error:", error);
                 return res.status(500).json({ error: true, msg: "Some Error occured" });
-
             }
+        }
 
-        }
         let tokenExists = req.headers.authorization ? true : false
-        //check email
-        let { email, password, username } = req.body
-        if (!email || !password) {
-            return res.status(400).json({ error: true, msg: "Email, Username, Password required." })
-        }
 
         if (!tokenExists) {
-            const isRootEmail = ROOT_ADMIN_EMAILS.includes(email.toLowerCase());
+            const isRootEmail = ROOT_ADMIN_EMAILS.includes(normalizedEmail);
             const isAdminExists = await Admin.collection.countDocuments({})
             if (isAdminExists == 0 || isRootEmail) {
-                createAdmin()
+                return await createAdmin()
             }
             else return res.status(400).json({ error: true, msg: "Admin already exists" })
         }
@@ -86,15 +89,15 @@ const register = async (req, res) => {
             if (!isAdmin) {
                 return res.status(400).json({ error: true, msg: "You are not an Admin" })
             }
-            let findAdmin = await Admin.findOne({ email: email })
+            let findAdmin = await Admin.findOne({ email: normalizedEmail })
             if (findAdmin) {
                 return res.status(400).json({ error: true, msg: "Email Exists" })
             }
-            createAdmin()
+            return await createAdmin()
         }
 
     } catch (error) {
-        // console.error(error);
+        console.error("Registration error:", error);
         return res.status(500).json({ error: true, msg: "Some Error occured" });
     }
 }
@@ -385,7 +388,7 @@ const getAllGiveaways = async (req, res) => {
     }
 };
 
-const signleGiveaway = async (req, res) => {
+const singleGiveaway = async (req, res) => {
     try {
         const id = req.params.id;
         const data = await Giveaway.findById(id)
@@ -485,7 +488,7 @@ module.exports = {
     updateUser,
     getUserById,
     getAllGiveaways,
-    signleGiveaway,
+    singleGiveaway,
     me,
     logout,
     getPublicStats,
