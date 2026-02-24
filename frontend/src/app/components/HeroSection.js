@@ -59,7 +59,7 @@ export default function HeroSection() {
 
     // Cursor glow effect
     const handleMouseMove = useCallback((e) => {
-        if (!cursorRef.current || !sectionRef.current) return;
+        if (!cursorRef.current || !sectionRef.current || window.innerWidth < 768) return;
         const rect = sectionRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -134,8 +134,8 @@ export default function HeroSection() {
                 }}
             />
 
-            {/* Image indicator dots */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            {/* Image indicator dots - Hidden on mobile to avoid overlap */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 hidden md:flex gap-2">
                 {heroImages.map((_, i) => (
                     <button
                         key={i}
@@ -157,15 +157,15 @@ export default function HeroSection() {
                 </div>
 
                 {/* Main Heading */}
-                <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
                     <span className="text-white">Win </span>
                     <span className="text-gradient">Premium</span>
-                    <br />
-                    <span className="text-white">Rewards Daily</span>
+                    <br className="hidden sm:block" />
+                    <span className="text-white"> Rewards Daily</span>
                 </h1>
 
                 {/* Subtitle */}
-                <p className="text-base sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-up font-medium drop-shadow-lg" style={{ animationDelay: '0.2s' }}>
+                <p className="text-sm sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-up font-medium drop-shadow-lg" style={{ animationDelay: '0.2s' }}>
                     Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
                     <span className="text-red-400 font-semibold"> real prizes </span>
                     delivered straight to your doorstep.
@@ -191,11 +191,11 @@ export default function HeroSection() {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-3xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                    <StatCard icon={<HiGift />} value={stats.activeGiveaways} label="Active Giveaways" />
-                    <StatCard icon={<HiUsers />} value={stats.totalWinners} label="Happy Winners" />
-                    <StatCard icon={<HiStar />} value={stats.totalPrizeValue} label="Prizes Given" />
-                    <StatCard icon={<HiSparkles />} value={stats.verifiedLegit} label="Verified Legit" />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
+                    <StatCard icon={<HiGift />} value={stats.activeGiveaways} label="Active" />
+                    <StatCard icon={<HiUsers />} value={stats.totalWinners} label="Winners" />
+                    <StatCard icon={<HiStar />} value={stats.totalPrizeValue} label="Prizes" />
+                    <StatCard icon={<HiSparkles />} value={stats.verifiedLegit} label="Legit" />
                 </div>
             </div>
 
@@ -207,10 +207,10 @@ export default function HeroSection() {
 
 function StatCard({ icon, value, label }) {
     return (
-        <div className="glass rounded-xl p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
-            <div className="text-red-500 text-2xl mb-2 group-hover:scale-110 transition-transform">{icon}</div>
-            <div className="text-2xl md:text-3xl font-bold text-white mb-1">{value}</div>
-            <div className="text-sm text-neutral-500">{label}</div>
+        <div className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
+            <div className="text-red-500 text-xl sm:text-2xl mb-1 sm:mb-2 group-hover:scale-110 transition-transform">{icon}</div>
+            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1">{value}</div>
+            <div className="text-[10px] sm:text-sm text-neutral-500 uppercase tracking-wider">{label}</div>
         </div>
     );
 }

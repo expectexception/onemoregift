@@ -83,7 +83,7 @@ export default function Giveaways() {
                             {items.map((item, index) => (
                                 <CarouselItem
                                     key={index}
-                                    className="pl-4 basis-full md:basis-1/2 lg:basis-1/3"
+                                    className="pl-4 basis-[90%] md:basis-1/2 lg:basis-1/3"
                                 >
                                     <GiveawayCard
                                         item={item}
@@ -161,11 +161,11 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
     return (
         <>
             <div
-                className="giveaway-card p-6 h-full flex flex-col animate-fade-up"
+                className="giveaway-card p-4 sm:p-6 h-full flex flex-col animate-fade-up border border-white/5"
                 style={{ animationDelay: `${delay}s` }}
             >
                 {/* Image Container */}
-                <div className="relative h-48 w-full mb-6 rounded-xl overflow-hidden bg-neutral-900/50 flex items-center justify-center">
+                <div className="relative h-40 sm:h-48 w-full mb-4 sm:mb-6 rounded-xl overflow-hidden bg-neutral-900/50 flex items-center justify-center">
                     <Image
                         src={item.image || gift1}
                         height={160}
@@ -190,7 +190,7 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
 
                 {/* Content */}
                 <div className="flex-1 flex flex-col">
-                    <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{item.title}</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2">{item.title}</h3>
 
                     {/* Countdown Timer */}
                     {!hasEnded ? (
@@ -208,9 +208,9 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
                     )}
 
                     {/* Participants */}
-                    <div className="flex items-center gap-2 text-neutral-500 mb-6">
+                    <div className="flex items-center gap-2 text-neutral-500 mb-4 sm:mb-6">
                         <HiUsers className="text-lg text-red-500" />
-                        <span className="text-sm">{item.participantCount || 0} participants</span>
+                        <span className="text-xs sm:text-sm">{item.participantCount || 0} participants</span>
                     </div>
 
                     {/* Action Button */}
