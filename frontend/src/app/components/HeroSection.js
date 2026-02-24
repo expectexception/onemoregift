@@ -151,13 +151,13 @@ export default function HeroSection() {
             {/* Content */}
             <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
                 {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 animate-fade-up border border-white/[0.12]">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-neutral-200 text-sm font-medium tracking-wide">India&apos;s Leading Giveaway Platform</span>
+                <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full glass mb-6 sm:mb-8 animate-fade-up border border-white/[0.12]">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-neutral-200 text-[10px] sm:text-xs md:text-sm font-medium tracking-wide">India&apos;s Leading Giveaway Platform</span>
                 </div>
 
                 {/* Main Heading */}
-                <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
                     <span className="text-white">Win </span>
                     <span className="text-gradient">Premium</span>
                     <br className="hidden sm:block" />

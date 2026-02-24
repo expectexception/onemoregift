@@ -83,7 +83,7 @@ export default function Giveaways() {
                             {items.map((item, index) => (
                                 <CarouselItem
                                     key={index}
-                                    className="pl-4 basis-[90%] md:basis-1/2 lg:basis-1/3"
+                                    className="pl-4 basis-[85%] sm:basis-[70%] md:basis-1/2 lg:basis-1/3"
                                 >
                                     <GiveawayCard
                                         item={item}
@@ -221,14 +221,14 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
                         </div>
                     ) : (
                         <button
-                            className={`w-full py-3.5 rounded-xl font-semibold transition-all duration-300 mt-auto ${hasEnded
+                            className={`w-full py-2.5 sm:py-3.5 rounded-xl text-sm sm:text-base font-semibold transition-all duration-300 mt-auto ${hasEnded
                                 ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                                 : 'btn-gradient hover:shadow-glow-lg'
                                 }`}
                             onClick={() => handleEnterClick(item._id)}
                             disabled={hasEnded}
                         >
-                            {hasEnded ? "Giveaway Ended" : "Enter Now"}
+                            {hasEnded ? "Ended" : "Enter Now"}
                         </button>
                     )}
                 </div>
