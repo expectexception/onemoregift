@@ -212,26 +212,28 @@ export default function UserLoginForm() {
 
                     {loginMode === "password" ? (
                         <>
-                            <div className="flex flex-col space-y-2 relative">
+                            <div className="flex flex-col space-y-2">
                                 <Label htmlFor="password" className="text-neutral-300">Password</Label>
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    className="premium-input h-12 text-white placeholder:text-neutral-600 pr-12"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-2 top-8 text-neutral-500 hover:text-white"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                >
-                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                </Button>
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Enter your password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        className="premium-input h-12 text-white placeholder:text-neutral-600 pr-12"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white h-8 w-8"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </Button>
+                                </div>
                             </div>
                             <Button type="submit" className="w-full h-12 btn-gradient rounded-xl font-semibold text-base">
                                 Sign In
