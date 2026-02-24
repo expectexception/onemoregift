@@ -5,11 +5,14 @@ const crypto = require('crypto');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const sibApi = require('@getbrevo/brevo');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'no-reply@onemoregift.in';
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'OneMoreGift';
 const MAIL_USER = process.env.MAIL_USER;
 const MAIL_APP_PASSWORD = process.env.MAIL_APP_PASSWORD;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -79,30 +82,37 @@ const sendEmailFallback = async ({ to, subject, html }) => {
 };
 
 const sendEmail = async ({ to, subject, html }) => {
-    console.log(`Attempting to send email to: ${to} | Subject: ${subject}`);
+    console.log(`[EmailService] Attempting to send email to: ${to} | Subject: ${subject}`);
+
     if (BREVO_API_KEY) {
         try {
-            await axios.post('https://api.brevo.com/v3/smtp/email', {
-                sender: { email: 'no-reply@onemoregift.in' },
-                to: [{ email: to }],
-                htmlContent: html,
-                subject,
-            }, {
-                headers: {
-                    accept: 'application/json',
-                    'api-key': BREVO_API_KEY,
-                    'content-type': 'application/json',
-                },
-            });
-            console.log('Email sent via Brevo successfully');
+            const apiInstance = new sibApi.TransactionalEmailsApi();
+            apiInstance.setApiKey(sibApi.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
+
+            const sendSmtpEmail = new sibApi.SendSmtpEmail();
+            sendSmtpEmail.subject = subject;
+            sendSmtpEmail.htmlContent = html;
+            sendSmtpEmail.sender = { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL };
+            sendSmtpEmail.to = [{ email: to }];
+
+            await apiInstance.sendTransacEmail(sendSmtpEmail);
+            console.log('[EmailService] Email sent via Brevo successfully');
             return true;
         } catch (error) {
-            console.error('Brevo mail failed:', error?.response?.data || error.message);
+            console.error('[EmailService] Brevo SDK failed:', error?.response?.body || error.message);
+            // If it's a "Key not found" error, we specifically want to log that it might be an invalid key
+            if (error?.response?.body?.code === 'unauthorized') {
+                console.warn('[EmailService] CRITICAL: Brevo API key is unauthorized. Please check your .env file.');
+            }
         }
     }
 
-    console.log('Using Gmail fallback for email...');
-    return await sendEmailFallback({ to, subject, html });
+    console.log('[EmailService] Falling back to SMTP (Gmail)...');
+    const fallbackSent = await sendEmailFallback({ to, subject, html });
+    if (!fallbackSent) {
+        console.error('[EmailService] FAILED: Both Brevo and SMTP fallback failed.');
+    }
+    return fallbackSent;
 };
 
 const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!DOCTYPE html>
@@ -639,4 +649,5 @@ module.exports = {
     googleSignin,
     me,
     logout,
+    sendEmail
 };
