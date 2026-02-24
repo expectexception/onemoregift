@@ -1,0 +1,14 @@
+const express = require('express');
+const router = express.Router();
+const isAdmin = require('../middleware/isAdmin');
+const isAuth = require('../middleware/isAuth');
+const { createGivewaway, editGiveaway, deleteGiveaway, getAllGiveaways, getSingleGiveaway, participate, getWinners, setWinners, getGiveaways } = require('../controller/giveawayController');
+router.post('/create-giveaway', isAdmin, createGivewaway);
+router.patch('/:id', isAdmin, editGiveaway);
+router.delete('/:id', isAdmin, deleteGiveaway);
+router.get('/', getGiveaways);
+router.get('/winners', getWinners);
+router.post('/winners/:id', isAdmin, setWinners);
+router.get('/:id', getSingleGiveaway);
+router.post('/participate/:id', isAuth, participate);
+module.exports = router;

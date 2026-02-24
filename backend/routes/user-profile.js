@@ -1,0 +1,11 @@
+const express = require('express');
+const router = express.Router();
+const isAdmin = require('../middleware/isAdmin');
+const isAuth = require('../middleware/isAuth');
+const { myProfile, updateProfile, changePassword } = require('./../controller/userprofileController');
+router.get('/', isAuth, myProfile);
+router.patch('/update', isAuth, updateProfile);
+router.patch('/change-pass', isAuth, changePassword);
+// router.get('/:id', getSingleGiveaway);
+// router.post('/participate/:id', isAuth, participate);
+module.exports = router;

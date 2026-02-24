@@ -1,0 +1,440 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogFooter,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import {
+    XCircle,
+    Search,
+    Shield,
+    ShieldOff,
+    Trash2,
+    Eye,
+    Users,
+    Chrome,
+    RefreshCw,
+    Filter,
+} from "lucide-react";
+import api from "@/app/utils/apiClient";
+
+const TABS = [
+    { key: "all", label: "All Users" },
+    { key: "active", label: "Active" },
+    { key: "blocked", label: "Blocked" },
+];
+
+const UsersPage = () => {
+    const router = useRouter();
+    const { toast } = useToast();
+    const [users, setUsers] = useState([]);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [search, setSearch] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState("all");
+
+    // Unified dialog state (one dialog, no shared-state bug)
+    const [dialog, setDialog] = useState({ open: false, type: null, user: null });
+
+    const limit = 10;
+
+    const fetchUsers = useCallback(async (overridePage, overrideTab) => {
+        setLoading(true);
+        try {
+            const currentPage = overridePage ?? page;
+            const currentTab = overrideTab ?? activeTab;
+            let query = `page=${currentPage}&limit=${limit}`;
+            if (currentTab === "blocked") query += "&blocked=true";
+            if (currentTab === "active") query += "&blocked=false";
+
+            const response = await api.get(`admin/all-users?${query}`, {
+                meta: { auth: "admin" },
+            });
+            setUsers(response.data.data || []);
+            setTotal(response.data.total || 0);
+        } catch (error) {
+            if (error?.response?.status === 401) {
+                toast({
+                    title: "Session Expired",
+                    variant: "destructive",
+                    description: (
+                        <div className="flex items-center gap-2">
+                            <XCircle className="w-4 h-4" />
+                            <span>Please login again.</span>
+                        </div>
+                    ),
+                });
+                router.push("/admin/");
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [page, activeTab]);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [page, activeTab]);
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setPage(1);
+        setSearch("");
+    };
+
+    const handleSearch = async () => {
+        const trimmed = search.trim();
+        if (!trimmed) {
+            fetchUsers(1);
+            return;
+        }
+
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+        const isPhone = /^\d{10}$/.test(trimmed);
+
+        if (!isEmail && !isPhone) {
+            toast({
+                title: "Invalid Search",
+                variant: "destructive",
+                description: "Enter a valid email or 10-digit phone number.",
+            });
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const query = isEmail ? `email=${trimmed}` : `phone=${trimmed}`;
+            const response = await api.get(`admin/all-users?${query}`, {
+                meta: { auth: "admin" },
+            });
+            setUsers(response.data.data || []);
+            setTotal(response.data.total || 0);
+            setPage(1);
+        } catch {
+            toast({ title: "Search Failed", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const closeDialog = () => setDialog({ open: false, type: null, user: null });
+
+    const handleDelete = async () => {
+        try {
+            const { data } = await api.post(
+                "admin/users/del",
+                { userId: dialog.user._id },
+                { meta: { auth: "admin" } }
+            );
+            if (!data.error) {
+                toast({ title: "User Deleted", description: `${dialog.user.name} has been removed.` });
+                fetchUsers();
+            } else {
+                toast({ title: "Error", variant: "destructive", description: data.msg });
+            }
+        } catch {
+            toast({ title: "Error", variant: "destructive", description: "Delete failed." });
+        } finally {
+            closeDialog();
+        }
+    };
+
+    const handleBan = async (ban) => {
+        try {
+            const endpoint = ban ? "admin/users/ban" : "admin/users/unban";
+            const { data } = await api.post(
+                endpoint,
+                { userId: dialog.user._id },
+                { meta: { auth: "admin" } }
+            );
+            if (!data.error) {
+                toast({
+                    title: ban ? "User Blocked" : "User Unblocked",
+                    description: `${dialog.user.name} has been ${ban ? "blocked" : "unblocked"}.`,
+                });
+                fetchUsers();
+            } else {
+                toast({ title: "Error", variant: "destructive", description: data.msg });
+            }
+        } catch {
+            toast({ title: "Error", variant: "destructive" });
+        } finally {
+            closeDialog();
+        }
+    };
+
+    const totalPages = Math.ceil(total / limit);
+
+    return (
+        <div className="min-h-screen bg-black p-4 md:p-8">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-white">User Management</h1>
+                    <p className="text-sm text-neutral-500 mt-1">
+                        {total} total user{total !== 1 ? "s" : ""}
+                    </p>
+                </div>
+                <button
+                    onClick={() => fetchUsers()}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-sm"
+                >
+                    <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                    <span className="hidden md:block">Refresh</span>
+                </button>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-8 w-fit">
+                {TABS.map((tab) => (
+                    <button
+                        key={tab.key}
+                        onClick={() => handleTabChange(tab.key)}
+                        className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === tab.key
+                            ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
+                            : "text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.03]"
+                            }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Search */}
+            <div className="flex items-center gap-2 mb-5 max-w-md">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                    <Input
+                        placeholder="Search by email or phone..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                        className="pl-9 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 h-10"
+                    />
+                </div>
+                <Button
+                    onClick={handleSearch}
+                    disabled={loading}
+                    className="bg-white/[0.06] hover:bg-white/[0.1] text-white border-0 h-10"
+                >
+                    Search
+                </Button>
+            </div>
+
+            {/* Table */}
+            <div className="rounded-xl border border-white/[0.06] overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.02]">
+                            <TableHead className="text-neutral-400 font-medium">User</TableHead>
+                            <TableHead className="text-neutral-400 font-medium hidden md:table-cell">Phone</TableHead>
+                            <TableHead className="text-neutral-400 font-medium">Status</TableHead>
+                            <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Auth</TableHead>
+                            <TableHead className="text-neutral-400 font-medium hidden lg:table-cell">Joined</TableHead>
+                            <TableHead className="text-neutral-400 font-medium text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i} className="border-white/[0.04]">
+                                    <TableCell colSpan={6}>
+                                        <div className="h-5 w-full bg-white/[0.04] rounded animate-pulse" />
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : users.length > 0 ? (
+                            users.map((user) => (
+                                <TableRow
+                                    key={user._id}
+                                    className="border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+                                >
+                                    <TableCell>
+                                        <div>
+                                            <div className="text-sm font-medium text-white">{user.name}</div>
+                                            <div className="text-xs text-neutral-500 mt-0.5">{user.email}</div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="hidden md:table-cell text-sm text-neutral-400">
+                                        {user.phone && !user.phone.startsWith("google_") ? user.phone : (
+                                            <span className="text-neutral-600 italic text-xs">not set</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.blocked
+                                            ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                                            : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                            }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${user.blocked ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} />
+                                            {user.blocked ? "Blocked" : "Active"}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="hidden lg:table-cell">
+                                        {user.isGoogleAuth ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-amber-600/10 text-amber-400 border border-amber-600/20">
+                                                <Chrome className="w-3 h-3" />
+                                                Google
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-neutral-500">Email</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="hidden lg:table-cell text-xs text-neutral-500">
+                                        {user.createdAt
+                                            ? new Date(user.createdAt).toLocaleDateString("en-IN", {
+                                                day: "numeric", month: "short", year: "numeric"
+                                            })
+                                            : "—"}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                onClick={() => router.push(`/admin/dashboard/users/${user._id}`)}
+                                                title="View Profile"
+                                                className="p-2 rounded-lg hover:bg-white/[0.06] text-neutral-500 hover:text-white transition-all"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {user.blocked ? (
+                                                <button
+                                                    onClick={() => setDialog({ open: true, type: "unban", user })}
+                                                    title="Unblock User"
+                                                    className="p-2 rounded-lg hover:bg-emerald-600/10 text-neutral-500 hover:text-emerald-400 transition-all"
+                                                >
+                                                    <Shield className="w-4 h-4" />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setDialog({ open: true, type: "ban", user })}
+                                                    title="Block User"
+                                                    className="p-2 rounded-lg hover:bg-amber-600/10 text-neutral-500 hover:text-amber-400 transition-all"
+                                                >
+                                                    <ShieldOff className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setDialog({ open: true, type: "delete", user })}
+                                                title="Delete User"
+                                                className="p-2 rounded-lg hover:bg-red-600/10 text-neutral-500 hover:text-red-400 transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-12">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <Users className="w-10 h-10 text-neutral-700" />
+                                        <span className="text-neutral-500 text-sm">No users found</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-4">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                        disabled={page === 1 || loading}
+                        className="bg-white/[0.04] hover:bg-white/[0.08] text-neutral-300 border-white/[0.06]"
+                    >
+                        Previous
+                    </Button>
+                    <span className="text-sm text-neutral-500">
+                        Page {page} of {totalPages}
+                    </span>
+                    <Button
+                        variant="secondary"
+                        onClick={() => setPage((prev) => (prev < totalPages ? prev + 1 : prev))}
+                        disabled={page === totalPages || loading}
+                        className="bg-white/[0.04] hover:bg-white/[0.08] text-neutral-300 border-white/[0.06]"
+                    >
+                        Next
+                    </Button>
+                </div>
+            )}
+
+            {/* Unified Confirmation Dialog */}
+            <Dialog open={dialog.open} onOpenChange={(open) => !open && closeDialog()}>
+                <DialogContent className="bg-zinc-950 border border-white/[0.08] text-white">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {dialog.type === "delete" && "Delete User"}
+                            {dialog.type === "ban" && "Block User"}
+                            {dialog.type === "unban" && "Unblock User"}
+                        </DialogTitle>
+                        <DialogDescription className="text-neutral-400">
+                            {dialog.type === "delete" &&
+                                `Are you sure you want to permanently delete ${dialog.user?.name}? This action cannot be undone.`}
+                            {dialog.type === "ban" &&
+                                `Block ${dialog.user?.name}? They will not be able to login or participate in giveaways.`}
+                            {dialog.type === "unban" &&
+                                `Unblock ${dialog.user?.name}? They will regain full access to the platform.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="secondary"
+                            onClick={closeDialog}
+                            className="bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 border-0"
+                        >
+                            Cancel
+                        </Button>
+                        {dialog.type === "delete" && (
+                            <Button
+                                onClick={handleDelete}
+                                className="bg-red-600 hover:bg-red-700 text-white border-0"
+                            >
+                                Delete
+                            </Button>
+                        )}
+                        {dialog.type === "ban" && (
+                            <Button
+                                onClick={() => handleBan(true)}
+                                className="bg-amber-600 hover:bg-amber-700 text-white border-0"
+                            >
+                                Block User
+                            </Button>
+                        )}
+                        {dialog.type === "unban" && (
+                            <Button
+                                onClick={() => handleBan(false)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+                            >
+                                Unblock User
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+};
+
+export default UsersPage;

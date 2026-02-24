@@ -1,0 +1,124 @@
+
+Running 4 tests using 1 worker
+
+[1A[2K[1/4] [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity
+[1A[2K  1) [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity 
+
+    Error: [2mexpect([22m[31mpage[39m[2m).[22mtoHaveURL[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Expected: [32m"http://localhost:3000/admin[7m/dashboard[27m"[39m
+    Received: [31m"http://localhost:3000/admin"[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveURL" with timeout 5000ms[22m
+    [2m    9 × unexpected value "http://localhost:3000/admin"[22m
+
+
+      19 |         await page.click('button:has-text("Access Dashboard")');
+      20 |
+    > 21 |         await expect(page).toHaveURL(`${BASE_URL}/admin/dashboard`);
+         |                            ^
+      22 |         console.log('✅ Admin Login Passed');
+      23 |
+      24 |         // Sidebar Interactivity
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:21:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--9ba29-n-and-Sidebar-Interactivity-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/full-workflow-Dorrka-Full--9ba29-n-and-Sidebar-Interactivity-chromium/error-context.md
+
+
+[1A[2K[2/4] [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI
+[1A[2K  2) [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('a:has-text("Add Giveaway")')[22m
+
+
+      43 |         await page.click('button:has-text("Access Dashboard")');
+      44 |
+    > 45 |         await page.click('a:has-text("Add Giveaway")');
+         |                    ^
+      46 |         await expect(page).toHaveURL(`${BASE_URL}/admin/dashboard/add`);
+      47 |
+      48 |         const eventTitle = `E2E-TEST-${Date.now()}`;
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:45:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--be41e-te-Giveaway-with-Premium-UI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/full-workflow-Dorrka-Full--be41e-te-Giveaway-with-Premium-UI-chromium/error-context.md
+
+
+[1A[2K[3/4] [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance
+[1A[2K  3) [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.hover: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.custom-scrollbar').nth(1)[22m
+
+
+       95 |         // Wait for modal and scroll
+       96 |         const scrollContainer = page.locator('.custom-scrollbar').nth(1); // Usually second one is in modal
+    >  97 |         await scrollContainer.hover();
+          |                               ^
+       98 |         await page.mouse.wheel(0, 2000);
+       99 |
+      100 |         const acceptBtn = page.locator('button:has-text("I Agree to Terms")');
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:97:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--803ef-n-Flow-and-Terms-Acceptance-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/full-workflow-Dorrka-Full--803ef-n-Flow-and-Terms-Acceptance-chromium/error-context.md
+
+
+[1A[2K[4/4] [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation
+[1A[2K  4) [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('text=OneMoreGift')
+    Expected: visible
+    Error: strict mode violation: locator('text=OneMoreGift') resolved to 4 elements:
+        1) <span class="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight whitespace-nowrap">…</span> aka getByRole('navigation').getByText('OneMoreGift')
+        2) <span class="text-2xl font-bold text-white">…</span> aka getByRole('contentinfo').getByText('OneMoreGift', { exact: true })
+        3) <span>contact@onemoregift.in</span> aka getByRole('link', { name: 'contact@onemoregift.in' })
+        4) <p class="text-neutral-600 text-sm text-center md:text-left">…</p> aka getByText('© 2026 OneMoreGift. All')
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('text=OneMoreGift')[22m
+
+
+      115 |
+      116 |         // Check for specific brand elements
+    > 117 |         await expect(page.locator('text=OneMoreGift')).toBeVisible();
+          |                                                        ^
+      118 |
+      119 |         // Navigation links
+      120 |         await page.click('text=Winners');
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:117:56
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--bab60-ic-Home-Page-and-Navigation-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/full-workflow-Dorrka-Full--bab60-ic-Home-Page-and-Navigation-chromium/error-context.md
+
+
+[1A[2K  4 failed
+    [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity 
+    [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI 
+    [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance 
+    [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation 

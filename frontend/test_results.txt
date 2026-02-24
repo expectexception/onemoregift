@@ -1,0 +1,102 @@
+
+Running 4 tests using 4 workers
+
+  ✘  3 [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity (4.2s)
+  ✘  4 [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation (4.0s)
+  ✘  1 [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI (4.3s)
+  ✘  2 [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance (4.4s)
+
+
+  1) [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity 
+
+    Test was interrupted.
+
+    Error: page.goto: Test ended.
+    Call log:
+    [2m  - navigating to "http://localhost:3000/", waiting until "load"[22m
+
+
+       8 |     test.beforeEach(async ({ page }) => {
+       9 |         // Ensure we handle hydration or other loading states gracefully
+    > 10 |         await page.goto(BASE_URL);
+         |                    ^
+      11 |     });
+      12 |
+      13 |     test('Administrator: Authentication and Sidebar Interactivity', async ({ page }) => {
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:10:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--9ba29-n-and-Sidebar-Interactivity-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI 
+
+    Test was interrupted.
+
+    Error: page.goto: Test ended.
+    Call log:
+    [2m  - navigating to "http://localhost:3000/", waiting until "load"[22m
+
+
+       8 |     test.beforeEach(async ({ page }) => {
+       9 |         // Ensure we handle hydration or other loading states gracefully
+    > 10 |         await page.goto(BASE_URL);
+         |                    ^
+      11 |     });
+      12 |
+      13 |     test('Administrator: Authentication and Sidebar Interactivity', async ({ page }) => {
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:10:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--be41e-te-Giveaway-with-Premium-UI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance 
+
+    Test was interrupted.
+
+    Error: page.goto: Test ended.
+    Call log:
+    [2m  - navigating to "http://localhost:3000/", waiting until "load"[22m
+
+
+       8 |     test.beforeEach(async ({ page }) => {
+       9 |         // Ensure we handle hydration or other loading states gracefully
+    > 10 |         await page.goto(BASE_URL);
+         |                    ^
+      11 |     });
+      12 |
+      13 |     test('Administrator: Authentication and Sidebar Interactivity', async ({ page }) => {
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:10:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--803ef-n-Flow-and-Terms-Acceptance-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation 
+
+    Test was interrupted.
+
+    Error: page.goto: Test ended.
+    Call log:
+    [2m  - navigating to "http://localhost:3000/", waiting until "load"[22m
+
+
+       8 |     test.beforeEach(async ({ page }) => {
+       9 |         // Ensure we handle hydration or other loading states gracefully
+    > 10 |         await page.goto(BASE_URL);
+         |                    ^
+      11 |     });
+      12 |
+      13 |     test('Administrator: Authentication and Sidebar Interactivity', async ({ page }) => {
+        at /home/null/Desktop/kashish/giveaway-main/tests/full-workflow.spec.js:10:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/full-workflow-Dorrka-Full--bab60-ic-Home-Page-and-Navigation-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4 interrupted
+    [chromium] › tests/full-workflow.spec.js:13:5 › Dorrka Full Workflow Verification › Administrator: Authentication and Sidebar Interactivity 
+    [chromium] › tests/full-workflow.spec.js:39:5 › Dorrka Full Workflow Verification › Administrator: Create Giveaway with Premium UI 
+    [chromium] › tests/full-workflow.spec.js:83:5 › Dorrka Full Workflow Verification › User: Registration Flow and Terms Acceptance 
+    [chromium] › tests/full-workflow.spec.js:112:5 › Dorrka Full Workflow Verification › Public: Home Page and Navigation 

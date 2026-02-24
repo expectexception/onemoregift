@@ -1,0 +1,72 @@
+
+Running 2 tests using 2 workers
+
+✅ Admin Authentication Verified
+✅ Navigation to Creation Engine Verified
+  ✘  2 [chromium] › tests/system-verification.spec.js:8:5 › Dorrka Admin & User System Verification › Full Giveaway Lifecycle Verification (30.2s)
+  ✘  1 [chromium] › tests/system-verification.spec.js:72:5 › Dorrka Admin & User System Verification › Sidebar Interaction & Visual States (30.2s)
+
+
+  1) [chromium] › tests/system-verification.spec.js:8:5 › Dorrka Admin & User System Verification › Full Giveaway Lifecycle Verification 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('button:has-text("Confirm")')[22m
+    [2m    - locator resolved to <button type="button" class="text-[9px] font-black text-white bg-red-600 px-3 py-1 rounded-full uppercase tracking-widest hover:bg-red-500 transition-colors">Confirm</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not stable[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+    [2m    - element is not stable[22m
+    [2m  - retrying click action[22m
+    [2m    - waiting 100ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+    [2m  - element was detached from the DOM, retrying[22m
+
+
+      47 |         await page.click('button:has-text("10")'); // Hour 10
+      48 |         await page.click('button:has-text("00")'); // Minute 00
+    > 49 |         await page.click('button:has-text("Confirm")');
+         |                    ^
+      50 |
+      51 |         await page.click('button:has-text("Select Time") >> nth=0'); // Second one (Termination)
+      52 |         await page.click('button:has-text("20")'); // Hour 20
+        at /home/null/Desktop/kashish/giveaway-main/tests/system-verification.spec.js:49:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/system-verification-Dorrka-9d067-away-Lifecycle-Verification-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/system-verification-Dorrka-9d067-away-Lifecycle-Verification-chromium/error-context.md
+
+  2) [chromium] › tests/system-verification.spec.js:72:5 › Dorrka Admin & User System Verification › Sidebar Interaction & Visual States 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('button:has-text("ChevronLeft")')[22m
+
+
+      81 |
+      82 |         // Check if tooltip appears for collapsed state
+    > 83 |         await page.click('button:has-text("ChevronLeft")', { force: true }); // Depending on icon name or hidden label
+         |                    ^
+      84 |         await dashboardLink.hover();
+      85 |
+      86 |         console.log('✅ Sidebar Interactivity Verified');
+        at /home/null/Desktop/kashish/giveaway-main/tests/system-verification.spec.js:83:20
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/system-verification-Dorrka-7c52b-r-Interaction-Visual-States-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/system-verification-Dorrka-7c52b-r-Interaction-Visual-States-chromium/error-context.md
+
+  2 failed
+    [chromium] › tests/system-verification.spec.js:8:5 › Dorrka Admin & User System Verification › Full Giveaway Lifecycle Verification 
+    [chromium] › tests/system-verification.spec.js:72:5 › Dorrka Admin & User System Verification › Sidebar Interaction & Visual States 
