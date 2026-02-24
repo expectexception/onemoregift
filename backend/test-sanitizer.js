@@ -5,9 +5,9 @@ const options = {
     noSql: true
 };
 
-const password = "ExpExc@1998$";
+const password = "OneMoreGift@2026";
 const payload = {
-    email: "test@example.com",
+    email: "expectexception@gmail.com",
     password: password
 };
 
@@ -19,6 +19,15 @@ const next = () => { };
 // sanitizer.clean returns a middleware
 const middleware = sanitizer.clean(options);
 middleware(req, res, next);
+
+console.log("Original Email:", payload.email);
+console.log("Sanitized Email:", req.body.email);
+
+if (payload.email !== req.body.email) {
+    console.log("❌ CRITICAL: The sanitizer changed the email!");
+} else {
+    console.log("✅ The sanitizer did not change the email.");
+}
 
 console.log("Original Password:", password);
 console.log("Sanitized Password:", req.body.password);

@@ -107,7 +107,7 @@ const login = async (req, res) => {
         console.log(`Admin login attempt for: [${email}]`);
 
         const trimmedEmail = email ? email.trim().toLowerCase() : "";
-        let user = await Admin.findOne({ email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') } });
+        let user = await Admin.findOne({ email: trimmedEmail });
 
         if (!user) {
             console.log(`Admin not found: [${trimmedEmail}]`);

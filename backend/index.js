@@ -45,12 +45,6 @@ app.use(rateLimit({
     legacyHeaders: false,
 }));
 app.use(mongoSanitize());
-app.use(
-    sanitizer.clean({
-        xss: true,
-        noSql: true
-    })
-);
 //Static
 app.use(express.static('public'))
 app.use('/api/v1/auth', auth);
