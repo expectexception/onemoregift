@@ -1,3 +1,4 @@
+"use client";
 // layouts/AdminLayout.js
 import { useState } from 'react';
 import AdminSidebar from '../../components/AdminSidebar';
