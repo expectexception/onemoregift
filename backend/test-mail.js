@@ -16,13 +16,13 @@ async function testMail() {
 
     const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // Use SSL
+        port: 587,
+        secure: false, // Use STARTTLS
         auth: {
             user: MAIL_USER,
             pass: MAIL_APP_PASSWORD,
         },
-        connectionTimeout: 10000, // 10 seconds timeout
+        connectionTimeout: 10000,
     });
 
     try {
