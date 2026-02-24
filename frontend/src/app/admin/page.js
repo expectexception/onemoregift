@@ -107,8 +107,8 @@ export default function AdminLoginForm() {
                                 OneMore<span className="text-gradient">Gift</span>
                             </span>
                         </div>
-                        <h1 className="text-xl font-semibold text-neutral-300 mt-2">Admin Control Center</h1>
-                        <p className="text-sm text-neutral-500">Secure access for platform administrators</p>
+                        <h1 className="text-xl font-semibold text-neutral-300 mt-2">Admin Login</h1>
+                        <p className="text-sm text-neutral-500">Sign in to manage the platform</p>
                     </div>
                 </div>
 
@@ -169,7 +169,7 @@ export default function AdminLoginForm() {
                     <div className="pt-6 border-t border-white/[0.06] text-center">
                         <p className="text-[10px] text-neutral-600 uppercase tracking-widest font-semibold flex items-center justify-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            End-to-End Encrypted Session
+                            Secure Admin Session
                         </p>
                     </div>
                 </form>

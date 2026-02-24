@@ -83,7 +83,10 @@ export default function AdminSidebar() {
             {mounted && mobileWidth && (
                 <button
                     onClick={toggleMobileMenu}
-                    className="fixed top-6 left-6 z-[60] w-12 h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-900/40 border border-red-500/20 active:scale-95 transition-all"
+                    className={cn(
+                        "fixed top-6 z-[60] w-12 h-12 rounded-2xl bg-red-600 flex items-center justify-center text-white shadow-lg shadow-red-900/40 border border-red-500/20 active:scale-95 transition-all",
+                        isMobileOpen ? "left-[215px]" : "left-6"
+                    )}
                 >
                     {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>
@@ -108,20 +111,20 @@ export default function AdminSidebar() {
                 {/* Branding Area */}
                 <div className="h-24 flex items-center px-6 border-b border-white/[0.04]">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shrink-0 shadow-lg shadow-red-900/20 shadow-inner">
-                        <span className="text-white font-black italic text-xl">D</span>
+                        <span className="text-white font-black italic text-xl">A</span>
                     </div>
-                    {mounted && !isCollapsed && !mobileWidth && (
+                    {(mounted && !isCollapsed && !mobileWidth) || (mobileWidth && isMobileOpen) ? (
                         <div className="ml-4 animate-in fade-in slide-in-from-left-2 duration-500">
-                            <h1 className="text-white font-black italic tracking-tighter text-lg uppercase leading-none">Dorrka</h1>
-                            <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-[0.2em]">Matrix Admin</span>
+                            <h1 className="text-white font-black italic tracking-tighter text-lg uppercase leading-none">Admin</h1>
+                            <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-[0.2em]">Management</span>
                         </div>
-                    )}
+                    ) : null}
                 </div>
 
                 {/* Navigation */}
                 <div className="flex-1 px-3 py-6 overflow-y-auto custom-scrollbar">
                     <Nav
-                        isCollapsed={mobileWidth ? true : isCollapsed}
+                        isCollapsed={mobileWidth ? false : isCollapsed}
                         links={navLinks}
                     />
                 </div>
@@ -143,7 +146,7 @@ export default function AdminSidebar() {
                     <div className="p-6 border-t border-white/[0.04] animate-in fade-in duration-700">
                         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
                             <p className="text-[9px] text-neutral-600 font-bold uppercase tracking-widest text-center">
-                                Protocol Version 4.0.2
+                                OneMoreGift System
                             </p>
                         </div>
                     </div>

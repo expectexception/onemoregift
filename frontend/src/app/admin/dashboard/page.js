@@ -134,12 +134,12 @@ function DashboardPage() {
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
-                                Admin <span className="text-gradient">Control</span>
+                                Admin <span className="text-gradient">Dashboard</span>
                             </h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                                 <p className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-widest leading-none">
-                                    System Online • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    System Ready • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </p>
                             </div>
                         </div>
@@ -152,7 +152,7 @@ function DashboardPage() {
                         className="self-start md:self-center flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-red-600/10 hover:border-red-600/40 transition-all duration-300 text-neutral-400 hover:text-red-400 font-bold text-[10px] md:text-xs uppercase tracking-widest group leading-none"
                     >
                         <LogOut className="w-3 h-3 md:w-4 md:h-4 group-hover:-translate-x-1 transition-transform" />
-                        <span>Terminate Session</span>
+                        <span>Logout</span>
                     </button>
                 </div>
 
@@ -161,7 +161,7 @@ function DashboardPage() {
                     <div className="flex items-center gap-3 mb-6">
                         <Activity className="w-4 h-4 text-red-500" />
                         <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                            Global Telemetry
+                            Dashboard Overview
                         </h3>
                         <div className="flex-1 h-px bg-white/[0.06]" />
                     </div>
@@ -216,7 +216,7 @@ function DashboardPage() {
                         <div className="flex items-center gap-3 mb-2">
                             <Database className="w-4 h-4 text-red-500" />
                             <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                                Command Center
+                                Quick Actions
                             </h3>
                             <div className="flex-1 h-px bg-white/[0.06]" />
                         </div>
@@ -234,7 +234,7 @@ function DashboardPage() {
                         <div className="flex items-center gap-3 mb-2">
                             <TrendingUp className="w-4 h-4 text-emerald-500" />
                             <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                                Analytics Hub
+                                Dashboard Insights
                             </h3>
                             <div className="flex-1 h-px bg-white/[0.06]" />
                         </div>
@@ -245,7 +245,7 @@ function DashboardPage() {
                                 <div className="space-y-4">
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-tighter">Engagement Velocity</span>
+                                            <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-tighter">Community Activity</span>
                                             <span className="text-xs font-black text-white">{loading ? "—" : activeUsers} Active</span>
                                         </div>
                                         <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
@@ -262,7 +262,7 @@ function DashboardPage() {
                                             <span className="text-md font-black text-red-500">{loading ? "—" : `${blockRate}%`}</span>
                                         </div>
                                         <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-0.5">
-                                            <span className="text-[8px] font-bold text-neutral-600 uppercase">Mesh Auth</span>
+                                            <span className="text-[8px] font-bold text-neutral-600 uppercase">External Auth</span>
                                             <span className="text-md font-black text-amber-500">{loading ? "—" : `${googleAuthRate}%`}</span>
                                         </div>
                                     </div>
@@ -270,7 +270,7 @@ function DashboardPage() {
 
                                 <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between">
                                     <div>
-                                        <span className="text-[8px] font-bold text-neutral-600 uppercase block mb-0.5">Entry Activity</span>
+                                        <span className="text-[8px] font-bold text-neutral-600 uppercase block mb-0.5">Participation</span>
                                         <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
                                             <TrendingUp className="w-3 h-3" />
                                             +{data.recentParticipations ?? 0} Joins (7D)
