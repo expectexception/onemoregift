@@ -115,7 +115,11 @@ export default function UserLoginForm() {
                 toast({ title: "Failed", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Failed", description: "Could not send OTP. Try again.", variant: "destructive" });
+            toast({
+                title: "Failed",
+                description: error?.response?.data?.msg || "Could not send OTP. Try again.",
+                variant: "destructive"
+            });
         } finally {
             setOtpLoading(false);
         }

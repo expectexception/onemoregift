@@ -50,7 +50,10 @@ const signUserToken = (user) => {
 };
 
 const sendEmailFallback = async ({ to, subject, html }) => {
-    if (!MAIL_USER || !MAIL_APP_PASSWORD) return false;
+    if (!MAIL_USER || !MAIL_APP_PASSWORD) {
+        console.error('Email Fallback Error: MAIL_USER or MAIL_APP_PASSWORD not configured');
+        return false;
+    }
 
     const transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -60,17 +63,23 @@ const sendEmailFallback = async ({ to, subject, html }) => {
         },
     });
 
-    await transporter.sendMail({
-        from: `OneMoreGift <${MAIL_USER}>`,
-        to,
-        subject,
-        html,
-    });
-
-    return true;
+    try {
+        await transporter.sendMail({
+            from: `OneMoreGift <${MAIL_USER}>`,
+            to,
+            subject,
+            html,
+        });
+        console.log(`Fallback Email sent successfully to: ${to}`);
+        return true;
+    } catch (error) {
+        console.error('Fallback SMTP Error:', error.message);
+        return false;
+    }
 };
 
 const sendEmail = async ({ to, subject, html }) => {
+    console.log(`Attempting to send email to: ${to} | Subject: ${subject}`);
     if (BREVO_API_KEY) {
         try {
             await axios.post('https://api.brevo.com/v3/smtp/email', {
@@ -85,18 +94,15 @@ const sendEmail = async ({ to, subject, html }) => {
                     'content-type': 'application/json',
                 },
             });
+            console.log('Email sent via Brevo successfully');
             return true;
         } catch (error) {
             console.error('Brevo mail failed:', error?.response?.data || error.message);
         }
     }
 
-    try {
-        return await sendEmailFallback({ to, subject, html });
-    } catch (error) {
-        console.error('Fallback mail failed:', error.message);
-        return false;
-    }
+    console.log('Using Gmail fallback for email...');
+    return await sendEmailFallback({ to, subject, html });
 };
 
 const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!DOCTYPE html>
@@ -277,12 +283,14 @@ const requestOtp = async (req, res) => {
         });
 
         if (!sent) {
-            return res.status(500).json({ error: true, msg: 'Failed to send OTP email' });
+            console.error(`Failed to send OTP email to ${email}`);
+            return res.status(500).json({ error: true, msg: 'Failed to send OTP email due to server configuration' });
         }
 
         return res.status(200).json({ error: false, msg: 'OTP sent successfully' });
     } catch (error) {
-        return res.status(500).json({ error: true, msg: 'Failed to request OTP' });
+        console.error('requestOtp Exception:', error);
+        return res.status(500).json({ error: true, msg: 'Failed to request OTP: internal error' });
     }
 };
 
