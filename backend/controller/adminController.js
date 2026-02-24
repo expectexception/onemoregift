@@ -101,16 +101,24 @@ const register = async (req, res) => {
 const login = async (req, res) => {
     try {
         let { email, password } = req.body;
-        let user = await Admin.findOne({ email: email })
+        console.log(`Admin login attempt for: [${email}]`);
+
+        const trimmedEmail = email ? email.trim().toLowerCase() : "";
+        let user = await Admin.findOne({ email: { $regex: new RegExp(`^${trimmedEmail}$`, 'i') } });
+
         if (!user) {
+            console.log(`Admin not found: [${trimmedEmail}]`);
             return res.status(401).json({ error: true, msg: "Please try to login with correct credentials" });
         }
+
         const passwordCompare = await bcrypt.compare(password, user.password);
         if (!passwordCompare) {
+            console.log(`Admin password mismatch for: [${trimmedEmail}]`);
             return res
                 .status(401)
                 .json({ error: true, msg: "Please try to login with correct credentials" });
         }
+        console.log(`Admin login successful: [${trimmedEmail}]`);
         const data = {
             user: {
                 id: user.id,
