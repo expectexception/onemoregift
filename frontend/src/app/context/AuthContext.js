@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import api from "../utils/apiClient";
 
 const AuthContext = createContext(null);
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
         setAdmin(null);
     };
 
-    const refreshUserSession = async () => {
+    const refreshUserSession = useCallback(async () => {
         try {
             const { data } = await api.get("auth/me", {
                 meta: { auth: "user", skipAuthRedirect: true },
@@ -34,9 +34,9 @@ export function AuthProvider({ children }) {
         } finally {
             setLoadingUser(false);
         }
-    };
+    }, []);
 
-    const refreshAdminSession = async () => {
+    const refreshAdminSession = useCallback(async () => {
         try {
             const { data } = await api.get("admin/me", {
                 meta: { auth: "admin", skipAuthRedirect: true },
@@ -49,25 +49,25 @@ export function AuthProvider({ children }) {
         } finally {
             setLoadingAdmin(false);
         }
-    };
+    }, []);
 
-    const logoutUser = async () => {
+    const logoutUser = useCallback(async () => {
         try {
             await api.post("auth/logout", {}, { meta: { skipAuthRedirect: true } });
         } catch (error) {
         } finally {
             clearUserSession();
         }
-    };
+    }, []);
 
-    const logoutAdmin = async () => {
+    const logoutAdmin = useCallback(async () => {
         try {
             await api.post("admin/logout", {}, { meta: { skipAuthRedirect: true } });
         } catch (error) {
         } finally {
             clearAdminSession();
         }
-    };
+    }, []);
 
     useEffect(() => {
         const hasUserToken = Boolean(localStorage.getItem("token"));
@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
         } else {
             setLoadingAdmin(false);
         }
-    }, []);
+    }, [refreshAdminSession, refreshUserSession]);
 
     const value = useMemo(() => ({
         user,
@@ -99,7 +99,7 @@ export function AuthProvider({ children }) {
         logoutAdmin,
         setUser,
         setAdmin,
-    }), [user, admin, loadingUser, loadingAdmin]);
+    }), [user, admin, loadingUser, loadingAdmin, refreshUserSession, refreshAdminSession, logoutUser, logoutAdmin]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

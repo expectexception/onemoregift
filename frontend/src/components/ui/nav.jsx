@@ -30,28 +30,22 @@ export function Nav({ links, isCollapsed }) {
                                     <Link
                                         href={link.href}
                                         className={cn(
-                                            "relative group/item h-12 w-12 flex items-center justify-center rounded-xl transition-all duration-300",
+                                            "relative group/item h-11 w-11 flex items-center justify-center rounded-md transition-colors",
                                             isActive
-                                                ? "bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.3)]"
-                                                : "text-neutral-500 hover:text-white hover:bg-white/[0.05]"
+                                                ? "bg-red-600 text-white"
+                                                : "text-neutral-500 hover:text-white hover:bg-white/[0.06]"
                                         )}
                                     >
                                         <link.icon className={cn(
-                                            "h-5 w-5 transition-transform duration-300",
-                                            !isActive && "group-hover/item:scale-110"
+                                            "h-5 w-5"
                                         )} />
-
-                                        {/* Hover Glow Background */}
-                                        {!isActive && (
-                                            <div className="absolute inset-0 bg-red-600/0 group-hover/item:bg-red-600/5 rounded-xl transition-colors duration-300" />
-                                        )}
 
                                         <span className="sr-only">{link.title}</span>
                                     </Link>
                                 </TooltipTrigger>
                                 <TooltipContent
                                     side="right"
-                                    className="bg-black border-white/[0.08] text-white font-bold uppercase text-[10px] tracking-widest px-3 py-1.5 rounded-lg backdrop-blur-xl shadow-2xl"
+                                    className="bg-[#111] border-white/10 text-white text-xs px-3 py-1.5 rounded-md shadow-xl"
                                 >
                                     {link.title}
                                 </TooltipContent>
@@ -61,24 +55,23 @@ export function Nav({ links, isCollapsed }) {
                                 key={index}
                                 href={link.href}
                                 className={cn(
-                                    "relative flex h-12 items-center px-4 rounded-xl transition-all duration-300 group/item overflow-hidden",
+                                    "relative flex h-11 items-center px-3 rounded-md transition-colors group/item overflow-hidden",
                                     isActive
-                                        ? "bg-white/[0.03] border border-white/[0.06] text-white shadow-inner"
+                                        ? "bg-white/[0.06] border border-white/10 text-white"
                                         : "text-neutral-500 hover:text-white hover:bg-white/[0.05]"
                                 )}
                             >
-                                {/* Left Active/Hover Accent */}
                                 <div className={cn(
-                                    "absolute left-0 top-1/4 bottom-1/4 w-1 bg-red-600 rounded-r-full transition-all duration-500 transform",
-                                    isActive ? "opacity-100 scale-y-100 shadow-[0_0_10px_rgba(220,38,38,0.8)]" : "opacity-0 scale-y-0 group-hover/item:opacity-50 group-hover/item:scale-y-75"
+                                    "absolute left-0 top-2 bottom-2 w-1 bg-red-500 rounded-r-full transition-opacity",
+                                    isActive ? "opacity-100" : "opacity-0 group-hover/item:opacity-50"
                                 )} />
 
                                 <link.icon className={cn(
-                                    "mr-3 h-5 w-5 shrink-0 transition-transform duration-300",
-                                    isActive ? "text-red-500" : "group-hover/item:scale-110 group-hover/item:text-neutral-200"
+                                    "mr-3 h-5 w-5 shrink-0",
+                                    isActive ? "text-red-400" : "group-hover/item:text-neutral-200"
                                 )} />
 
-                                <span className="text-xs font-black uppercase tracking-widest italic leading-none transition-colors duration-300">
+                                <span className="text-sm font-medium leading-none transition-colors duration-300">
                                     {link.title}
                                 </span>
 
@@ -89,11 +82,6 @@ export function Nav({ links, isCollapsed }) {
                                     )}>
                                         {link.label}
                                     </span>
-                                )}
-
-                                {/* Premium Hover Sweep Effect */}
-                                {!isActive && (
-                                    <div className="absolute inset-0 bg-gradient-to-r from-red-600/0 via-red-600/[0.01] to-red-600/0 translate-x-[-100%] group-hover/item:translate-x-[100%] transition-transform duration-1000" />
                                 )}
                             </Link>
                         );

@@ -33,7 +33,7 @@ export default function withAdminAuth(Component, options = {}) {
             if (!loadingAdmin && !adminAuthenticated) {
                 router.replace(redirectTo);
             }
-        }, [loadingAdmin, adminAuthenticated, redirectTo, router]);
+        }, [loadingAdmin, adminAuthenticated, router]);
 
         if (loadingAdmin) {
             return <SessionLoader label={loadingLabel} />;

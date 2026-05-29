@@ -1,321 +1,241 @@
-// pages/dashboard.js
-"use client"
+"use client";
+
 import {
+    Activity,
+    ArrowRight,
+    BarChart3,
+    Chrome,
+    Database,
     Gift,
     LogOut,
-    Users,
     ShieldOff,
-    Chrome,
-    UserCheck,
     TrendingUp,
-    ChevronRight,
-    Database,
-    Activity,
-    ShieldCheck,
+    UserCheck,
+    Users,
 } from "lucide-react";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "../../../components/ui/card"
-import { Button } from "@/components/ui/button";
-import { useState, useEffect, useRef } from "react";
-import withAdminAuth from "../../components/withAdminAuth"
+import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import withAdminAuth from "../../components/withAdminAuth";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import api from "@/app/utils/apiClient";
 
 function DashboardPage() {
-    let [data, setData] = useState({});
+    const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const { logoutAdmin } = useAuth();
-    const containerRef = useRef(null);
 
-    // Cursor glow effect
     useEffect(() => {
-        const handleMouseMove = (e) => {
-            if (!containerRef.current) return;
-            const { clientX, clientY } = e;
-            const { left, top } = containerRef.current.getBoundingClientRect();
-            containerRef.current.style.setProperty('--x', `${clientX - left}px`);
-            containerRef.current.style.setProperty('--y', `${clientY - top}px`);
+        let mounted = true;
+
+        async function getData() {
+            try {
+                setLoading(true);
+                const { data } = await api.get("admin/", {
+                    meta: { auth: "admin" },
+                });
+                if (mounted) setData(data);
+            } catch (error) {
+                console.error("Dashboard data fetch failed:", error);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        }
+
+        getData();
+        return () => {
+            mounted = false;
         };
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
     }, []);
 
-    let getData = async () => {
-        try {
-            setLoading(true);
-            const { data } = await api.get(`admin/`, {
-                meta: { auth: "admin" },
-            });
-            setData(data);
-        } catch (error) {
-            console.error("Dashboard data fetch failed:", error);
-        } finally {
-            setLoading(false);
-        }
-    }
+    const metrics = useMemo(() => {
+        const totalUsers = data.users ?? 0;
+        const blockedUsers = data.blockedUsers ?? 0;
+        const activeUsers = Math.max(totalUsers - blockedUsers, 0);
+        return {
+            activeUsers,
+            blockRate: totalUsers > 0 ? ((blockedUsers / totalUsers) * 100).toFixed(1) : "0",
+            googleAuthRate: totalUsers > 0 ? (((data.googleUsers ?? 0) / totalUsers) * 100).toFixed(1) : "0",
+            activePercent: totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 100,
+        };
+    }, [data]);
 
-    useEffect(() => {
-        getData()
-    }, [])
+    const statCards = [
+        { label: "Total Users", value: data.users, detail: "Registered accounts", icon: Users, tone: "text-sky-300 bg-sky-500/10 border-sky-400/20" },
+        { label: "Giveaways", value: data.giveaways, detail: "Created campaigns", icon: Gift, tone: "text-violet-300 bg-violet-500/10 border-violet-400/20" },
+        { label: "Blocked Users", value: data.blockedUsers, detail: "Restricted accounts", icon: ShieldOff, tone: "text-rose-300 bg-rose-500/10 border-rose-400/20" },
+        { label: "Google Auth", value: data.googleUsers, detail: "External sign-ins", icon: Chrome, tone: "text-amber-300 bg-amber-500/10 border-amber-400/20" },
+        { label: "7 Day Growth", value: data.recentUsers, detail: "New users", icon: TrendingUp, tone: "text-emerald-300 bg-emerald-500/10 border-emerald-400/20" },
+    ];
 
-    const StatCard = ({ icon: Icon, label, value, color, subtext, gradient }) => (
-        <Card className="relative overflow-hidden border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-500 group">
-            <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-[0.05] transition-opacity duration-500`} />
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/[0.02] rounded-full blur-2xl group-hover:bg-white/[0.05] transition-colors duration-500" />
-
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                <CardTitle className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.15em]">{label}</CardTitle>
-                <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center shadow-lg shadow-black/20 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                    <Icon className="w-5 h-5 text-white" />
-                </div>
-            </CardHeader>
-            <CardContent className="relative z-10">
-                <div className="text-3xl font-bold text-white mb-1 tracking-tight group-hover:text-gradient transition-all duration-300">
-                    {loading ? (
-                        <div className="h-9 w-20 bg-white/[0.06] rounded-lg animate-pulse" />
-                    ) : (
-                        value ?? 0
-                    )}
-                </div>
-                {subtext && <p className="text-[11px] text-neutral-500 font-medium flex items-center gap-1.5 font-mono">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500/50" />
-                    {subtext}
-                </p>}
-            </CardContent>
-        </Card>
-    );
-
-    const QuickLink = ({ label, href, icon: Icon, delay }) => (
-        <button
-            onClick={() => router.push(href)}
-            style={{ animationDelay: delay }}
-            className="flex items-center justify-between w-full p-4 rounded-2xl border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/[0.12] hover:shadow-2xl hover:shadow-black transition-all duration-300 group animate-fade-in relative overflow-hidden"
-        >
-            <div className="absolute inset-0 bg-gradient-to-r from-red-600/0 via-red-600/[0.02] to-red-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-
-            <div className="flex items-center gap-4 relative z-10">
-                <div className="w-11 h-11 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center group-hover:bg-red-600 group-hover:border-red-500 transition-all duration-300 shadow-inner">
-                    <Icon className="w-5 h-5 text-neutral-400 group-hover:text-white group-hover:scale-110 transition-all" />
-                </div>
-                <div className="flex flex-col items-start px-1">
-                    <span className="text-sm text-neutral-300 font-bold group-hover:text-white transition-colors tracking-wide underline-offset-4 group-hover:underline decoration-red-500/30">{label}</span>
-                    <span className="text-[10px] text-neutral-600 uppercase tracking-tighter group-hover:text-neutral-400 transition-colors">Action Required</span>
-                </div>
-            </div>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/[0.03] border border-white/[0.06] group-hover:bg-white/[0.08] group-hover:border-white/[0.12] transition-all relative z-10">
-                <ChevronRight className="w-4 h-4 text-neutral-600 group-hover:text-red-400 group-hover:translate-x-0.5 transition-all" />
-            </div>
-        </button>
-    );
-
-    const activeUsers = (data.users ?? 0) - (data.blockedUsers ?? 0);
-    const blockRate = data.users > 0 ? ((data.blockedUsers / data.users) * 100).toFixed(1) : "0";
-    const googleAuthRate = data.users > 0 ? ((data.googleUsers / data.users) * 100).toFixed(1) : "0";
+    const quickLinks = [
+        { label: "Users", detail: "Review accounts and access", href: "/admin/dashboard/users", icon: Users },
+        { label: "Giveaways", detail: "Manage active campaigns", href: "/admin/dashboard/giveaways", icon: Gift },
+        { label: "Winners", detail: "Review winner selections", href: "/admin/dashboard/winners", icon: UserCheck },
+        { label: "Add Giveaway", detail: "Create a new campaign", href: "/admin/dashboard/add", icon: TrendingUp },
+        { label: "Settings", detail: "Platform configuration", href: "/admin/dashboard/settings", icon: Database },
+    ];
 
     return (
-        <div ref={containerRef} className="flex flex-col min-h-screen bg-black relative overflow-hidden cursor-glow-container">
-            {/* Background elements */}
-            <div className="absolute inset-0 section-gradient opacity-40 pointer-events-none" />
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/5 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />
-
-            <div className="flex-col space-y-8 p-6 md:p-10 relative z-10 overflow-y-auto max-h-screen">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 animate-slide-down">
-                    <div className="flex items-center gap-5">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-xl shadow-red-900/20 border border-red-500/20">
-                            <ShieldCheck className="text-white w-7 h-7" />
+        <div className="min-h-screen bg-[#070707] text-white">
+            <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+                <header className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10">
+                            <Activity className="h-6 w-6 text-red-300" />
                         </div>
-                        <div className="flex flex-col">
-                            <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white uppercase italic">
-                                Admin <span className="text-gradient">Dashboard</span>
-                            </h2>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                <p className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-widest leading-none">
-                                    System Ready • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                            </div>
+                        <div>
+                            <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
+                                Admin Dashboard
+                            </h1>
+                            <p className="mt-1 text-sm text-neutral-400">
+                                Platform overview for {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </p>
                         </div>
                     </div>
+
                     <button
                         onClick={async () => {
                             await logoutAdmin();
-                            router.push('/admin/');
+                            router.push("/admin/");
                         }}
-                        className="self-start md:self-center flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-red-600/10 hover:border-red-600/40 transition-all duration-300 text-neutral-400 hover:text-red-400 font-bold text-[10px] md:text-xs uppercase tracking-widest group leading-none"
+                        className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-neutral-200 transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-white md:w-auto"
                     >
-                        <LogOut className="w-3 h-3 md:w-4 md:h-4 group-hover:-translate-x-1 transition-transform" />
-                        <span>Logout</span>
+                        <LogOut className="h-4 w-4" />
+                        Logout
                     </button>
-                </div>
+                </header>
 
-                {/* Stats Grid */}
-                <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <Activity className="w-4 h-4 text-red-500" />
-                        <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                            Dashboard Overview
-                        </h3>
-                        <div className="flex-1 h-px bg-white/[0.06]" />
-                    </div>
-                    <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                        <StatCard
-                            icon={Users}
-                            label="Total Users"
-                            value={data.users}
-                            color="bg-blue-600"
-                            gradient="from-blue-600/30 to-cyan-600/10"
-                            subtext="Live Directory"
-                        />
-                        <StatCard
-                            icon={Gift}
-                            label="Giveaways"
-                            value={data.giveaways}
-                            color="bg-purple-600"
-                            gradient="from-purple-600/30 to-pink-600/10"
-                            subtext="Active Pools"
-                        />
-                        <StatCard
-                            icon={ShieldOff}
-                            label="Blocked"
-                            value={data.blockedUsers}
-                            color="bg-red-600"
-                            gradient="from-red-600/30 to-orange-600/10"
-                            subtext="Restricted Area"
-                        />
-                        <StatCard
-                            icon={Chrome}
-                            label="Google Auth"
-                            value={data.googleUsers}
-                            color="bg-amber-600"
-                            gradient="from-amber-600/30 to-yellow-600/10"
-                            subtext="Externally Verified"
-                        />
-                        <StatCard
-                            icon={TrendingUp}
-                            label="7D Growth"
-                            value={data.recentUsers}
-                            color="bg-emerald-600"
-                            gradient="from-emerald-600/30 to-teal-600/10"
-                            subtext="New Arrivals"
-                        />
-                    </div>
-                </div>
-
-                {/* Main Content Area */}
-                <div className="grid gap-8 lg:grid-cols-12 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                    {/* Navigation Container */}
-                    <div className="lg:col-span-12 xl:col-span-8 space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                            <Database className="w-4 h-4 text-red-500" />
-                            <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                                Quick Actions
-                            </h3>
-                            <div className="flex-1 h-px bg-white/[0.06]" />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <QuickLink label="User Directory" href="/admin/dashboard/users" icon={Users} delay="0.1s" />
-                            <QuickLink label="Giveaway Engine" href="/admin/dashboard/giveaways" icon={Gift} delay="0.2s" />
-                            <QuickLink label="Winner Selection" href="/admin/dashboard/winners" icon={UserCheck} delay="0.3s" />
-                            <QuickLink label="Draft Giveaway" href="/admin/dashboard/add" icon={TrendingUp} delay="0.4s" />
-                            <QuickLink label="Global Config" href="/admin/dashboard/settings" icon={Database} delay="0.5s" />
-                        </div>
-                    </div>
-
-                    {/* Analytics & Performance */}
-                    <div className="lg:col-span-12 xl:col-span-4 space-y-6 flex flex-col">
-                        <div className="flex items-center gap-3 mb-2">
-                            <TrendingUp className="w-4 h-4 text-emerald-500" />
-                            <h3 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
-                                Dashboard Insights
-                            </h3>
-                            <div className="flex-1 h-px bg-white/[0.06]" />
-                        </div>
-
-                        <div className="flex-1 space-y-4">
-                            {/* Platform Health */}
-                            <div className="premium-card rounded-2xl border border-white/[0.06] bg-white/[0.01] p-5 space-y-5 hover:bg-white/[0.02] transition-colors duration-500">
-                                <div className="space-y-4">
-                                    <div className="flex flex-col gap-1.5">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-extrabold text-neutral-500 uppercase tracking-tighter">Community Activity</span>
-                                            <span className="text-xs font-black text-white">{loading ? "—" : activeUsers} Active</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                                                style={{ width: `${loading ? 0 : data.users > 0 ? ((activeUsers / data.users) * 100) : 100}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-0.5">
-                                            <span className="text-[8px] font-bold text-neutral-600 uppercase">Block Ratio</span>
-                                            <span className="text-md font-black text-red-500">{loading ? "—" : `${blockRate}%`}</span>
-                                        </div>
-                                        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-col gap-0.5">
-                                            <span className="text-[8px] font-bold text-neutral-600 uppercase">External Auth</span>
-                                            <span className="text-md font-black text-amber-500">{loading ? "—" : `${googleAuthRate}%`}</span>
-                                        </div>
-                                    </div>
+                <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                    {statCards.map(({ label, value, detail, icon: Icon, tone }) => (
+                        <Card key={label} className="rounded-lg border-white/10 bg-[#111111] shadow-none">
+                            <CardHeader className="flex flex-row items-start justify-between gap-3 p-5 pb-3">
+                                <div>
+                                    <CardTitle className="text-sm font-medium text-neutral-400">{label}</CardTitle>
+                                    <p className="mt-1 text-xs text-neutral-500">{detail}</p>
                                 </div>
-
-                                <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between">
-                                    <div>
-                                        <span className="text-[8px] font-bold text-neutral-600 uppercase block mb-0.5">Participation</span>
-                                        <span className="text-xs font-black text-emerald-400 flex items-center gap-1">
-                                            <TrendingUp className="w-3 h-3" />
-                                            +{data.recentParticipations ?? 0} Joins (7D)
-                                        </span>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-full border border-emerald-500/20 bg-emerald-500/5 flex items-center justify-center">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                    </div>
+                                <div className={`flex h-10 w-10 items-center justify-center rounded-md border ${tone}`}>
+                                    <Icon className="h-5 w-5" />
                                 </div>
-                            </div>
+                            </CardHeader>
+                            <CardContent className="p-5 pt-0">
+                                {loading ? (
+                                    <div className="h-9 w-20 animate-pulse rounded-md bg-white/10" />
+                                ) : (
+                                    <div className="text-3xl font-semibold tabular-nums text-white">{value ?? 0}</div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ))}
+                </section>
 
-                            {/* Top Performing Events */}
-                            <div className="premium-card rounded-2xl border border-white/[0.06] bg-white/[0.01] p-5 hover:bg-white/[0.02] transition-colors duration-500">
-                                <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4">Top Performing Contests</h4>
-                                <div className="space-y-3">
-                                    {loading ? (
-                                        [1, 2, 3].map(i => <div key={i} className="h-10 w-full bg-white/[0.03] rounded-xl animate-pulse" />)
-                                    ) : (
-                                        data.topGiveaways?.length > 0 ? (
-                                            data.topGiveaways.map((g, idx) => (
-                                                <div
-                                                    key={g._id}
-                                                    onClick={() => router.push(`/admin/dashboard/giveaways/${g._id}`)}
-                                                    className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1] transition-all cursor-pointer group"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-[10px] font-black text-neutral-700">#{idx + 1}</span>
-                                                        <span className="text-xs font-bold text-neutral-300 group-hover:text-white truncate max-w-[120px]">{g.title}</span>
-                                                    </div>
-                                                    <span className="text-[10px] font-black bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20">
-                                                        {g.participantCount} Joins
-                                                    </span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-[10px] text-neutral-600 italic">No entry data synced yet</p>
-                                        )
-                                    )}
-                                </div>
+                <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-lg font-semibold text-white">Quick Actions</h2>
+                                <p className="text-sm text-neutral-500">Common admin workflows</p>
                             </div>
                         </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                            {quickLinks.map(({ label, detail, href, icon: Icon }) => (
+                                <button
+                                    key={label}
+                                    onClick={() => router.push(href)}
+                                    className="flex min-h-[88px] items-center justify-between gap-4 rounded-lg border border-white/10 bg-[#111111] p-4 text-left transition-colors hover:border-white/20 hover:bg-[#171717]"
+                                >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-neutral-300">
+                                            <Icon className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold text-white">{label}</p>
+                                            <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{detail}</p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="h-4 w-4 shrink-0 text-neutral-500" />
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
+
+                    <aside className="space-y-4">
+                        <Card className="rounded-lg border-white/10 bg-[#111111] shadow-none">
+                            <CardHeader className="p-5 pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
+                                    <BarChart3 className="h-4 w-4 text-emerald-300" />
+                                    Account Health
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-5 p-5 pt-0">
+                                <div>
+                                    <div className="mb-2 flex items-center justify-between text-sm">
+                                        <span className="text-neutral-400">Active users</span>
+                                        <span className="font-medium text-white">{loading ? "..." : `${metrics.activeUsers} active`}</span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                                        <div
+                                            className="h-full rounded-full bg-emerald-400 transition-all"
+                                            style={{ width: `${loading ? 0 : metrics.activePercent}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-md border border-white/10 bg-black/20 p-3">
+                                        <p className="text-xs text-neutral-500">Block Rate</p>
+                                        <p className="mt-1 text-xl font-semibold text-rose-300">{loading ? "..." : `${metrics.blockRate}%`}</p>
+                                    </div>
+                                    <div className="rounded-md border border-white/10 bg-black/20 p-3">
+                                        <p className="text-xs text-neutral-500">Google Auth</p>
+                                        <p className="mt-1 text-xl font-semibold text-amber-300">{loading ? "..." : `${metrics.googleAuthRate}%`}</p>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-md border border-white/10 bg-black/20 p-3">
+                                    <p className="text-xs text-neutral-500">Participation, last 7 days</p>
+                                    <p className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-300">
+                                        <TrendingUp className="h-4 w-4" />
+                                        +{data.recentParticipations ?? 0} joins
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="rounded-lg border-white/10 bg-[#111111] shadow-none">
+                            <CardHeader className="p-5 pb-3">
+                                <CardTitle className="text-base font-semibold text-white">Top Giveaways</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 p-5 pt-0">
+                                {loading ? (
+                                    [1, 2, 3].map((item) => <div key={item} className="h-11 animate-pulse rounded-md bg-white/10" />)
+                                ) : data.topGiveaways?.length > 0 ? (
+                                    data.topGiveaways.map((giveaway, index) => (
+                                        <button
+                                            key={giveaway._id}
+                                            onClick={() => router.push(`/admin/dashboard/giveaways/${giveaway._id}`)}
+                                            className="flex w-full items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-left hover:bg-white/[0.04]"
+                                        >
+                                            <span className="min-w-0 truncate text-sm text-neutral-200">
+                                                {index + 1}. {giveaway.title}
+                                            </span>
+                                            <span className="shrink-0 rounded bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
+                                                {giveaway.participantCount} joins
+                                            </span>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-neutral-500">No giveaway activity yet.</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </aside>
+                </section>
             </div>
         </div>
-    )
+    );
 }
+
 export default withAdminAuth(DashboardPage);

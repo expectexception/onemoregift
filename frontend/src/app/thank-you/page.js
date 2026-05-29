@@ -3,59 +3,64 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Link from "next/link";
 import { useEffect } from "react";
-import confetti from "canvas-confetti";
 import { HiCheckCircle, HiArrowLeft, HiGift } from "react-icons/hi";
 
 export default function ThankYou() {
     useEffect(() => {
-        // Advanced Premium Fireworks Celebration
-        const duration = 5000;
-        const animationEnd = Date.now() + duration;
-        const defaults = {
-            startVelocity: 30,
-            spread: 360,
-            ticks: 60,
-            zIndex: 9999,
-            colors: ['#dc2626', '#991b1b', '#fbbf24', '#f59e0b', '#ffffff', '#10b981', '#34d399']
-        };
+        let interval;
+        import("canvas-confetti").then((module) => {
+            const confetti = module.default;
+            // Advanced Premium Fireworks Celebration
+            const duration = 5000;
+            const animationEnd = Date.now() + duration;
+            const defaults = {
+                startVelocity: 30,
+                spread: 360,
+                ticks: 60,
+                zIndex: 9999,
+                colors: ['#dc2626', '#991b1b', '#fbbf24', '#f59e0b', '#ffffff', '#10b981', '#34d399']
+            };
 
-        const randomInRange = (min, max) => Math.random() * (max - min) + min;
+            const randomInRange = (min, max) => Math.random() * (max - min) + min;
 
-        // Massive initial launch
-        confetti({
-            ...defaults,
-            particleCount: 150,
-            spread: 100,
-            origin: { y: 0.6, x: 0.5 },
-            startVelocity: 55
-        });
-
-        // Continuous random firework bursts
-        const interval = setInterval(function () {
-            const timeLeft = animationEnd - Date.now();
-
-            if (timeLeft <= 0) {
-                return clearInterval(interval);
-            }
-
-            const particleCount = 50 * (timeLeft / duration);
-
-            // Left burst
+            // Massive initial launch
             confetti({
                 ...defaults,
-                particleCount,
-                origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.6, x: 0.5 },
+                startVelocity: 55
             });
-            // Right burst
-            confetti({
-                ...defaults,
-                particleCount,
-                origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-            });
-        }, 250);
+
+            // Continuous random firework bursts
+            interval = setInterval(function () {
+                const timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                const particleCount = 50 * (timeLeft / duration);
+
+                // Left burst
+                confetti({
+                    ...defaults,
+                    particleCount,
+                    origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+                });
+                // Right burst
+                confetti({
+                    ...defaults,
+                    particleCount,
+                    origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+                });
+            }, 250);
+        }).catch(err => console.error("Failed to load confetti", err));
 
         // Cleanup interval on unmount
-        return () => clearInterval(interval);
+        return () => {
+            if (interval) clearInterval(interval);
+        };
     }, []);
 
     return (

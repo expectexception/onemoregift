@@ -65,8 +65,8 @@ function Page() {
             <div className="max-w-7xl mx-auto p-4 md:p-10 animate-fade-in">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">Giveaways & Winners</h1>
-                        <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">View past giveaways and their winners</p>
+                        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white ">Giveaways & Winners</h1>
+                        <p className="text-[10px] text-neutral-500 font-bold  tracking-widest mt-1">View past giveaways and their winners</p>
                     </div>
                 </div>
 
@@ -81,7 +81,7 @@ function Page() {
                             className="premium-input pl-10 h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-xl text-xs"
                         />
                     </div>
-                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.2em] pl-1">
+                    <div className="text-[10px] font-semibold text-neutral-600  tracking-wide pl-1">
                         {loading ? 'Refreshing data...' : `${filtered.length} Giveaways Found`}
                     </div>
                 </div>
@@ -99,7 +99,7 @@ function Page() {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />
                                 <div className="absolute top-4 right-4">
-                                    <span className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-bold text-red-400 border border-red-400/20 flex items-center gap-1.5 uppercase tracking-wider">
+                                    <span className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[10px] font-bold text-red-400 border border-red-400/20 flex items-center gap-1.5  tracking-wider">
                                         <Trophy className="w-3 h-3" />
                                         {g.winners?.length || 0} Winners
                                     </span>
@@ -116,14 +116,14 @@ function Page() {
 
                                 <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.04] mb-6">
                                     <div className="space-y-1">
-                                        <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest block">Start Date</span>
+                                        <span className="text-[10px] text-neutral-600 font-bold  tracking-widest block">Start Date</span>
                                         <span className="text-xs text-neutral-300 flex items-center gap-1.5">
                                             <Calendar className="w-3 h-3 text-neutral-500" />
                                             {formatDateTime(g.startDate).split(',')[0]}
                                         </span>
                                     </div>
                                     <div className="space-y-1">
-                                        <span className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest block">Participants</span>
+                                        <span className="text-[10px] text-neutral-600 font-bold  tracking-widest block">Participants</span>
                                         <span className="text-xs text-neutral-300 flex items-center gap-1.5">
                                             <Users className="w-3 h-3 text-neutral-500" />
                                             {g.maxParticipants} Max
@@ -132,7 +132,7 @@ function Page() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <div className="text-[10px] text-neutral-600 font-bold  tracking-widest flex items-center gap-2">
                                         <Trophy className="w-3 h-3 text-red-500" />
                                         Recent Winners
                                     </div>
@@ -144,7 +144,7 @@ function Page() {
                                                 </Link>
                                             ))
                                         ) : (
-                                            <span className="text-xs text-neutral-600 italic">Winners not announced yet</span>
+                                            <span className="text-xs text-neutral-600">Winners not announced yet</span>
                                         )}
                                         {g.winners?.length > 4 && (
                                             <span className="px-2.5 py-1 text-xs text-neutral-500 font-medium">+{g.winners.length - 4} more</span>

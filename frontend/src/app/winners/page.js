@@ -101,8 +101,8 @@ function WinnerCard({ giveaway, delay }) {
             {/* Image */}
             <div className="relative h-48 bg-neutral-900 flex items-center justify-center">
                 <Image
-                    src={giveaway.image}
-                    alt={giveaway.title}
+                    src={giveaway.image || "/images/gift.png"}
+                    alt={giveaway.title || "Giveaway"}
                     width={160}
                     height={160}
                     className="object-contain"

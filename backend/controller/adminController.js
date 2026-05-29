@@ -345,14 +345,17 @@ const getUserById = async (req, res) => {
     try {
         let { userId } = req.params;
         if (!userId) {
-            return res.status(200).json({ error: true, msg: "UserId is required.." })
+            return res.status(400).json({ error: true, msg: "UserId is required.." })
         }
         let getUser = await Users.findById(userId).select('-password');
+        if (!getUser) {
+            return res.status(404).json({ error: true, msg: "User not found" });
+        }
         let joinedGiveaways = await JoinedGiveaway.countDocuments({ user: userId });
         let wonGiveaways = await JoinedGiveaway.countDocuments({ user: userId, won: true });
         return res.status(200).json({ error: false, data: getUser, joinedGiveaways, wonGiveaways });
     } catch (error) {
-        return res.status(200).json({ error: true, msg: "Something went wrong.." })
+        return res.status(500).json({ error: true, msg: "Something went wrong.." })
     }
 }
 const getAllGiveaways = async (req, res) => {

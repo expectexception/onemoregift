@@ -77,16 +77,16 @@ test.describe('Dorrka Full Event Lifecycle (User & Admin)', () => {
         await page.fill('#prizeValue', '5000');
 
         await page.screenshot({ path: 'debug-pre-deployment.png' });
-        console.log('--- Attempting Initiate Deployment ---');
+        console.log('--- Attempting Create Giveaway ---');
 
         // Ensure we are at the bottom
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         await page.waitForTimeout(500);
 
-        const deployBtn = page.getByRole('button', { name: 'Initiate Deployment' });
+        const deployBtn = page.getByRole('button', { name: 'Create Giveaway' });
         await expect(deployBtn).toBeEnabled();
         await deployBtn.click({ force: true });
-        console.log('--- Clicked Initiate Deployment ---');
+        console.log('--- Clicked Create Giveaway ---');
 
         await page.waitForURL('**/admin/dashboard/giveaways', { timeout: 30000 });
         console.log('✅ Admin: Giveaway Created');
@@ -144,7 +144,10 @@ test.describe('Dorrka Full Event Lifecycle (User & Admin)', () => {
         await page.click('button:has-text("Next")');
 
         // Step 2: Address
-        await page.fill('textarea[name="address"]', '123 E2E Street, Cyber City');
+        await page.fill('input[placeholder="Address Line 1"]', '123 E2E Street, Cyber City');
+        await page.selectOption('select >> nth=0', 'IN');
+        await page.selectOption('select >> nth=1', 'Delhi');
+        await page.fill('input[placeholder="Pincode / Zipcode"]', '110001');
         await page.click('button:has-text("Next")');
 
         // Step 3: CAPTCHA (Bypass logic)
@@ -152,9 +155,25 @@ test.describe('Dorrka Full Event Lifecycle (User & Admin)', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
         });
 
+        // Wait for altcha-widget to be attached to DOM
+        await page.waitForSelector('altcha-widget');
+
+        // Simulate Altcha verification event to trigger the validation logic
+        await page.evaluate(() => {
+            const widget = document.querySelector('altcha-widget');
+            if (widget) {
+                widget.dispatchEvent(new CustomEvent('verified', { detail: { payload: 'dummy-payload' } }));
+            }
+        });
+
         // Force join via programmatic interaction
         console.log('--- Triggering Final Submission ---');
-        await page.waitForTimeout(2000); // Wait for profile update toast and state sync
+        
+        // Wait for the button to become enabled (since verify-captcha API call is async)
+        await page.waitForFunction(() => {
+            const btn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Submit Entry'));
+            return btn && !btn.disabled;
+        }, { timeout: 10000 });
 
         const submitVisible = await page.getByRole('button', { name: 'Submit Entry' }).isVisible();
         const submitEnabled = await page.getByRole('button', { name: 'Submit Entry' }).isEnabled();

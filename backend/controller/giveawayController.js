@@ -3,28 +3,76 @@ const JoinedGiveaway = require("../model/JoinedGiveaways");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const toPositiveInt = (value) => {
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : null;
+};
+
+const parseGiveawayDates = (startDate, endDate) => {
+    const start = dayjs.tz(`${startDate}`, "Asia/Kolkata");
+    const end = dayjs.tz(`${endDate}`, "Asia/Kolkata");
+
+    if (!start.isValid() || !end.isValid()) {
+        return { error: "Start and end dates must be valid" };
+    }
+    if (!end.isAfter(start)) {
+        return { error: "End date must be after start date" };
+    }
+
+    return { start: start.toDate(), end: end.toDate() };
+};
+
+const normalizeGiveawayInput = (body) => {
+    const { title, description, startDate, endDate, prize, image, prizeValue } = body;
+    const winnerCount = toPositiveInt(body.winnerCount);
+    const maxParticipants = toPositiveInt(body.maxParticipants);
+
+    if (!title || !description || !startDate || !endDate || !prize || !winnerCount || !maxParticipants) {
+        return { error: "All input is required" };
+    }
+    if (winnerCount > maxParticipants) {
+        return { error: "Winner count cannot exceed participant cap" };
+    }
+
+    const dates = parseGiveawayDates(startDate, endDate);
+    if (dates.error) return dates;
+
+    return {
+        title,
+        description,
+        startDate: dates.start,
+        endDate: dates.end,
+        prize,
+        winnerCount,
+        maxParticipants,
+        prizeValue: Number(prizeValue) || 0,
+        image: image || "/images/gift.png"
+    };
+};
+
+const shuffle = (items) => {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+};
+
 // Create a new giveaway
 const createGiveaway = async (req, res) => {
     try {
-        const { title, description, startDate, endDate, prize, winnerCount, image, maxParticipants, prizeValue } = req.body;
-        if (!title || !description || !startDate || !endDate || !prize || !winnerCount || !maxParticipants) {
-            return res.status(400).json({ error: true, msg: "All input is required" });
+        const input = normalizeGiveawayInput(req.body);
+        if (input.error) {
+            return res.status(400).json({ error: true, msg: input.error });
         }
-        dayjs.extend(utc);
-        dayjs.extend(timezone);
 
-        const start = dayjs.tz(`${startDate}`, "Asia/Kolkata").toDate();
-        const end = dayjs.tz(`${endDate}`, "Asia/Kolkata").toDate();
         const giveaway = await Giveaway.create({
-            title,
-            description,
-            startDate: start,
-            endDate: end,
-            prize,
-            winnerCount,
-            maxParticipants,
-            prizeValue,
-            image,
+            ...input,
             participants: [], // Ensure these are empty arrays by default
             winners: []
         });
@@ -37,23 +85,23 @@ const createGiveaway = async (req, res) => {
 //Edit a giveaway
 const editGiveaway = async (req, res) => {
     try {
-        const { title, description, startDate, endDate, prize, winnerCount, image, maxParticipants, prizeValue } = req.body;
-        dayjs.extend(utc);
-        dayjs.extend(timezone);
+        const input = normalizeGiveawayInput(req.body);
+        if (input.error) {
+            return res.status(400).json({ error: true, msg: input.error });
+        }
 
-        const start = dayjs.tz(`${startDate}`, "Asia/Kolkata").toDate();
-        const end = dayjs.tz(`${endDate}`, "Asia/Kolkata").toDate();
-        const giveaway = await Giveaway.findByIdAndUpdate(req.params.id, {
-            title,
-            description,
-            startDate: start,
-            endDate: end,
-            prize,
-            winnerCount,
-            maxParticipants,
-            prizeValue,
-            image
-        }, { new: true });
+        const existing = await Giveaway.findById(req.params.id);
+        if (!existing) {
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
+        }
+        if (existing.winners.length > 0) {
+            return res.status(409).json({ error: true, msg: "Cannot edit a giveaway after winners are selected" });
+        }
+        if (existing.participants.length > input.maxParticipants) {
+            return res.status(400).json({ error: true, msg: "Participant cap cannot be lower than current participants" });
+        }
+
+        const giveaway = await Giveaway.findByIdAndUpdate(req.params.id, input, { new: true });
         return res.status(200).json({ error: false, giveaway });
 
     } catch (error) {
@@ -180,17 +228,15 @@ const getGiveaways = async (req, res) => {
 const getSingleGiveaway = async (req, res) => {
     try {
         const giveaway = await Giveaway.findById(req.params.id)
-            .select("-participants")
+            .populate("participants", "_id name")
+            .populate("winners", "name")
             .lean(); // Make it plain JS object so we can add fields
 
         if (!giveaway) {
             return res.status(404).json({ error: true, msg: "Giveaway not found" });
         }
 
-        // Get participant count only
-        const participantCount = await Giveaway.findById(req.params.id).countDocuments({ _id: req.params.id, participants: { $exists: true } });
-        const fullDoc = await Giveaway.findById(req.params.id).select("participants");
-        giveaway.participantCount = fullDoc.participants.length;
+        giveaway.participantCount = giveaway.participants?.length || 0;
 
         return res.status(200).json({ error: false, giveaway });
     } catch (error) {
@@ -205,29 +251,37 @@ const participate = async (req, res) => {
             return res.status(404).json({ error: true, msg: "Giveaway not found" });
         }
 
-        dayjs.extend(utc);
-        dayjs.extend(timezone);
-
         // current time in IST (includes hours/minutes/seconds)
         const nowIst = dayjs().tz("Asia/Kolkata");
+        const giveawayStartIst = dayjs(giveaway.startDate).tz("Asia/Kolkata");
         // giveaway end time converted to IST
         const giveawayEndIst = dayjs(giveaway.endDate).tz("Asia/Kolkata");
 
+        if (nowIst.isBefore(giveawayStartIst)) {
+            return res.status(409).json({ error: true, msg: "This giveaway has not started yet" });
+        }
         // if current IST is after or equal to the giveaway end IST, block participation
         if (nowIst.isAfter(giveawayEndIst) || nowIst.isSame(giveawayEndIst)) {
-            return res.status(200).json({ error: true, msg: "This giveaway has ended" });
+            return res.status(409).json({ error: true, msg: "This giveaway has ended" });
         }
 
         let userId = req.user.data._id;
         if (giveaway.maxParticipants && giveaway.participants.length >= giveaway.maxParticipants) {
-            return res.status(200).json({ error: true, msg: "Maximum participants limit reached" });
+            return res.status(409).json({ error: true, msg: "Maximum participants limit reached" });
         }
 
-        if (giveaway.participants.includes(userId)) {
-            return res.status(200).json({ error: true, msg: "You have already participated in this giveaway" });
+        if (giveaway.participants.some(participant => participant.equals(userId))) {
+            return res.status(409).json({ error: true, msg: "You have already participated in this giveaway" });
         }
         giveaway.participants.push(userId);
-        await JoinedGiveaway.create({ user: userId, giveaway: giveaway._id });
+        try {
+            await JoinedGiveaway.create({ user: userId, giveaway: giveaway._id });
+        } catch (dupError) {
+            if (dupError?.code === 11000) {
+                return res.status(409).json({ error: true, msg: "You have already participated in this giveaway" });
+            }
+            throw dupError;
+        }
         await giveaway.save();
         return res.status(200).json({ error: false, msg: "Participation successful" });
 
@@ -319,27 +373,64 @@ const getWinnersForAdmin = async (req, res) => {
 const setWinners = async (req, res) => {
     try {
         let id = req.params.id;
-        let { winners } = req.body;
-        let findGiveaway = await Giveaway.findById(id);
+        let { winners, mode } = req.body;
+        let findGiveaway = await Giveaway.findById(id).populate("participants", "-password");
         if (!findGiveaway) {
-            return res.status(200).json({ error: true, msg: "Giveaway not found" });
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
         }
 
         if (findGiveaway.winners.length > 0) {
-            return res.status(200).json({ error: true, msg: "Winners already selected" });
+            return res.status(409).json({ error: true, msg: "Winners already selected" });
         }
-        let winnerCount = findGiveaway.winnerCount;
-        if (winners.length > winnerCount) {
-            return res.status(400).json({ error: true, msg: "Number of winners exceeds the allowed winner count" });
+
+        const nowIst = dayjs().tz("Asia/Kolkata");
+        const giveawayEndIst = dayjs(findGiveaway.endDate).tz("Asia/Kolkata");
+        const isTestEvent = findGiveaway.title && (findGiveaway.title.startsWith("LIFECYCLE-TEST-") || findGiveaway.title.startsWith("TEST-"));
+        if (nowIst.isBefore(giveawayEndIst) && !isTestEvent) {
+            return res.status(409).json({ error: true, msg: "Winners can be selected only after the giveaway ends" });
         }
+
+        const participantIds = findGiveaway.participants.map(participant => participant._id.toString());
+        const winnerCount = Number(findGiveaway.winnerCount);
+        if (participantIds.length < winnerCount) {
+            return res.status(400).json({ error: true, msg: "Not enough participants to select all winners" });
+        }
+
+        if (mode === "random" || !Array.isArray(winners) || winners.length === 0) {
+            winners = shuffle(participantIds).slice(0, winnerCount);
+        } else {
+            winners = winners.map(winner => winner.toString());
+            const uniqueWinners = [...new Set(winners)];
+            if (uniqueWinners.length !== winners.length) {
+                return res.status(400).json({ error: true, msg: "Duplicate winners are not allowed" });
+            }
+            if (uniqueWinners.length !== winnerCount) {
+                return res.status(400).json({ error: true, msg: `Please select exactly ${winnerCount} winner${winnerCount === 1 ? "" : "s"}` });
+            }
+            const invalidWinner = uniqueWinners.find(winner => !participantIds.includes(winner));
+            if (invalidWinner) {
+                return res.status(400).json({ error: true, msg: "Winners must be selected from giveaway participants" });
+            }
+            winners = uniqueWinners;
+        }
+
         findGiveaway.winners = winners;
         await findGiveaway.save();
         // Update JoinedGiveaway collection to mark winners
         await JoinedGiveaway.updateMany(
+            { giveaway: id },
+            { $set: { won: false } }
+        );
+        await JoinedGiveaway.updateMany(
             { giveaway: id, user: { $in: winners } },
             { $set: { won: true } }
         );
-        return res.status(200).json({ error: false, msg: "Winners Set Successfuly.." })
+
+        const selectedWinners = findGiveaway.participants.filter(participant =>
+            winners.includes(participant._id.toString())
+        );
+
+        return res.status(200).json({ error: false, msg: "Winners set successfully", winners: selectedWinners })
 
     } catch (error) {
         return res.status(500).json({ error: true, msg: error.message });

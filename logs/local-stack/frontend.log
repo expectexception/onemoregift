@@ -1,0 +1,104 @@
+   ▲ Next.js 15.5.18
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.31.125:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1777ms
+ ○ Compiling / ...
+ ✓ Compiled / in 6.3s (1232 modules)
+ GET / 200 in 7059ms
+ ✓ Compiled in 238ms (481 modules)
+ ○ Compiling /register ...
+ ✓ Compiled /register in 1681ms (1223 modules)
+ GET /register 200 in 2592ms
+ GET / 200 in 154ms
+ GET / 200 in 84ms
+ ○ Compiling /my-profile ...
+ ✓ Compiled /my-profile in 1965ms (1250 modules)
+ GET /my-profile 200 in 2297ms
+ GET /my-profile 200 in 579ms
+ ○ Compiling /my-profile/edit ...
+ ✓ Compiled /my-profile/edit in 1389ms (1271 modules)
+ GET /my-profile/edit 200 in 1572ms
+ GET /my-profile 200 in 508ms
+ GET / 200 in 187ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1812ms (1278 modules)
+ GET /login 200 in 2123ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1392ms (1289 modules)
+ GET /admin 200 in 1723ms
+ ○ Compiling /admin/dashboard ...
+ ✓ Compiled /admin/dashboard in 4s (1339 modules)
+ GET /admin/dashboard 200 in 4262ms
+ ○ Compiling /admin/dashboard/add ...
+ ✓ Compiled /admin/dashboard/add in 2.3s (1347 modules)
+ GET /admin/dashboard/add 200 in 2490ms
+ ○ Compiling /admin/dashboard/giveaways ...
+ ✓ Compiled /admin/dashboard/giveaways in 3.8s (1360 modules)
+ GET /admin/dashboard/giveaways 200 in 4219ms
+ ○ Compiling /admin/logout ...
+ ✓ Compiled /admin/logout in 1339ms (1354 modules)
+ GET /admin/logout 200 in 1790ms
+ GET /admin 200 in 97ms
+ GET /admin 200 in 46ms
+ GET /login 200 in 442ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1391ms (799 modules)
+ GET / 200 in 1767ms
+ GET / 200 in 68ms
+ ○ Compiling /giveaway/[id] ...
+ ✓ Compiled /giveaway/[id] in 3.4s (1392 modules)
+ GET /giveaway/6a18c03aad17273623cadcdd 200 in 5028ms
+ ○ Compiling /giveaway/[id]/join ...
+ ✓ Compiled /giveaway/[id]/join in 5s (1414 modules)
+ GET /giveaway/6a18c03aad17273623cadcdd/join 200 in 6584ms
+ ○ Compiling /api/altcha/challenge ...
+ ✓ Compiled /api/altcha/challenge in 3.4s (1400 modules)
+ GET /api/altcha/challenge 200 in 2028ms
+ GET /giveaway/6a18c03aad17273623cadcdd/join 200 in 600ms
+ ○ Compiling /api/verify-captcha ...
+ ✓ Compiled /api/verify-captcha in 550ms (1402 modules)
+ POST /api/verify-captcha 200 in 613ms
+ GET /api/altcha/challenge 200 in 24ms
+ POST /api/verify-captcha 200 in 38ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 652ms (821 modules)
+ ○ Compiling /thank-you ...
+ ✓ Compiled /thank-you in 951ms (1421 modules)
+ GET /thank-you 200 in 1877ms
+ GET /login 200 in 2418ms
+ GET / 200 in 97ms
+ GET / 200 in 190ms
+ GET /login 200 in 148ms
+ GET /login 200 in 293ms
+ GET / 200 in 136ms
+ GET / 200 in 123ms
+ GET /giveaway/6a18c03aad17273623cadcdd 200 in 319ms
+ ○ Compiling /privacy-policy ...
+ ✓ Compiled /privacy-policy in 2.2s (1399 modules)
+ GET /privacy-policy 200 in 3282ms
+ ✓ Compiled in 1633ms (611 modules)
+ GET /giveaway/6a18c03aad17273623cadcdd 200 in 194ms
+ ✓ Compiled in 416ms (611 modules)
+ GET /giveaway/6a18c03aad17273623cadcdd 200 in 144ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 1821ms (803 modules)
+ GET / 200 in 3433ms
+ GET / 200 in 3436ms
+ GET / 200 in 3435ms
+ GET / 200 in 3440ms
+ GET /admin 200 in 3758ms
+ GET /admin 200 in 3801ms
+ ○ Compiling /register ...
+ GET / 200 in 2675ms
+ ✓ Compiled /register in 6s (817 modules)
+ GET /admin 200 in 11241ms
+ GET /admin 200 in 11012ms
+ GET /register 200 in 11369ms
+ ○ Compiling /winners ...
+ ✓ Compiled /winners in 3.7s (1391 modules)
+ GET /winners 200 in 4494ms
+ GET /admin 200 in 169ms
+[?25h

@@ -16,6 +16,8 @@ import { useRouter } from 'next/navigation'
 import api from "@/app/utils/apiClient";
 import { useAuth } from "@/app/context/AuthContext";
 import withUserAuth from "../../components/withUserAuth";
+import Image from "next/image";
+import userImage from "../../../../public/images/user.png";
 
 function Home() {
     const { toast } = useToast();
@@ -29,6 +31,51 @@ function Home() {
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
     const [address, setAddress] = useState("");
+    const [avatar, setAvatar] = useState("");
+
+    const handleAvatarChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            toast({ title: "Error", description: "Please upload an image file.", variant: "destructive" });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new window.Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 400;
+                const MAX_HEIGHT = 400;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL("image/jpeg", 0.85);
+                setAvatar(compressedBase64);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
 
     let savePassword = async (e) => {
         e.preventDefault();
@@ -56,17 +103,30 @@ function Home() {
     let fetchUserProfile = async () => {
         try {
             let { data } = await api.get("profile/", { meta: { auth: "user" } });
-            setName(data.myProfile.name);
-            setPhone(data.myProfile.phone);
-            setEmail(data.myProfile.email);
-            setAddress(data.myProfile.address);
+            setName(data.myProfile.name || "");
+            setPhone(data.myProfile.phone || "");
+            setEmail(data.myProfile.email || "");
+            setAddress(data.myProfile.address || "");
+            setAvatar(data.myProfile.avatar || "");
         } catch (error) {}
-    }
+    };
 
     let saveProfile = async (e) => {
         e.preventDefault();
+        if (!name.trim()) {
+            toast({ title: "Validation Error", description: "Name is required.", variant: "destructive" });
+            return;
+        }
+        if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+            toast({ title: "Validation Error", description: "Please enter a valid email address.", variant: "destructive" });
+            return;
+        }
+        if (phone && !/^[6-9]\d{9}$/.test(phone.trim())) {
+            toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
+            return;
+        }
         try {
-            let { data } = await api.patch("profile/update", { name, email, phone, address }, { meta: { auth: "user" } })
+            let { data } = await api.patch("profile/update", { name, email, phone, address, avatar }, { meta: { auth: "user" } })
             if (!data.error) {
                 toast({
                     title: "Success",
@@ -121,21 +181,51 @@ function Home() {
                                     <p className="text-neutral-500 text-sm">Make changes to your profile. Click save when done.</p>
                                 </div>
                                 <form className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name" className="text-neutral-300">Name</Label>
-                                        <Input id="name" defaultValue={name} onChange={(e) => setName(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
+                                    <div className="flex flex-col items-center space-y-3 pb-4">
+                                        <div className="relative w-24 h-24 rounded-full bg-neutral-900 border-2 border-white/[0.06] overflow-hidden group">
+                                            <Image
+                                                src={avatar || userImage}
+                                                alt="Avatar Preview"
+                                                width={96}
+                                                height={96}
+                                                className="w-full h-full object-cover rounded-full"
+                                                unoptimized={avatar ? true : false}
+                                            />
+                                            <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-white text-xs font-semibold">
+                                                Change
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={handleAvatarChange}
+                                                />
+                                            </label>
+                                        </div>
+                                        {avatar && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAvatar("")}
+                                                className="text-xs text-red-500 hover:text-red-400 font-medium transition-colors"
+                                            >
+                                                Remove Photo
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="phone" className="text-neutral-300">Phone</Label>
-                                        <Input id="phone" defaultValue={phone} onChange={(e) => setPhone(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
+                                        <Label htmlFor="name" className="text-neutral-300">Name</Label>
+                                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone" className="text-neutral-300">Phone (Optional)</Label>
+                                        <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email" className="text-neutral-300">Email</Label>
-                                        <Input id="email" defaultValue={email} onChange={(e) => setEmail(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
+                                        <Input id="email" value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input h-11 text-white placeholder:text-neutral-600" />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="address" className="text-neutral-300">Address</Label>
-                                        <Textarea placeholder="Your shipping address" defaultValue={address} onChange={(e) => setAddress(e.target.value)} className="premium-input text-white placeholder:text-neutral-600 min-h-[80px]" />
+                                        <Textarea placeholder="Your shipping address" value={address} onChange={(e) => setAddress(e.target.value)} className="premium-input text-white placeholder:text-neutral-600 min-h-[80px]" />
                                     </div>
                                     <Button type="button" className="w-full btn-gradient rounded-xl h-11 font-medium" onClick={(e) => saveProfile(e)}>
                                         Save Changes

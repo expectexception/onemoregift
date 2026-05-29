@@ -1,5 +1,4 @@
-import { HiMenu, HiOutlineUser, HiOutlineLockClosed, HiOutlineLogout, HiArrowRight, HiSparkles } from "react-icons/hi";
-import { HiGift } from "react-icons/hi2";
+import { HiOutlineLogout } from "react-icons/hi";
 import { SheetDemo } from "./Sidebar";
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -9,6 +8,8 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { useAuth } from "../context/AuthContext";
+import AnimatedGiftSVG from "./AnimatedGiftSVG";
+import { UserIcon, LockIcon } from "./SVGIcons";
 
 export default function Navbar() {
     const { userAuthenticated, loadingUser, logoutUser } = useAuth();
@@ -22,17 +23,15 @@ export default function Navbar() {
 
     return (
         <nav className="premium-nav">
-            <div className="relative flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+            <div className="relative flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 max-w-7xl mx-auto w-full">
                 {/* Logo */}
                 <div
-                    className="flex items-center gap-3 cursor-pointer group"
+                    className="flex items-center gap-1 sm:gap-2 cursor-pointer group flex-shrink-0"
                     onClick={() => router.push('/')}
                 >
-                    <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shadow-glow group-hover:shadow-glow-lg transition-all duration-300">
-                        <HiGift className="text-white text-xl" />
-                    </div>
+                    <AnimatedGiftSVG className="w-10 sm:w-12 h-10 sm:h-12" />
                     <div className="flex flex-col">
-                        <span className="text-lg sm:text-xl md:text-2xl font-bold text-white tracking-tight whitespace-nowrap">
+                        <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white tracking-tight whitespace-nowrap">
                             OneMore<span className="text-gradient">Gift</span>
                         </span>
                     </div>
@@ -54,7 +53,7 @@ export default function Navbar() {
                             onClick={() => router.push('/my-profile')}
                         >
                             <span className="flex items-center gap-2">
-                                <HiOutlineUser className="text-lg" />
+                                <UserIcon className="w-5 h-5" />
                                 Profile
                             </span>
                         </button>
@@ -89,7 +88,7 @@ export default function Navbar() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <button className="w-10 h-10 rounded-xl glass flex items-center justify-center border border-white/10 hover:border-red-600/40 transition-colors">
-                                <HiOutlineUser className="text-neutral-300 text-xl" />
+                                <UserIcon className="w-6 h-6" />
                             </button>
                         </PopoverTrigger>
                         <PopoverContent
@@ -112,8 +111,8 @@ export default function Navbar() {
 
                                 {isUserLoggedIn ? (
                                     <div className="space-y-1">
-                                        <MobileNavLink href="/my-profile" label="My Profile" icon={<HiOutlineUser />} />
-                                        <MobileNavLink href="/my-profile/edit" label="Settings" icon={<HiOutlineLockClosed />} />
+                                        <MobileNavLink href="/my-profile" label="My Profile" icon={<UserIcon className="w-5 h-5" />} />
+                                        <MobileNavLink href="/my-profile/edit" label="Settings" icon={<LockIcon className="w-5 h-5" />} />
                                         <button
                                             className="w-full flex items-center gap-3 px-3 py-2.5 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
                                             onClick={handleUserLogout}

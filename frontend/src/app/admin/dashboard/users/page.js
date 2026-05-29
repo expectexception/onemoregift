@@ -24,14 +24,10 @@ import { useToast } from "@/hooks/use-toast";
 import {
     XCircle,
     Search,
-    Shield,
-    ShieldOff,
     Trash2,
-    Eye,
     Users,
     Chrome,
     RefreshCw,
-    Filter,
 } from "lucide-react";
 import api from "@/app/utils/apiClient";
 
@@ -40,6 +36,19 @@ const TABS = [
     { key: "active", label: "Active" },
     { key: "blocked", label: "Blocked" },
 ];
+
+function ViewSvg() {
+    return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="3" /></svg>;
+}
+function BlockSvg() {
+    return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="m7 7 10 10" /></svg>;
+}
+function AllowSvg() {
+    return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.5 2.5 4.5-5" /></svg>;
+}
+function DeleteSvg() {
+    return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>;
+}
 
 const UsersPage = () => {
     const router = useRouter();
@@ -87,11 +96,11 @@ const UsersPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, activeTab]);
+    }, [activeTab, page, router, toast]);
 
     useEffect(() => {
         fetchUsers();
-    }, [page, activeTab]);
+    }, [fetchUsers]);
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -187,15 +196,15 @@ const UsersPage = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">User Management</h1>
-                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest mt-1">
+                    <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white ">User Management</h1>
+                    <p className="text-[10px] text-neutral-500 font-bold  tracking-widest mt-1">
                         {total} total user{total !== 1 ? "s" : ""}
                     </p>
                 </div>
                 <button
                     onClick={() => fetchUsers()}
                     disabled={loading}
-                    className="self-start md:self-center flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest"
+                    className="self-start md:self-center flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] text-neutral-400 hover:text-white transition-all text-[10px] font-bold  tracking-widest"
                 >
                     <RefreshCw className={`w-3 h-3 md:w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                     <span>Refresh</span>
@@ -208,7 +217,7 @@ const UsersPage = () => {
                     <button
                         key={tab.key}
                         onClick={() => handleTabChange(tab.key)}
-                        className={`flex-1 md:flex-none px-4 md:px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${activeTab === tab.key
+                        className={`flex-1 md:flex-none px-4 md:px-5 py-2 rounded-lg text-[10px] font-semibold  tracking-widest transition-all duration-300 ${activeTab === tab.key
                             ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
                             : "text-neutral-500 hover:text-neutral-300 hover:bg-white/[0.03]"
                             }`}
@@ -233,14 +242,14 @@ const UsersPage = () => {
                 <Button
                     onClick={handleSearch}
                     disabled={loading}
-                    className="w-full sm:w-auto px-8 bg-red-600 hover:bg-red-700 text-white border-0 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-900/20"
+                    className="w-full sm:w-auto px-8 bg-red-600 hover:bg-red-700 text-white border-0 h-11 rounded-xl font-semibold  text-[10px] tracking-widest shadow-lg shadow-red-900/20"
                 >
                     Search
                 </Button>
             </div>
 
             {/* Table */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] backdrop-blur-3xl overflow-hidden mb-6">
+            <div className="admin-table-shell mb-6">
                 <div className="overflow-x-auto custom-scrollbar">
                     <div className="min-w-[600px]">
                         <Table>
@@ -277,11 +286,11 @@ const UsersPage = () => {
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell text-sm text-neutral-400">
                                                 {user.phone && !user.phone.startsWith("google_") ? user.phone : (
-                                                    <span className="text-neutral-600 italic text-xs">not set</span>
+                                                    <span className="text-neutral-600 text-xs">not set</span>
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.blocked
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold  tracking-wider ${user.blocked
                                                     ? "bg-red-500/10 text-red-500 border border-red-500/20"
                                                     : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                                                     }`}>
@@ -311,33 +320,33 @@ const UsersPage = () => {
                                                     <button
                                                         onClick={() => router.push(`/admin/dashboard/users/${user._id}`)}
                                                         title="View Profile"
-                                                        className="p-2 rounded-lg hover:bg-white/[0.06] text-neutral-500 hover:text-white transition-all"
+                                                        className="admin-action-btn view"
                                                     >
-                                                        <Eye className="w-4 h-4" />
+                                                        <ViewSvg />
                                                     </button>
                                                     {user.blocked ? (
                                                         <button
                                                             onClick={() => setDialog({ open: true, type: "unban", user })}
                                                             title="Unblock User"
-                                                            className="p-2 rounded-lg hover:bg-emerald-600/10 text-neutral-500 hover:text-emerald-400 transition-all"
+                                                            className="admin-action-btn edit"
                                                         >
-                                                            <Shield className="w-4 h-4" />
+                                                            <AllowSvg />
                                                         </button>
                                                     ) : (
                                                         <button
                                                             onClick={() => setDialog({ open: true, type: "ban", user })}
                                                             title="Block User"
-                                                            className="p-2 rounded-lg hover:bg-amber-600/10 text-neutral-500 hover:text-amber-400 transition-all"
+                                                            className="admin-action-btn warn"
                                                         >
-                                                            <ShieldOff className="w-4 h-4" />
+                                                            <BlockSvg />
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={() => setDialog({ open: true, type: "delete", user })}
                                                         title="Delete User"
-                                                        className="p-2 rounded-lg hover:bg-red-600/10 text-neutral-500 hover:text-red-400 transition-all"
+                                                        className="admin-action-btn danger"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <DeleteSvg />
                                                     </button>
                                                 </div>
                                             </TableCell>

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check, ShieldCheck, FileText, ChevronDown } from "lucide-react";
+import Link from "next/link";
 
 export default function TermsModal({ isOpen, onOpenChange, onAccept }) {
     const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
@@ -98,6 +99,13 @@ export default function TermsModal({ isOpen, onOpenChange, onAccept }) {
                                     Privacy Policy Note
                                 </h4>
                                 <p>We value your privacy. Your data is used solely for giveaway participation and prize fulfillment. We do not sell your personal information to third parties.</p>
+                                <p className="mt-3">
+                                    Read full policies:
+                                    {" "}
+                                    <Link href="/terms-conditions" target="_blank" className="text-red-400 hover:text-red-300 font-semibold">Terms</Link>
+                                    {" · "}
+                                    <Link href="/privacy-policy" target="_blank" className="text-red-400 hover:text-red-300 font-semibold">Privacy Policy</Link>
+                                </p>
                             </section>
                         </div>
 

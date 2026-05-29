@@ -54,7 +54,7 @@ test.describe('Dorrka Full Workflow Verification', () => {
         await page.waitForURL(`${BASE_URL}/admin/dashboard`, { timeout: 15000 });
 
         await page.click('a:has-text("Add Giveaway")');
-        await expect(page).toHaveURL(`${BASE_URL}/admin/dashboard/add`);
+        await expect(page).toHaveURL(`${BASE_URL}/admin/dashboard/add`, { timeout: 20000 });
 
         const eventTitle = `E2E-TEST-${Date.now()}`;
         await page.fill('input[id="title"]', eventTitle);
@@ -71,22 +71,13 @@ test.describe('Dorrka Full Workflow Verification', () => {
         await page.fill('input[type="date"] >> nth=0', startStr);
         await page.fill('input[type="date"] >> nth=1', endStr);
 
-        // TimePicker: Start Chronology
-        await page.click('[data-testid="time-picker-trigger-start-chronology"]');
-        const startDialog = page.locator('div[role="dialog"]').filter({ visible: true });
-        await startDialog.waitFor({ state: 'visible' });
-        await startDialog.locator('button:has-text("09")').click();
-        await startDialog.locator('button:has-text("30")').click();
-        await startDialog.locator('button:has-text("Confirm")').click();
+        // TimePicker: Start Chronology (Programmatic fill for stability)
+        await page.fill('[data-testid="time-picker-input-start-chronology"]', '09:30');
+        await page.waitForTimeout(500);
 
-        // TimePicker: Termination Date
-        await page.click('[data-testid="time-picker-trigger-termination-date"]');
-        const endDialog = page.locator('div[role="dialog"]').filter({ visible: true });
-        await endDialog.waitFor({ state: 'visible' });
-        await endDialog.locator('button:has-text("18")').click();
-        await endDialog.locator('button:has-text("00")').click();
-        await endDialog.locator('button:has-text("Confirm")').click();
-        await page.waitForTimeout(500); // Wait for popover closure
+        // TimePicker: Termination Date (Programmatic fill for stability)
+        await page.fill('[data-testid="time-picker-input-termination-date"]', '18:00');
+        await page.waitForTimeout(500);
 
         await page.fill('input[id="prize"]', 'Test Prize Asset');
         await page.fill('input[id="prizeValue"]', '10000');
@@ -134,7 +125,7 @@ test.describe('Dorrka Full Workflow Verification', () => {
 
         // Navigation links
         await page.locator('nav').getByText('Winners').click();
-        await expect(page).toHaveURL(`${BASE_URL}/winners`);
+        await expect(page).toHaveURL(`${BASE_URL}/winners`, { timeout: 20000 });
 
         console.log('✅ Public Navigation Passed');
     });

@@ -6,7 +6,7 @@ import giveaway from "../../../public/images/gift.png"
 import winners from "../../../public/images/medal.png"
 import crown from "../../../public/images/crown.png"
 import spin from "../../../public/images/spin.png"
-import { HiIdentification, HiOutlineBookOpen, HiTruck, HiOutlinePencilAlt, HiGift, HiOutlineBadgeCheck, HiUser } from "react-icons/hi";
+import { HiIdentification, HiOutlineBookOpen, HiTruck, HiOutlinePencilAlt } from "react-icons/hi";
 import {
     Sheet,
     SheetClose,
@@ -20,6 +20,7 @@ import {
 import Image from "next/image";
 import { useRouter } from 'next/navigation'
 import { useAuth } from "../context/AuthContext";
+import { TrophyIcon, UserIcon } from "./SVGIcons";
 export function SheetDemo() {
     const router = useRouter()
     const { userAuthenticated, loadingUser, logoutUser } = useAuth();
@@ -103,7 +104,7 @@ export function SheetDemo() {
                 </div>
                 <div className="flex flex-col gap-3 pt-4">
                     {isUserLoggedIn && <div className="bg-neutral-900 flex flex-row rounded-md gap-2 p-4 hover:bg-red-900 cursor-pointer">
-                        <HiUser className="text-white text-2xl" />
+                        <UserIcon className="w-7 h-7" />
                         <p className="text-white text-xl">My Profile</p>
                     </div>}
                     <div className="bg-neutral-900 flex flex-row rounded-md gap-2 p-4 hover:bg-red-900 cursor-pointer">
@@ -119,7 +120,7 @@ export function SheetDemo() {
                         <p className="text-white text-xl">Terms</p>
                     </div>
                     <div className="p-4 bg-neutral-900 gap-2 flex flex-row rounded-md hover:bg-red-900 cursor-pointer">
-                        <HiGift className="text-white text-2xl" />
+                        <TrophyIcon className="w-7 h-7" />
                         <p className="text-white text-xl">Contest Policy</p>
                     </div>
                     <div className="p-4 bg-neutral-900 gap-2 flex flex-row rounded-md hover:bg-red-900 cursor-pointer">

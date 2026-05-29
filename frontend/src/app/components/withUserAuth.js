@@ -20,7 +20,7 @@ export default function withUserAuth(Component, options = {}) {
             if (!loadingUser && !userAuthenticated) {
                 router.replace(redirectTo);
             }
-        }, [loadingUser, userAuthenticated, redirectTo, router]);
+        }, [loadingUser, userAuthenticated, router]);
 
         if (loadingUser) {
             return <SessionLoader label={loadingLabel} />;

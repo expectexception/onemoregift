@@ -22,8 +22,15 @@ const nextConfig = {
                 hostname: 'api.onemoregift.in',
                 pathname: '/uploads/images/**', // Allow images under /uploads/images/
             },
+            {
+                protocol: 'https',
+                hostname: 'onemoregift.in',
+                pathname: '/uploads/images/**', // Allow images under /uploads/images/
+            },
         ],
-
+    },
+    compiler: {
+        removeConsole: process.env.NODE_ENV === 'production',
     },
 };
 

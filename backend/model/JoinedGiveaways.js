@@ -18,6 +18,9 @@ const giveawaySchema = new mongoose.Schema({
         timestamps: true,
         versionKey: false
     });
+
+giveawaySchema.index({ user: 1, giveaway: 1 }, { unique: true });
+
 const JoinedGiveaway = mongoose.model('JoinedGiveaway', giveawaySchema);
 
 module.exports = JoinedGiveaway;

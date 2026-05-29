@@ -2,8 +2,10 @@ import Image from "next/image";
 import gift1 from "../../../public/images/gift-1.png";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import { useState, useEffect } from "react";
-import { HiClock, HiUsers, HiSparkles, HiArrowRight } from "react-icons/hi";
+import { HiClock, HiArrowRight } from "react-icons/hi";
 import { CheckCircle } from "lucide-react";
 import {
     Dialog,
@@ -23,6 +25,10 @@ import {
 import { useRouter } from "next/navigation";
 import api from "../utils/apiClient";
 import { useAuth } from "../context/AuthContext";
+import { VerificationIcon, UserIcon, ShieldIcon } from "./SVGIcons";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export default function Giveaways() {
     const router = useRouter();
@@ -66,7 +72,7 @@ export default function Giveaways() {
                 {(!items || items.length === 0) ? (
                     <div className="glass rounded-2xl p-16 text-center border border-white/[0.06]">
                         <div className="w-20 h-20 rounded-full bg-red-600/10 flex items-center justify-center mx-auto mb-6">
-                            <HiSparkles className="text-4xl text-red-500" />
+                            <VerificationIcon className="w-12 h-12" />
                         </div>
                         <h3 className="text-2xl font-semibold text-white mb-2">No Active Giveaways</h3>
                         <p className="text-neutral-500 mb-6">Check back soon for new exciting contests!</p>
@@ -121,11 +127,11 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
     const [showDialog, setShowDialog] = useState(false);
 
     useEffect(() => {
-        const end = dayjs(item.endDate);
+        const endIst = dayjs(item.endDate).tz("Asia/Kolkata");
 
         const updateTimeLeft = () => {
-            const now = dayjs();
-            const diff = end.diff(now);
+            const nowIst = dayjs().tz("Asia/Kolkata");
+            const diff = endIst.diff(nowIst);
 
             if (diff > 0) {
                 setTimeLeft({
@@ -153,7 +159,7 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
     };
 
     const { user } = useAuth();
-    const hasEnded = timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0;
+    const hasEnded = !dayjs().tz("Asia/Kolkata").isBefore(dayjs(item.endDate).tz("Asia/Kolkata"));
 
     // Check if the current user is already in the participants array
     const hasJoined = loggedIn && user && item.participants?.some(p => (p._id || p) === user._id);
@@ -209,7 +215,7 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
 
                     {/* Participants */}
                     <div className="flex items-center gap-2 text-neutral-500 mb-4 sm:mb-6">
-                        <HiUsers className="text-lg text-red-500" />
+                        <UserIcon className="w-5 h-5" />
                         <span className="text-xs sm:text-sm">{item.participantCount || 0} participants</span>
                     </div>
 
@@ -238,8 +244,8 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
                 <DialogContent className="glass-dark border-white/10 rounded-2xl max-w-md mx-auto">
                     <DialogHeader className="text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-red-600 flex items-center justify-center mx-auto mb-4 shadow-glow">
-                            <HiSparkles className="text-white text-2xl" />
+                        <div className="flex justify-center mb-4">
+                            <ShieldIcon className="w-12 h-12" />
                         </div>
                         <DialogTitle className="text-2xl font-bold text-white">Join the Giveaway</DialogTitle>
                         <DialogDescription className="text-neutral-400 text-base">

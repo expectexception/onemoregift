@@ -1,0 +1,29 @@
+{
+  "name": "onemoregift-email-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone email delivery gateway for OneMoreGift.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "nodemailer": "^8.0.9",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.3"
+  }
+}

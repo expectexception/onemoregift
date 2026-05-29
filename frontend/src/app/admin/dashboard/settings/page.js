@@ -34,14 +34,10 @@ function AdminSettings() {
     };
 
     return (
-        <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* Background elements */}
-            <div className="absolute inset-0 section-gradient opacity-10" />
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/5 rounded-full blur-[120px] animate-pulse" />
-
-            <div className="relative z-10 p-4 md:p-8 max-w-7xl mx-auto animate-fade-in">
+        <div className="min-h-screen bg-[#070707]">
+            <div className="p-4 md:p-8 max-w-7xl mx-auto">
                 <div className="flex items-center gap-4 mb-10">
-                    <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg shadow-red-600/20">
+                    <div className="w-14 h-14 rounded-lg bg-red-600 flex items-center justify-center">
                         <Database className="text-white w-7 h-7" />
                     </div>
                     <div>
@@ -54,7 +50,7 @@ function AdminSettings() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
                     {/* Data Maintenance Card */}
-                    <Card className="premium-card border-white/[0.06] bg-white/[0.02] overflow-hidden group hover:bg-white/[0.03] transition-all duration-300">
+                    <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                         <div className="absolute top-0 left-0 w-1 h-full bg-red-600 opacity-60 transition-opacity" />
                         <CardHeader className="p-8 pb-4">
                             <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
@@ -71,7 +67,7 @@ function AdminSettings() {
                             <div className="p-5 rounded-2xl bg-red-600/5 border border-red-600/10 flex gap-4">
                                 <AlertTriangle className="text-red-500 w-6 h-6 shrink-0 mt-0.5" />
                                 <div className="space-y-1">
-                                    <strong className="text-red-500 text-sm font-bold uppercase tracking-wider block">Caution: Destructive Action</strong>
+                                    <strong className="text-red-500 text-sm font-semibold block">Caution: destructive action</strong>
                                     <p className="text-sm text-neutral-400 leading-relaxed font-medium">
                                         This action will wipe all <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">JoinedGiveaway</code> collections and reset
                                         participant lists in all events.
@@ -80,7 +76,7 @@ function AdminSettings() {
                             </div>
                             <Button
                                 variant="destructive"
-                                className="w-full h-14 rounded-2xl font-bold text-base shadow-lg shadow-red-600/10 hover:shadow-red-600/20 active:scale-[0.98] transition-all group/btn"
+                                className="w-full h-12 rounded-lg font-semibold text-base active:scale-[0.98] transition-all group/btn"
                                 onClick={handleClearAll}
                                 disabled={loading}
                             >
@@ -99,8 +95,8 @@ function AdminSettings() {
                 </div>
 
                 <div className="mt-20 py-8 border-t border-white/[0.06] text-center">
-                    <p className="text-[10px] text-neutral-600 uppercase tracking-[0.3em] font-bold">
-                        Antigravity Engine • Secured for {new Date().getFullYear()} Distribution
+                    <p className="text-xs text-neutral-600 font-medium">
+                        OneMoreGift admin controls for {new Date().getFullYear()}
                     </p>
                 </div>
             </div>
@@ -148,7 +144,7 @@ function SecurityCard() {
     }
 
     return (
-        <Card className="premium-card border-white/[0.06] bg-white/[0.02] overflow-hidden group hover:bg-white/[0.03] transition-all duration-300">
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600 opacity-60 transition-opacity" />
             <CardHeader className="p-8 pb-4">
                 <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
@@ -164,32 +160,32 @@ function SecurityCard() {
             <CardContent className="p-8 pt-4">
                 <form onSubmit={handleUpdate} className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-1">Current Password</label>
+                        <label className="text-xs font-semibold text-neutral-500 pl-1">Current password</label>
                         <Input
                             type="password"
                             required
                             placeholder="••••••••"
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="premium-input h-12 bg-white/[0.03]"
+                            className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                         />
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest pl-1">New Secure Password</label>
+                            <label className="text-xs font-semibold text-neutral-500 pl-1">New secure password</label>
                             <Input
                                 type="password"
                                 required
                                 placeholder="Min 6 characters"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="premium-input h-12 bg-white/[0.03]"
+                                className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                             />
                         </div>
                         <Button
                             type="submit"
                             disabled={loading || !currentPassword || !newPassword}
-                            className="w-full h-14 rounded-2xl bg-white text-black hover:bg-neutral-200 font-bold transition-all active:scale-[0.98]"
+                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98]"
                         >
                             {loading ? <RefreshCw className="animate-spin" /> : "Update Credentials"}
                         </Button>

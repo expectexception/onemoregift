@@ -56,7 +56,14 @@ function Home() {
                         {/* Avatar */}
                         <div className="flex justify-center mb-6">
                             <div className="w-24 h-24 rounded-full bg-neutral-800 border-2 border-white/[0.06] overflow-hidden">
-                                <Image src={userImage} alt="Profile" width={96} height={96} className="rounded-full object-cover" />
+                                <Image
+                                    src={user.avatar || userImage}
+                                    alt="Profile"
+                                    width={96}
+                                    height={96}
+                                    className="rounded-full object-cover w-full h-full"
+                                    unoptimized={user.avatar ? true : false}
+                                />
                             </div>
                         </div>
 
@@ -118,8 +125,8 @@ function Home() {
                                     <div key={giveaway._id} className="premium-card rounded-xl overflow-hidden group">
                                         <div className="relative h-48 bg-neutral-900 overflow-hidden">
                                             <Image
-                                                src={giveaway.image}
-                                                alt={giveaway.title}
+                                                src={giveaway.image || "/images/gift.png"}
+                                                alt={giveaway.title || "Giveaway"}
                                                 width={400}
                                                 height={200}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

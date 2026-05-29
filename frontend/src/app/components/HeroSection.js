@@ -1,8 +1,9 @@
 "use client"
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { HiSparkles, HiGift, HiUsers, HiStar, HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import Image from "next/image";
 import api from "../utils/apiClient";
+import { CheckIcon, TrophyIcon, VerificationIcon, ShieldIcon } from "./SVGIcons";
 
 const heroImages = [
     "/images/giftsa.webp",
@@ -99,11 +100,13 @@ export default function HeroSection() {
                         willChange: 'opacity',
                     }}
                 >
-                    <img
+                    <Image
                         src={img}
                         alt=""
+                        fill
+                        sizes="100vw"
                         className="absolute inset-0 h-full w-full object-cover object-center"
-                        loading={i === 0 ? "eager" : "lazy"}
+                        priority={i === 0}
                     />
                 </div>
             ))}
@@ -134,8 +137,8 @@ export default function HeroSection() {
                 }}
             />
 
-            {/* Image indicator dots - Hidden on mobile to avoid overlap */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 hidden md:flex gap-2">
+            {/* Image indicator dots - keep lower and only on larger screens to avoid overlap */}
+            <div className="absolute bottom-3 lg:bottom-5 left-1/2 -translate-x-1/2 z-20 hidden lg:flex gap-2">
                 {heroImages.map((_, i) => (
                     <button
                         key={i}
@@ -149,13 +152,7 @@ export default function HeroSection() {
             </div>
 
             {/* Content */}
-            <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
-                {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full glass mb-6 sm:mb-8 animate-fade-up border border-white/[0.12]">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-neutral-200 text-[10px] sm:text-xs md:text-sm font-medium tracking-wide">India&apos;s Leading Giveaway Platform</span>
-                </div>
-
+            <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-10 sm:pt-14 lg:pt-16 pb-14 lg:pb-20">
                 {/* Main Heading */}
                 <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
                     <span className="text-white">Win </span>
@@ -178,7 +175,7 @@ export default function HeroSection() {
                         onClick={() => router.push('/register')}
                     >
                         <span className="flex items-center justify-center gap-2">
-                            <HiGift className="text-xl" />
+                            <CheckIcon className="w-5 h-5" />
                             Start Winning Now
                         </span>
                     </button>
@@ -192,10 +189,10 @@ export default function HeroSection() {
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                    <StatCard icon={<HiGift />} value={stats.activeGiveaways} label="Active" />
-                    <StatCard icon={<HiUsers />} value={stats.totalWinners} label="Winners" />
-                    <StatCard icon={<HiStar />} value={stats.totalPrizeValue} label="Prizes" />
-                    <StatCard icon={<HiSparkles />} value={stats.verifiedLegit} label="Legit" />
+                    <StatCard Icon={CheckIcon} value={stats.activeGiveaways} label="Active" />
+                    <StatCard Icon={TrophyIcon} value={stats.totalWinners} label="Winners" />
+                    <StatCard Icon={VerificationIcon} value={stats.totalPrizeValue} label="Prizes" />
+                    <StatCard Icon={ShieldIcon} value={stats.verifiedLegit} label="Legit" />
                 </div>
             </div>
 
@@ -205,10 +202,12 @@ export default function HeroSection() {
     );
 }
 
-function StatCard({ icon, value, label }) {
+function StatCard({ Icon, value, label }) {
     return (
         <div className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
-            <div className="text-red-500 text-xl sm:text-2xl mb-1 sm:mb-2 group-hover:scale-110 transition-transform">{icon}</div>
+            <div className="mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
+                <Icon className="w-7 h-7 sm:w-8 sm:h-8" />
+            </div>
             <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1">{value}</div>
             <div className="text-[10px] sm:text-sm text-neutral-500 uppercase tracking-wider">{label}</div>
         </div>

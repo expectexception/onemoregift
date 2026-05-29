@@ -64,6 +64,23 @@ const userSchema = new mongoose.Schema({
     isVerified: {
         type: Boolean,
         default: true
+    },
+    legalConsent: {
+        termsAcceptedAt: {
+            type: Date,
+        },
+        privacyAcceptedAt: {
+            type: Date,
+        },
+        policyVersion: {
+            type: String,
+        },
+        ipAddress: {
+            type: String,
+        },
+        userAgent: {
+            type: String,
+        }
     }
 }, { timestamps: true, versionKey: false });
 

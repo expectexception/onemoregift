@@ -19,9 +19,10 @@ const myProfile = async (req, res) => {
 };
 const updateProfile = async (req, res) => {
     let userId = req.user.data._id;
-    let { name, email, phone, address } = req.body;
+    let { name, email, phone, address, avatar } = req.body;
+    const normalizedPhone = (phone && phone.trim() !== "") ? phone.trim() : null;
     try {
-        const updatedProfile = await User.findByIdAndUpdate(userId, { name, email, phone, address }, { new: true }).select("-password -resetToken");
+        const updatedProfile = await User.findByIdAndUpdate(userId, { name, email, phone: normalizedPhone, address, avatar }, { new: true }).select("-password -resetToken");
         if (updatedProfile) {
             return res.status(200).json({ error: false, updatedProfile });
         }
@@ -40,11 +41,11 @@ const changePassword = async (req, res) => {
     try {
         const user = await User.findById(userId);
         if (!user) {
-            return res.status(200).json({ error: true, msg: "User not found" });
+            return res.status(404).json({ error: true, msg: "User not found" });
         }
         const isMatch = await bcrypt.compare(oldPassword, user.password);
         if (!isMatch) {
-            return res.status(200).json({ error: true, msg: "Old password is incorrect" });
+            return res.status(400).json({ error: true, msg: "Old password is incorrect" });
         }
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);

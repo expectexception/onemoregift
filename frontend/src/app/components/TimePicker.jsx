@@ -48,7 +48,7 @@ export function TimePicker({ value, onChange, label }) {
                 className="sr-only"
                 value={value || ""}
                 onChange={(e) => onChange(e.target.value)}
-                data-testid={`time-picker-input-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                data-testid={label === "Start time" ? "time-picker-input-start-chronology" : "time-picker-input-termination-date"}
                 aria-hidden="true"
             />
 

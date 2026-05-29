@@ -3,9 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/**/*.test.js",
+    "test:smoke": "node --test test/smoke.test.js",
+    "test:contracts": "node --test test/contracts.test.js",
+    "seed:test": "node scripts/seed-test-data.js"
   },
   "author": "",
   "license": "ISC",
@@ -17,16 +23,17 @@
     "cors": "^2.8.5",
     "dayjs": "^1.11.19",
     "dotenv": "^16.4.5",
-    "express-rate-limit": "^7.4.1",
     "express": "^4.19.2",
     "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.4.1",
     "google-auth-library": "^9.15.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
     "mongoose": "^8.3.4",
+    "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.9.15",
-    "perfect-express-sanitizer": "^2.0.2"
+    "nodemailer": "^8.0.9",
+    "perfect-express-sanitizer": "^2.0.2",
+    "supertest": "^7.1.3"
   }
 }

@@ -1,14 +1,38 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, CheckCircle, XCircle, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import { useRouter } from 'next/navigation'
 import { HiGift } from "react-icons/hi2";
 import api from "../utils/apiClient";
 import { useAuth } from "../context/AuthContext";
+
+function AdminShieldMark() {
+    return (
+        <svg viewBox="0 0 64 64" className="w-9 h-9" fill="none" aria-hidden="true">
+            <defs>
+                <linearGradient id="shieldGrad" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stopColor="#ffffff" />
+                    <stop offset="1" stopColor="#fecaca" />
+                </linearGradient>
+            </defs>
+            <path d="M32 6L52 14V30C52 42 44.7 52.8 32 58C19.3 52.8 12 42 12 30V14L32 6Z" fill="url(#shieldGrad)" fillOpacity="0.18" stroke="url(#shieldGrad)" strokeWidth="2" />
+            <path d="M24 31L29 36L40 25" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+function GiftWordmark() {
+    return (
+        <svg viewBox="0 0 180 24" className="h-6 w-auto" fill="none" aria-label="OneMoreGift">
+            <text x="0" y="17" fill="#ffffff" fontSize="16" fontWeight="800" fontFamily="system-ui, sans-serif">OneMore</text>
+            <text x="82" y="17" fill="#ef4444" fontSize="16" fontWeight="800" fontFamily="system-ui, sans-serif">Gift</text>
+        </svg>
+    );
+}
 
 export default function AdminLoginForm() {
     const router = useRouter();
@@ -18,21 +42,6 @@ export default function AdminLoginForm() {
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const containerRef = useRef(null);
-
-    // Cursor glow effect
-    useEffect(() => {
-        const handleMouseMove = (e) => {
-            if (!containerRef.current) return;
-            const { clientX, clientY } = e;
-            const { left, top } = containerRef.current.getBoundingClientRect();
-            containerRef.current.style.setProperty('--x', `${clientX - left}px`);
-            containerRef.current.style.setProperty('--y', `${clientY - top}px`);
-        };
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -85,27 +94,17 @@ export default function AdminLoginForm() {
     };
 
     return (
-        <div
-            ref={containerRef}
-            className="flex justify-center items-center min-h-screen px-4 py-12 bg-black relative overflow-hidden cursor-glow-container"
-        >
-            {/* Background elements */}
-            <div className="absolute inset-0 section-gradient opacity-40" />
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-600/5 rounded-full blur-[120px] animate-pulse-slow" />
-
-            <div className="w-full max-w-md premium-card rounded-3xl p-8 md:p-10 relative z-10 animate-scale-in">
+        <div className="flex min-h-screen items-center justify-center bg-[#070707] px-4 py-10">
+            <div className="w-full max-w-md rounded-lg border border-white/[0.08] bg-[#111111] p-6 shadow-2xl md:p-8">
                 {/* Brand Header */}
                 <div className="text-center mb-10">
-                    <div className="w-16 h-16 rounded-2xl bg-red-600 flex items-center justify-center mx-auto mb-6 shadow-glow">
-                        <ShieldCheck className="text-white text-3xl" />
+                    <div className="w-16 h-16 rounded-lg bg-red-600 flex items-center justify-center mx-auto mb-6">
+                        <AdminShieldMark />
                     </div>
                     <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-white/[0.03] border border-white/[0.06]">
                             <HiGift className="text-red-500 text-2xl" />
-                            <span className="text-2xl font-bold text-white tracking-tight">
-                                OneMore<span className="text-gradient">Gift</span>
-                            </span>
+                            <GiftWordmark />
                         </div>
                         <h1 className="text-xl font-semibold text-neutral-300 mt-2">Admin Login</h1>
                         <p className="text-sm text-neutral-500">Sign in to manage the platform</p>
@@ -115,14 +114,14 @@ export default function AdminLoginForm() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
                         <Label htmlFor="email" className="text-neutral-300 text-sm font-medium ml-1">Admin Email</Label>
-                        <Input
-                            id="email"
+                            <Input
+                                id="email"
                             type="email"
                             placeholder="admin@onemoregift.in"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="premium-input h-12 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 rounded-xl"
+                                className="h-12 rounded-lg border-white/[0.08] bg-white/[0.03] text-white placeholder:text-neutral-600"
                         />
                     </div>
 
@@ -138,7 +137,7 @@ export default function AdminLoginForm() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="premium-input h-12 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 pr-12 rounded-xl"
+                                className="h-12 rounded-lg border-white/[0.08] bg-white/[0.03] pr-12 text-white placeholder:text-neutral-600"
                             />
                             <Button
                                 type="button"
@@ -155,7 +154,7 @@ export default function AdminLoginForm() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 btn-gradient rounded-xl font-bold text-base mt-4 shadow-lg shadow-red-600/10 hover:shadow-red-600/20 transition-all duration-300"
+                        className="w-full h-12 rounded-lg bg-red-600 text-base font-semibold text-white hover:bg-red-500 mt-4"
                     >
                         {loading ? (
                             <span className="flex items-center gap-2">
@@ -167,7 +166,7 @@ export default function AdminLoginForm() {
 
                     {/* Security Note */}
                     <div className="pt-6 border-t border-white/[0.06] text-center">
-                        <p className="text-[10px] text-neutral-600 uppercase tracking-widest font-semibold flex items-center justify-center gap-2">
+                        <p className="text-xs text-neutral-500 font-medium flex items-center justify-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             Secure Admin Session
                         </p>

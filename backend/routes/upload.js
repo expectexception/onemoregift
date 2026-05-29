@@ -35,8 +35,17 @@ const storage = multer.diskStorage({
 //         cb(false);
 //     }
 // };
+const getBaseUrl = (req) => {
+    const host = req.get('host') || '';
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        return `${req.protocol}://${host}`;
+    }
+    return ServerURL ? ServerURL.replace(/\/$/, '') : `${req.protocol}://${host}`;
+};
+
+// File filter function to accept only images
 let fileFilter = function (req, file, cb) {
-    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
         // return cb(new Error('Only image files are allowed!'));
         return cb(null, false);
     }
@@ -53,7 +62,8 @@ router.post('/', isAdmin, uploadStorage.single('image'), async (req, res) => {
         if (!req.file) {
             return res.status(400).json({ error: true, msg: 'No valid image file provided' });
         }
-        res.status(200).json({ error: false, url: `${ServerURL}` + '/uploads/images/' + req.file.filename });
+        const baseUrl = getBaseUrl(req);
+        res.status(200).json({ error: false, url: `${baseUrl}/uploads/images/${req.file.filename}` });
     } catch (error) {
         // console.log(error);
         res.status(500).json({ error: true, msg: 'File Upload Failed, only Image files are accepted' });
@@ -78,7 +88,8 @@ router.post('/multiple', isAdmin, uploadStorage.array('images', 10), async (req,
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: true, msg: 'No valid image files provided' });
         }
-        const urls = req.files.map(file => "https://businessdialer.in/uploads/images/" + file.filename);
+        const baseUrl = getBaseUrl(req);
+        const urls = req.files.map(file => `${baseUrl}/uploads/images/${file.filename}`);
         res.status(200).json({ error: false, urls });
     } catch (error) {
         res.status(500).json({ error: true, msg: 'An error occurred while processing the uploaded files' });

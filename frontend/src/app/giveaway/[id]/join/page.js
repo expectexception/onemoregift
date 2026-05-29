@@ -1,17 +1,21 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import medal from "../../../../../public/images/medal.png";
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
-import confetti from "canvas-confetti";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { Country, State } from "country-state-city";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import withUserAuth from "@/app/components/withUserAuth";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const ALTCHA_CHALLENGE_URL = process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL;
 
@@ -39,16 +43,28 @@ function Home() {
         state: "",
         pincode: "",
     });
+    const [countries, setCountries] = useState([]);
+    const [states, setStates] = useState([]);
     const [isProfileUpdated, setIsProfileUpdated] = useState(false);
     const [alreadyJoined, setAlreadyJoined] = useState(false);
+    const [isGiveawayEnded, setIsGiveawayEnded] = useState(false);
+    const [isGiveawayNotStarted, setIsGiveawayNotStarted] = useState(false);
     const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
-    const checkGiveawayStatus = async () => {
+    const checkGiveawayStatus = useCallback(async () => {
         if (!user?._id || !giveawayId) return;
         try {
             const { data } = await api.get(`giveaway/${giveawayId}`);
-            if (data?.giveaway?.participants) {
-                const joined = data.giveaway.participants.some(p => (p._id || p) === user._id);
+            if (data?.giveaway) {
+                const giveaway = data.giveaway;
+                const nowIst = dayjs().tz("Asia/Kolkata");
+                const startIst = dayjs(giveaway.startDate).tz("Asia/Kolkata");
+                const endIst = dayjs(giveaway.endDate).tz("Asia/Kolkata");
+
+                setIsGiveawayNotStarted(nowIst.isBefore(startIst));
+                setIsGiveawayEnded(nowIst.isAfter(endIst) || nowIst.isSame(endIst));
+
+                const joined = giveaway.participants?.some((p) => (p._id || p) === user._id);
                 if (joined) {
                     setAlreadyJoined(true);
                     setTimeout(() => { router.push(`/giveaway/${giveawayId}`); }, 3500);
@@ -59,7 +75,7 @@ function Home() {
         } finally {
             setIsCheckingStatus(false);
         }
-    };
+    }, [giveawayId, router, user?._id]);
 
     const fetchData = async () => {
         try {
@@ -104,7 +120,25 @@ function Home() {
         } else {
             setIsCheckingStatus(false);
         }
-    }, [user, giveawayId]);
+    }, [user, giveawayId, checkGiveawayStatus]);
+
+    useEffect(() => {
+        if (currentStep === 2 && countries.length === 0) {
+            import("country-state-city").then(({ Country }) => {
+                setCountries(Country.getAllCountries());
+            }).catch(err => console.error("Failed to load country data", err));
+        }
+    }, [currentStep, countries.length]);
+
+    useEffect(() => {
+        if (currentStep === 2 && addressData.countryCode) {
+            import("country-state-city").then(({ State }) => {
+                setStates(State.getStatesOfCountry(addressData.countryCode));
+            }).catch(err => console.error("Failed to load state data", err));
+        } else {
+            setStates([]);
+        }
+    }, [currentStep, addressData.countryCode]);
 
     useEffect(() => {
         if (currentStep !== 3) return;
@@ -163,35 +197,46 @@ function Home() {
         if (currentStep < 3) setCurrentStep(currentStep + 1);
     };
 
+    const handleBack = () => {
+        if (currentStep === 1) {
+            router.back();
+        } else {
+            setCurrentStep((prev) => Math.max(prev - 1, 1));
+        }
+    };
+
     const handleJoin = async () => {
         try {
             let { data } = await api.post("giveaway/participate/" + giveawayId, {}, { meta: { auth: "user" } });
             if (!data.error) {
                 setParticipated(true);
+                import("canvas-confetti").then((module) => {
+                    const confetti = module.default;
+                    // Premium, expensive multi-burst fireworks animation
+                    const count = 250;
+                    const defaults = {
+                        origin: { y: 0.6 },
+                        colors: ['#dc2626', '#991b1b', '#fbbf24', '#f59e0b', '#ffffff'], // Deep Red, Crimson, Gold, Light Gold, Silver
+                        zIndex: 9999
+                    };
+
+                    const fire = (particleRatio, opts) => {
+                        confetti(Object.assign({}, defaults, opts, {
+                            particleCount: Math.floor(count * particleRatio)
+                        }));
+                    };
+
+                    fire(0.25, { spread: 26, startVelocity: 55 });
+                    fire(0.2, { spread: 60 });
+                    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+                    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+                    fire(0.1, { spread: 120, startVelocity: 45 });
+                }).catch(err => console.error("Failed to load confetti", err));
+                
                 setTimeout(() => { router.push("/thank-you"); }, 3500); // Give the premium confetti time to shine
             }
             if (data.error) {
                 toast({ title: "Error", description: data.msg || "Participation failed.", variant: "destructive" });
-            } else {
-                // Premium, expensive multi-burst fireworks animation
-                const count = 250;
-                const defaults = {
-                    origin: { y: 0.6 },
-                    colors: ['#dc2626', '#991b1b', '#fbbf24', '#f59e0b', '#ffffff'], // Deep Red, Crimson, Gold, Light Gold, Silver
-                    zIndex: 9999
-                };
-
-                const fire = (particleRatio, opts) => {
-                    confetti(Object.assign({}, defaults, opts, {
-                        particleCount: Math.floor(count * particleRatio)
-                    }));
-                };
-
-                fire(0.25, { spread: 26, startVelocity: 55 });
-                fire(0.2, { spread: 60 });
-                fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-                fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-                fire(0.1, { spread: 120, startVelocity: 45 });
             }
         } catch (error) {
             const message = error?.response?.data?.msg || "Participation failed.";
@@ -249,9 +294,6 @@ function Home() {
                     </div>
                 );
             case 2:
-                const countries = Country.getAllCountries();
-                const states = addressData.countryCode ? State.getStatesOfCountry(addressData.countryCode) : [];
-
                 return (
                     <div className="space-y-4">
                         <label className="text-neutral-300 text-sm font-medium">Shipping Address</label>
@@ -348,33 +390,73 @@ function Home() {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4">
-            <Image src={medal} height={100} width={100} alt="Medal" className="mb-6" />
-            <h1 className="text-2xl font-bold text-white mb-6">
-                {participated ? "Participation Successful!" : alreadyJoined ? "Already Participated" : "Confirm Your Participation"}
+        <div className="flex flex-col items-center justify-center min-h-screen bg-black p-3 sm:p-4">
+            <Image src={medal} height={100} width={100} alt="Medal" className="mb-4 sm:mb-6 w-16 sm:w-24 h-16 sm:h-24" />
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-4 sm:mb-6 text-center px-2">
+                {participated
+                    ? "Participation Successful!"
+                    : alreadyJoined
+                        ? "Already Participated"
+                        : isGiveawayEnded
+                            ? "Giveaway Ended"
+                        : isGiveawayNotStarted
+                            ? "Giveaway Not Started"
+                            : "Confirm Your Participation"}
             </h1>
-            <div className="w-full max-w-2xl premium-card rounded-2xl p-6 min-h-[420px] flex flex-col justify-between">
+            <div className="w-full max-w-2xl premium-card rounded-2xl p-4 sm:p-6 min-h-[420px] flex flex-col justify-between">
 
                 {alreadyJoined ? (
-                    <div className="flex-1 flex flex-col items-center justify-center space-y-4 text-center animate-fade-up">
-                        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 mb-2">
-                            <CheckCircle className="w-10 h-10 text-emerald-400" />
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center animate-fade-up">
+                        <div className="w-16 sm:w-20 h-16 sm:h-20 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 mb-2">
+                            <CheckCircle className="w-8 sm:w-10 h-8 sm:h-10 text-emerald-400" />
                         </div>
-                        <h2 className="text-2xl font-bold text-white">You&apos;re already in!</h2>
-                        <p className="text-neutral-400 max-w-sm mx-auto">
+                        <h2 className="text-lg sm:text-2xl font-bold text-white">You&apos;re already in!</h2>
+                        <p className="text-sm sm:text-base text-neutral-400 max-w-sm mx-auto">
                             You have successfully entered this giveaway. Redirecting you back to the main page...
                         </p>
                         <Button
                             onClick={() => router.push(`/giveaway/${giveawayId}`)}
-                            className="mt-4 px-8 btn-outline-premium rounded-xl"
+                            className="mt-3 sm:mt-4 px-6 sm:px-8 btn-outline-premium rounded-xl text-sm sm:text-base"
                         >
                             Return Now
+                        </Button>
+                    </div>
+                ) : isGiveawayEnded ? (
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center animate-fade-up">
+                        <div className="w-16 sm:w-20 h-16 sm:h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 mb-2">
+                            <XCircle className="w-8 sm:w-10 h-8 sm:h-10 text-red-400" />
+                        </div>
+                        <h2 className="text-lg sm:text-2xl font-bold text-white">This giveaway has ended</h2>
+                        <p className="text-sm sm:text-base text-neutral-400 max-w-sm mx-auto">
+                            Entries are closed for this giveaway.
+                        </p>
+                        <Button
+                            onClick={() => router.push(`/giveaway/${giveawayId}`)}
+                            className="mt-3 sm:mt-4 px-6 sm:px-8 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 rounded-xl text-sm sm:text-base"
+                        >
+                            Back to Giveaway
+                        </Button>
+                    </div>
+                ) : isGiveawayNotStarted ? (
+                    <div className="flex-1 flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center animate-fade-up">
+                        <div className="w-16 sm:w-20 h-16 sm:h-20 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/20 mb-2">
+                            <AlertCircle className="w-8 sm:w-10 h-8 sm:h-10 text-blue-300" />
+                        </div>
+                        <h2 className="text-lg sm:text-2xl font-bold text-white">Giveaway not started yet</h2>
+                        <p className="text-sm sm:text-base text-neutral-400 max-w-sm mx-auto">
+                            You can enter this giveaway once it goes live.
+                        </p>
+                        <Button
+                            onClick={() => router.push(`/giveaway/${giveawayId}`)}
+                            className="mt-3 sm:mt-4 px-6 sm:px-8 bg-neutral-800 text-neutral-300 hover:bg-neutral-700 rounded-xl text-sm sm:text-base"
+                        >
+                            Back to Giveaway
                         </Button>
                     </div>
                 ) : (
                     <>
                         {/* Step Indicators */}
-                        <div className="flex justify-between items-center mb-6 gap-1 sm:gap-2">
+                        <div className="flex justify-between items-center mb-4 sm:mb-6 gap-1 sm:gap-2">
                             {[1, 2, 3].map((step) => (
                                 <div
                                     key={step}
@@ -394,20 +476,18 @@ function Home() {
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">{displayStep(currentStep)}</div>
 
                         {/* Navigation */}
-                        <div className="flex flex-col-reverse sm:flex-row justify-between mt-6 gap-3">
+                        <div className="flex flex-col-reverse sm:flex-row justify-between mt-4 sm:mt-6 gap-2 sm:gap-3">
                             <Button
                                 variant="outline"
-                                onClick={() => setCurrentStep((prev) => Math.max(prev - 1, 1))}
-                                className={`w-full sm:w-auto px-6 rounded-xl border-white/[0.06] text-neutral-300 hover:bg-white/[0.04] ${currentStep === 1 ? "opacity-40 cursor-not-allowed" : ""
-                                    }`}
-                                disabled={currentStep === 1}
+                                onClick={handleBack}
+                                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl border-white/[0.06] text-neutral-300 hover:bg-white/[0.04] text-sm sm:text-base"
                             >
                                 Back
                             </Button>
                             <Button
                                 onClick={currentStep === 3 ? handleJoin : handleNext}
-                                className="w-full sm:w-auto px-6 btn-gradient rounded-xl font-medium"
-                                disabled={currentStep === 3 && !!ALTCHA_CHALLENGE_URL && !isCaptchaValid}
+                                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 btn-gradient rounded-xl font-medium text-sm sm:text-base"
+                                disabled={currentStep === 3 && !!ALTCHA_CHALLENGE_URL && !isCaptchaValid && process.env.NODE_ENV !== 'development'}
                             >
                                 {currentStep === 3 ? "Submit Entry" : "Next"}
                             </Button>

@@ -1,19 +1,22 @@
 import Image from "next/image";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import confetti from "canvas-confetti";
 import { useRouter, usePathname } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle } from "lucide-react";
-import { HiClock, HiUsers, HiGift, HiSparkles, HiCalendar, HiStar } from "react-icons/hi";
-import { FaTrophy } from "react-icons/fa";
+import { CheckCircle, Shuffle, ListChecks, AlertCircle } from "lucide-react";
+import { HiClock, HiCalendar } from "react-icons/hi";
 import api from "../utils/apiClient";
 import { exportToCSV } from "../utils/exportUtils";
 import { HiDownload } from "react-icons/hi";
 import { useAuth } from "@/app/context/AuthContext";
+import { TrophyIcon, UserIcon } from "./SVGIcons";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export default function GiveawayDetails({ data }) {
     const { toast } = useToast();
@@ -40,18 +43,45 @@ export default function GiveawayDetails({ data }) {
     const [isJoining, setIsJoining] = useState(false);
     const [hasJoined, setHasJoined] = useState(false);
 
+    // Check participation status from server
+    const checkParticipationStatus = async () => {
+        if (!user?._id || !_id) return;
+        try {
+            const { data } = await api.get(`giveaway/${_id}`);
+            if (data?.giveaway?.participants) {
+                const joined = data.giveaway.participants.some(p => (p._id || p) === user._id);
+                setHasJoined(joined);
+            }
+        } catch (error) {
+            console.error("Failed to check participation status", error);
+        }
+    };
+
     useEffect(() => {
         if (user && participants) {
             // Handle both populated objects (p._id) and unpopulated string IDs (p)
-            setHasJoined(participants.some(p => (p._id || p) === user._id));
+            const isJoined = participants.some(p => (p._id || p) === user._id);
+            setHasJoined(isJoined);
         } else {
             setHasJoined(false);
         }
     }, [user, participants]);
+
+    // Check server on component mount to ensure latest status
+    useEffect(() => {
+        if (user) {
+            checkParticipationStatus();
+        }
+    }, [user?._id, _id]);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedWinners, setSelectedWinners] = useState([]);
+    const [winnerMode, setWinnerMode] = useState("random");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    const participantTotal = Number(participantCount || participants?.length || 0);
+    const winnerTotal = Number(winnerCount || 0);
+    const participantCap = Number(maxParticipants || 0);
+    const imageSrc = image || "/images/gift.png";
 
     useEffect(() => {
         const end = dayjs(endDate);
@@ -74,7 +104,16 @@ export default function GiveawayDetails({ data }) {
         return () => clearInterval(timer);
     }, [endDate]);
 
-    const hasEnded = dayjs().isAfter(endDate);
+    const nowIst = dayjs().tz("Asia/Kolkata");
+    const isAdminPath = path.includes("/admin/dashboard/giveaways/");
+    const isTestEvent = data?.title?.startsWith("LIFECYCLE-TEST-") || data?.title?.startsWith("TEST-");
+    const hasStarted = startDate ? !nowIst.isBefore(dayjs(startDate).tz("Asia/Kolkata")) : true;
+    const hasEnded = (endDate ? !nowIst.isBefore(dayjs(endDate).tz("Asia/Kolkata")) : false) || (isAdminPath && isTestEvent);
+    const canPickWinners = isAdminPath
+        && hasEnded
+        && initialWinners?.length === 0
+        && participants?.length >= winnerTotal
+        && winnerTotal > 0;
 
     const handleEnterClick = () => {
         const joinPath = `${path}/join`;
@@ -82,26 +121,42 @@ export default function GiveawayDetails({ data }) {
     };
 
     const handleSetWinners = () => {
-        setIsLoading(true);
-        setTimeout(() => {
-            const shuffled = [...participants].sort(() => Math.random() - 0.5);
-            const selected = shuffled.slice(0, winnerCount);
-            setSelectedWinners(selected);
-            setIsLoading(false);
-            setIsDialogOpen(true);
-        }, 1000);
+        if (!hasEnded) {
+            toast({ title: "Giveaway still live", variant: "destructive", description: "Winners can be selected after the giveaway ends." });
+            return;
+        }
+        if (!participants?.length) {
+            toast({ title: "No participants", variant: "destructive", description: "There are no participants to select from." });
+            return;
+        }
+        if (participants.length < winnerTotal) {
+            toast({ title: "Not enough participants", variant: "destructive", description: `Need at least ${winnerTotal} participants.` });
+            return;
+        }
+        setWinnerMode("random");
+        setSelectedWinners([]);
+        setIsDialogOpen(true);
     };
 
     const handleConfirmWinners = async () => {
-        let winnersIds = selectedWinners.map(winner => winner._id);
-        setIsDialogOpen(false);
+        const winnersIds = selectedWinners.map(winner => winner._id);
+        if (winnerMode === "manual" && winnersIds.length !== winnerTotal) {
+            toast({ title: "Select winners", variant: "destructive", description: `Please select exactly ${winnerTotal} winner${winnerTotal === 1 ? "" : "s"}.` });
+            return;
+        }
+        setIsLoading(true);
         try {
-            let { data } = await api.post(`giveaway/winners/${_id}`, { winners: winnersIds }, {
+            let { data } = await api.post(`giveaway/winners/${_id}`, { mode: winnerMode, winners: winnersIds }, {
                 meta: { auth: "admin" },
             });
             if (data.error === false) {
-                setWinners(selectedWinners);
-                confetti();
+                setWinners(data.winners || selectedWinners);
+                setSelectedWinners(data.winners || selectedWinners);
+                setIsDialogOpen(false);
+                import("canvas-confetti").then((module) => {
+                    const confetti = module.default;
+                    confetti();
+                }).catch(err => console.error("Failed to load confetti", err));
                 toast({
                     title: "Winners Set",
                     variant: "success",
@@ -113,11 +168,27 @@ export default function GiveawayDetails({ data }) {
                     )
                 });
             } else {
-                toast({ title: "Error", variant: "destructive", description: "Something went wrong." });
+                toast({ title: "Error", variant: "destructive", description: data.msg || "Something went wrong." });
             }
         } catch (error) {
-            toast({ title: "Error", variant: "destructive", description: "Something went wrong." });
+            toast({ title: "Error", variant: "destructive", description: error?.response?.data?.msg || "Something went wrong." });
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    const toggleManualWinner = (participant) => {
+        setSelectedWinners((current) => {
+            const exists = current.some(winner => winner._id === participant._id);
+            if (exists) {
+                return current.filter(winner => winner._id !== participant._id);
+            }
+            if (current.length >= winnerTotal) {
+                toast({ title: "Winner limit reached", description: `Only ${winnerTotal} winner${winnerTotal === 1 ? "" : "s"} can be selected.` });
+                return current;
+            }
+            return [...current, participant];
+        });
     };
 
     const handleExportParticipants = () => {
@@ -144,36 +215,36 @@ export default function GiveawayDetails({ data }) {
         exportToCSV(exportData, `Winners_${title.replace(/\s+/g, '_')}`);
     };
 
-    const progressPercent = Math.min((participantCount / (maxParticipants || 1)) * 100, 100);
+    const progressPercent = participantCap ? Math.min((participantTotal / participantCap) * 100, 100) : 0;
 
     return (
-        <div className="max-w-3xl mx-auto px-4 py-8 animate-fade-up">
-            <div className="premium-card rounded-3xl overflow-hidden">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 animate-fade-up">
+            <div className="premium-card rounded-2xl sm:rounded-3xl overflow-hidden">
                 {/* Image Section */}
-                <div className="relative h-72 bg-neutral-900 flex items-center justify-center">
+                <div className="relative h-48 sm:h-56 md:h-72 bg-neutral-900 flex items-center justify-center">
                     <Image
-                        src={image || ""}
-                        alt={title}
+                        src={imageSrc}
+                        alt={title ? `${title} giveaway image` : "Giveaway image"}
                         width={280}
                         height={280}
-                        className="object-contain transform transition-transform duration-500 hover:scale-105"
+                        className="object-contain transform transition-transform duration-500 hover:scale-105 w-32 sm:w-40 md:w-56 h-32 sm:h-40 md:h-56"
                     />
                     {/* Status Badge */}
-                    <div className={`absolute top-4 right-4 px-4 py-2 rounded-full ${hasEnded ? 'bg-red-500/20 border-red-500/40' : 'bg-emerald-500/20 border-emerald-500/40'} border`}>
-                        <span className={`text-sm font-semibold flex items-center gap-2 ${hasEnded ? 'text-red-400' : 'text-emerald-400'}`}>
-                            {!hasEnded && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
-                            {hasEnded ? 'Ended' : 'Live'}
+                    <div className={`absolute top-3 sm:top-4 right-3 sm:right-4 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm ${hasEnded ? 'bg-red-500/20 border-red-500/40' : !hasStarted ? 'bg-blue-500/20 border-blue-500/40' : 'bg-emerald-500/20 border-emerald-500/40'} border`}>
+                        <span className={`font-semibold flex items-center gap-1 sm:gap-2 ${hasEnded ? 'text-red-400' : !hasStarted ? 'text-blue-300' : 'text-emerald-400'}`}>
+                            {hasStarted && !hasEnded && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+                            {hasEnded ? 'Ended' : !hasStarted ? 'Scheduled' : 'Live'}
                         </span>
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-8">
-                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">{title}</h1>
-                    <p className="text-neutral-400 text-lg leading-relaxed mb-8">{description}</p>
+                <div className="p-4 sm:p-6 md:p-8">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">{title}</h1>
+                    <p className="text-sm sm:text-base md:text-lg text-neutral-400 leading-relaxed mb-6 sm:mb-8">{description}</p>
 
                     {/* Countdown Timer */}
-                    {!hasEnded && (
+                    {hasStarted && !hasEnded && (
                         <div className="mb-8">
                             <div className="flex items-center gap-2 text-neutral-500 mb-3">
                                 <HiClock className="text-red-500" />
@@ -210,10 +281,10 @@ export default function GiveawayDetails({ data }) {
                     <div className="mb-8">
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2 text-neutral-500">
-                                <HiUsers className="text-red-500" />
+                                <UserIcon className="w-5 h-5" />
                                 <span className="text-sm font-medium">Participants</span>
                             </div>
-                            <span className="text-white font-bold">{participantCount} / {maxParticipants || "\u221E"}</span>
+                            <span className="text-white font-bold">{participantTotal} / {participantCap || "\u221E"}</span>
                         </div>
                         <div className="h-3 bg-white/[0.05] rounded-full overflow-hidden">
                             <div
@@ -221,7 +292,7 @@ export default function GiveawayDetails({ data }) {
                                 style={{ width: `${progressPercent}%` }}
                             />
                         </div>
-                        {participantCount >= maxParticipants && (
+                        {participantCap > 0 && participantTotal >= participantCap && (
                             <p className="mt-2 text-sm text-emerald-400 font-medium">Giveaway is full!</p>
                         )}
                     </div>
@@ -229,8 +300,8 @@ export default function GiveawayDetails({ data }) {
                     {/* Prize */}
                     <div className="p-4 rounded-xl bg-red-600/5 border border-red-600/10 mb-8">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                                <FaTrophy className="text-white text-xl" />
+                            <div className="w-12 h-12 rounded-xl bg-red-600/10 flex items-center justify-center">
+                                <TrophyIcon className="w-8 h-8" />
                             </div>
                             <div>
                                 <p className="text-sm text-neutral-500">Prize</p>
@@ -245,8 +316,8 @@ export default function GiveawayDetails({ data }) {
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <h4 className="text-red-500 font-semibold flex items-center gap-2">
-                                        <HiUsers className="text-lg" />
-                                        Participants ({participantCount || 0})
+                                        <UserIcon className="w-5 h-5" />
+                                        Participants ({participantTotal || 0})
                                     </h4>
                                     {path.includes("/admin") && participants?.length > 0 && (
                                         <button
@@ -276,7 +347,7 @@ export default function GiveawayDetails({ data }) {
                                 <div className="border-t md:border-t-0 md:border-l border-white/5 pt-6 md:pt-0 md:pl-6">
                                     <div className="flex items-center justify-between mb-4">
                                         <h4 className="text-yellow-400 font-semibold flex items-center gap-2">
-                                            <FaTrophy className="text-lg" /> Winners
+                                            <TrophyIcon className="w-5 h-5" /> Winners
                                         </h4>
                                         <div className="flex items-center gap-2">
                                             {path.includes("/admin") && (
@@ -318,19 +389,19 @@ export default function GiveawayDetails({ data }) {
                             </div>
                         ) : (
                             <button
-                                className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-300 ${hasEnded || (maxParticipants && participantCount >= maxParticipants)
+                                className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-300 ${!hasStarted || hasEnded || (participantCap && participantTotal >= participantCap)
                                     ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                                     : 'btn-gradient hover:shadow-glow-lg'
                                     }`}
                                 onClick={handleEnterClick}
-                                disabled={hasEnded || isJoining || (maxParticipants && participantCount >= maxParticipants)}
+                                disabled={!hasStarted || hasEnded || isJoining || (participantCap && participantTotal >= participantCap)}
                             >
-                                {hasEnded ? "Giveaway Ended" : isJoining ? (
+                                {!hasStarted ? "Giveaway Not Started" : hasEnded ? "Giveaway Ended" : isJoining ? (
                                     <span className="flex items-center justify-center gap-2">
                                         <span className="animate-spin rounded-full border-t-2 border-white h-5 w-5"></span>
                                         Processing...
                                     </span>
-                                ) : (participantCount >= maxParticipants ? "Limit Reached" : "Enter Now")}
+                                ) : (participantCap && participantTotal >= participantCap ? "Limit Reached" : "Enter Now")}
                             </button>
                         )
                     ) : (
@@ -343,16 +414,16 @@ export default function GiveawayDetails({ data }) {
                             </button>
                             {initialWinners?.length === 0 && (
                                 <button
-                                    className="w-full sm:flex-1 py-4 rounded-xl font-semibold btn-gradient"
+                                    className={`w-full sm:flex-1 py-4 rounded-xl font-semibold ${canPickWinners ? "btn-gradient" : "bg-neutral-800 text-neutral-500 cursor-not-allowed"}`}
                                     onClick={handleSetWinners}
-                                    disabled={isLoading}
+                                    disabled={isLoading || !canPickWinners}
                                 >
                                     {isLoading ? (
                                         <span className="flex items-center justify-center gap-2">
                                             <span className="animate-spin rounded-full border-t-2 border-white h-5 w-5"></span>
                                             Selecting...
                                         </span>
-                                    ) : "Set Winners"}
+                                    ) : hasEnded ? "Set Winners" : "Wait Until Ended"}
                                 </button>
                             )}
                         </div>
@@ -364,27 +435,88 @@ export default function GiveawayDetails({ data }) {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="glass-dark border-white/10 rounded-2xl max-w-md">
                     <DialogHeader className="text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center mx-auto mb-4 shadow-glow">
-                            <FaTrophy className="text-white text-2xl" />
+                        <div className="flex justify-center mb-4">
+                            <TrophyIcon className="w-12 h-12" />
                         </div>
                         <DialogTitle className="text-2xl font-bold text-white">Selected Winners</DialogTitle>
                         <DialogDescription className="text-neutral-400">
-                            Confirm these winners for the giveaway
+                            Select {winnerTotal} winner{winnerTotal === 1 ? "" : "s"} from {participantTotal} participant{participantTotal === 1 ? "" : "s"}.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 space-y-3">
-                        {selectedWinners.map((winner, index) => (
-                            <div key={index} className="flex items-center gap-3 p-3 rounded-xl bg-red-600/5 border border-red-600/10">
-                                <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-sm">
-                                    {index + 1}
-                                </div>
-                                <span className="text-white font-medium">{winner.name}</span>
-                            </div>
-                        ))}
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setWinnerMode("random");
+                                setSelectedWinners([]);
+                            }}
+                            className={`py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${winnerMode === "random" ? "bg-red-600 text-white border-red-500" : "bg-white/[0.03] text-neutral-400 border-white/10 hover:text-white"}`}
+                        >
+                            <Shuffle className="w-4 h-4" /> Random
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setWinnerMode("manual");
+                                setSelectedWinners([]);
+                            }}
+                            className={`py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${winnerMode === "manual" ? "bg-red-600 text-white border-red-500" : "bg-white/[0.03] text-neutral-400 border-white/10 hover:text-white"}`}
+                        >
+                            <ListChecks className="w-4 h-4" /> Manual
+                        </button>
                     </div>
+                    <div className="py-4 space-y-3">
+                        {winnerMode === "random" ? (
+                            <div className="p-4 rounded-xl bg-red-600/5 border border-red-600/10 flex gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                                <p className="text-sm text-neutral-300 leading-relaxed">
+                                    The backend will randomly draw winners from the participant list and lock this giveaway.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                {participants?.map((participant) => {
+                                    const checked = selectedWinners.some(winner => winner._id === participant._id);
+                                    return (
+                                        <button
+                                            type="button"
+                                            key={participant._id}
+                                            onClick={() => toggleManualWinner(participant)}
+                                            className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${checked ? "bg-red-600/15 border-red-500/40" : "bg-white/[0.03] border-white/10 hover:border-white/20"}`}
+                                        >
+                                            <span className={`w-5 h-5 rounded border flex items-center justify-center ${checked ? "bg-red-600 border-red-500" : "border-white/20"}`}>
+                                                {checked && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                                            </span>
+                                            <span>
+                                                <span className="block text-white text-sm font-semibold">{participant.name || "Unnamed participant"}</span>
+                                                <span className="block text-neutral-500 text-xs">{participant.email || participant.phone || participant._id}</span>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {selectedWinners.length > 0 && (
+                            <div className="text-xs text-neutral-500 text-center">
+                                {selectedWinners.length} / {winnerTotal} selected
+                            </div>
+                        )}
+                    </div>
+                    {winnerMode === "manual" && selectedWinners.length > 0 && (
+                        <div className="space-y-2">
+                            {selectedWinners.map((winner, index) => (
+                                <div key={winner._id} className="flex items-center gap-3 p-3 rounded-xl bg-red-600/5 border border-red-600/10">
+                                    <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-sm">
+                                        {index + 1}
+                                    </div>
+                                    <span className="text-white font-medium">{winner.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex gap-3">
-                        <button className="flex-1 py-3 rounded-xl btn-gradient font-semibold" onClick={handleConfirmWinners}>
-                            Confirm Winners
+                        <button className="flex-1 py-3 rounded-xl btn-gradient font-semibold disabled:opacity-50" onClick={handleConfirmWinners} disabled={isLoading || (winnerMode === "manual" && selectedWinners.length !== winnerTotal)}>
+                            {isLoading ? "Saving..." : "Confirm Winners"}
                         </button>
                         <button className="flex-1 py-3 rounded-xl btn-outline-premium font-medium" onClick={() => setIsDialogOpen(false)}>
                             Cancel

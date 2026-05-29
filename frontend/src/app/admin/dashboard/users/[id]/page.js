@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
     User,
@@ -8,7 +9,6 @@ import {
     MapPin,
     Calendar,
     Shield,
-    ShieldOff,
     Gift,
     Trophy,
     ArrowLeft,
@@ -39,7 +39,7 @@ const UserProfilePage = () => {
     const [newPassword, setNewPassword] = useState("");
     const [resetLoading, setResetLoading] = useState(false);
 
-    const fetchUser = async () => {
+    const fetchUser = useCallback(async () => {
         try {
             setLoading(true);
             const { data } = await api.get(`admin/users/${userId}`, {
@@ -55,7 +55,7 @@ const UserProfilePage = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast, userId]);
 
     const handlePasswordReset = async (e) => {
         e.preventDefault();
@@ -98,7 +98,7 @@ const UserProfilePage = () => {
 
     useEffect(() => {
         if (userId) fetchUser();
-    }, [userId]);
+    }, [userId, fetchUser]);
 
     if (loading) {
         return (
@@ -119,12 +119,8 @@ const UserProfilePage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-black p-4 md:p-8 relative overflow-hidden">
-            {/* Background elements */}
-            <div className="absolute inset-0 section-gradient opacity-10" />
-            <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-red-600/5 rounded-full blur-[120px]" />
-
-            <div className="relative z-10 max-w-5xl mx-auto animate-fade-in">
+        <div className="min-h-screen bg-[#070707] p-4 md:p-8">
+            <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <button
@@ -134,7 +130,7 @@ const UserProfilePage = () => {
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                         <span className="text-sm font-medium">Back to Users</span>
                     </button>
-                    <div className={`px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${user.blocked
+                    <div className={`px-4 py-1.5 rounded-full text-xs font-semibold border ${user.blocked
                         ? "bg-red-500/10 text-red-500 border-red-500/20"
                         : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                         }`}>
@@ -145,13 +141,13 @@ const UserProfilePage = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Profile Card */}
                     <div className="lg:col-span-1 space-y-8">
-                        <Card className="premium-card border-white/[0.06] bg-white/[0.02] overflow-hidden">
+                        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                             <div className="h-24 bg-gradient-to-r from-red-600/20 to-neutral-900" />
                             <CardContent className="relative pt-0 px-6 pb-8">
                                 <div className="absolute -top-12 left-6">
-                                    <div className="w-24 h-24 rounded-3xl bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
+                                    <div className="w-24 h-24 rounded-lg bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
                                         {user.avatar ? (
-                                            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                                            <Image src={user.avatar || "/images/user.png"} alt={user.name || "User"} width={96} height={96} className="w-full h-full object-cover" />
                                         ) : (
                                             <User className="w-10 h-10 text-neutral-500" />
                                         )}
@@ -181,7 +177,7 @@ const UserProfilePage = () => {
                     {/* Right Column: Actions & Details */}
                     <div className="lg:col-span-2 space-y-8">
                         {/* Security Management */}
-                        <Card className="premium-card border-white/[0.06] bg-white/[0.02]">
+                        <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
                             <CardHeader>
                                 <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
                                     <Lock className="w-5 h-5 text-red-500" />
@@ -194,24 +190,24 @@ const UserProfilePage = () => {
                             <CardContent>
                                 <form onSubmit={handlePasswordReset} className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Set New Password</label>
+                                        <label className="text-xs font-semibold text-neutral-500">Set new password</label>
                                         <div className="flex gap-3">
                                             <Input
                                                 type="password"
                                                 placeholder="Enter secure password"
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
-                                                className="premium-input h-12 bg-white/[0.03] text-white placeholder:text-neutral-600"
+                                                className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600"
                                             />
                                             <Button
                                                 type="submit"
                                                 disabled={resetLoading}
-                                                className="btn-gradient px-8 rounded-xl h-12 font-bold whitespace-nowrap"
+                                                className="px-6 rounded-lg h-12 font-semibold whitespace-nowrap bg-red-600 text-white hover:bg-red-500"
                                             >
                                                 {resetLoading ? <RefreshCw className="animate-spin" /> : "Reset Access"}
                                             </Button>
                                         </div>
-                                        <p className="text-[10px] text-neutral-600 italic mt-2">
+                                        <p className="text-[10px] text-neutral-600 mt-2">
                                             * Minimum 6 characters. User will need to login with these new credentials immediately.
                                         </p>
                                     </div>
@@ -220,7 +216,7 @@ const UserProfilePage = () => {
                         </Card>
 
                         {/* Additional Info / Activity Placeholder */}
-                        <Card className="premium-card border-white/[0.06] bg-white/[0.02] border-dashed opacity-50 grayscale">
+                        <Card className="border-white/[0.06] bg-white/[0.02] border-dashed opacity-60 rounded-lg">
                             <CardContent className="p-12 flex flex-col items-center justify-center text-center">
                                 <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4">
                                     <Shield className="w-8 h-8 text-neutral-700" />
@@ -242,17 +238,17 @@ const ProfileInfo = ({ icon: Icon, label, value }) => (
             <Icon className="w-4 h-4 text-neutral-500" />
         </div>
         <div className="overflow-hidden">
-            <p className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest">{label}</p>
+            <p className="text-xs font-semibold text-neutral-500">{label}</p>
             <p className="text-neutral-300 text-sm truncate">{value}</p>
         </div>
     </div>
 );
 
 const StatBox = ({ icon: Icon, label, value, color }) => (
-    <div className="premium-card border-white/[0.06] bg-white/[0.02] p-5 rounded-2xl flex flex-col items-center text-center group hover:bg-white/[0.04] transition-all">
+    <div className="border border-white/[0.06] bg-white/[0.02] p-5 rounded-lg flex flex-col items-center text-center hover:bg-white/[0.04] transition-all">
         <Icon className={`w-6 h-6 ${color} mb-3 group-hover:scale-110 transition-transform`} />
-        <span className="text-2xl font-black text-white">{value}</span>
-        <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-widest mt-1">{label}</span>
+        <span className="text-2xl font-semibold text-white">{value}</span>
+        <span className="text-xs font-semibold text-neutral-500 mt-1">{label}</span>
     </div>
 );
 

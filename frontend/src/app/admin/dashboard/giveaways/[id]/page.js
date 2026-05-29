@@ -2,14 +2,14 @@
 // import Navbar from "../../components/Navbar";
 // import Footer from "../../components/Footer";
 // import Disclaimer from "@/app/components/Disclaimer";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import GiveawayDetails from "@/app/components/GiveawayDetails";
 import withAdminAuth from "../../../../components/withAdminAuth";
 import api from "@/app/utils/apiClient";
 function Page({ params }) {
     const slug = use(params).id
     let [giveaway, setGiveaway] = useState({});
-    let fetchGiveaway = async () => {
+    const fetchGiveaway = useCallback(async () => {
         try {
             const { data } = await api.get(`admin/giveaway/${slug}`, {
                 meta: { auth: "admin" },
@@ -17,10 +17,10 @@ function Page({ params }) {
             setGiveaway(data.data);
         } catch (error) {
         }
-    };
+    }, [slug]);
     useEffect(() => {
         fetchGiveaway();
-    }, []);
+    }, [fetchGiveaway]);
 
 
     // return <div>My Post: {slug}</div>

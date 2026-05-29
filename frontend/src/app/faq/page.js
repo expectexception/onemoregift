@@ -198,7 +198,7 @@ export default function FAQPage() {
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-3">No results found</h3>
                             <p className="text-neutral-500 text-lg max-w-md mx-auto">
-                                We couldn't find any answers matching your search. Try adjusting your keywords or selecting a different category.
+                                We couldn&apos;t find any answers matching your search. Try adjusting your keywords or selecting a different category.
                             </p>
                         </div>
                     )}
@@ -212,7 +212,7 @@ export default function FAQPage() {
                     </div>
                     <h3 className="text-3xl font-bold text-white mb-4">Still have questions?</h3>
                     <p className="text-neutral-400 text-lg mb-8 max-w-lg mx-auto leading-relaxed">
-                        Our dedicated support team is always here to help. Reach out and we'll get back to you within 24 hours.
+                        Our dedicated support team is always here to help. Reach out and we&apos;ll get back to you within 24 hours.
                     </p>
                     <Link
                         href="mailto:support@onemoregift.in"

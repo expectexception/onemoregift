@@ -2,7 +2,7 @@
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import Disclaimer from "@/app/components/Disclaimer";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import GiveawayDetails from "@/app/components/GiveawayDetails";
 import api from "@/app/utils/apiClient";
 
@@ -11,7 +11,7 @@ export default function Page({ params }) {
     let [giveaway, setGiveaway] = useState({});
     let [loading, setLoading] = useState(true);
 
-    let fetchGiveaway = async () => {
+    const fetchGiveaway = useCallback(async () => {
         try {
             const { data } = await api.get(`giveaway/${slug}`);
             setGiveaway(data.giveaway);
@@ -20,13 +20,13 @@ export default function Page({ params }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [slug]);
 
     useEffect(() => {
         fetchGiveaway();
         const interval = setInterval(fetchGiveaway, 10000); // Poll every 10 seconds for real-time stats
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchGiveaway]);
 
     return (
         <div className="min-h-screen flex flex-col">

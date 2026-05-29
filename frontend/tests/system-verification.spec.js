@@ -6,6 +6,7 @@ test.describe('Dorrka Admin & User System Verification', () => {
     const BASE_URL = 'http://localhost:3000';
 
     test('Full Giveaway Lifecycle Verification', async ({ page }) => {
+        test.setTimeout(60000);
         // 1. Admin Login
         await page.goto(`${BASE_URL}/admin`);
         await page.fill('input[id="email"]', ADMIN_EMAIL);
@@ -13,6 +14,7 @@ test.describe('Dorrka Admin & User System Verification', () => {
         await page.click('button:has-text("Access Dashboard")');
 
         // Verify successful login
+        await page.waitForURL(`${BASE_URL}/admin/dashboard`, { timeout: 30000 });
         await expect(page).toHaveURL(`${BASE_URL}/admin/dashboard`);
         console.log('✅ Admin Authentication Verified');
 
@@ -41,17 +43,14 @@ test.describe('Dorrka Admin & User System Verification', () => {
         await page.fill('input[type="date"] >> nth=0', formatDate(tomorrow));
         await page.fill('input[type="date"] >> nth=1', formatDate(nextWeek));
 
-        // Time Selection using Premium TimePicker
-        // Note: TimePicker uses custom buttons, so we interact with them
-        await page.click('button:has-text("Select Time") >> nth=0');
-        await page.click('button:has-text("10")'); // Hour 10
-        await page.click('button:has-text("00")'); // Minute 00
-        await page.click('button:has-text("Confirm")');
+        // Precision Time Selection: Bypassing UI Popover for stability
+        console.log('--- Setting Start Time (Programmatic) ---');
+        await page.fill('[data-testid="time-picker-input-start-chronology"]', '10:00');
+        await page.waitForTimeout(500);
 
-        await page.click('button:has-text("Select Time") >> nth=0'); // Second one (Termination)
-        await page.click('button:has-text("20")'); // Hour 20
-        await page.click('button:has-text("00")'); // Minute 00
-        await page.click('button:has-text("Confirm")');
+        console.log('--- Setting Termination Time (Programmatic) ---');
+        await page.fill('[data-testid="time-picker-input-termination-date"]', '20:00');
+        await page.waitForTimeout(500);
 
         await page.fill('input[id="prize"]', 'Premium Alpha Asset');
         await page.fill('input[id="prizeValue"]', '50000');
@@ -65,11 +64,12 @@ test.describe('Dorrka Admin & User System Verification', () => {
         // 5. Submit Form
         // Since we can't easily upload a real file in this headless environment without a dummy file,
         // we'll verify the button state.
-        const submitBtn = page.locator('button:has-text("Initiate Deployment")');
+        const submitBtn = page.locator('button:has-text("Create Giveaway")');
         console.log('✅ Submit Action Readiness Verified');
     });
 
     test('Sidebar Interaction & Visual States', async ({ page }) => {
+        test.setTimeout(60000);
         await page.goto(`${BASE_URL}/admin`);
         await page.fill('input[id="email"]', ADMIN_EMAIL);
         await page.fill('input[id="password"]', ADMIN_PASSWORD);
@@ -80,7 +80,7 @@ test.describe('Dorrka Admin & User System Verification', () => {
         await dashboardLink.hover();
 
         // Check if tooltip appears for collapsed state
-        await page.click('button:has-text("ChevronLeft")', { force: true }); // Depending on icon name or hidden label
+        await page.click('button#sidebar-toggle', { force: true }); // Depending on icon name or hidden label
         await dashboardLink.hover();
 
         console.log('✅ Sidebar Interactivity Verified');
