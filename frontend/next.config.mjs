@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    output: "standalone",
     env: {
         NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
         NEXT_PUBLIC_ALTCHA_CHALLENGE_URL: process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL,

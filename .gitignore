@@ -26,3 +26,6 @@ frontend/.vercel
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 frontend/coverage/
+
+# Local build artifacts
+dist/
