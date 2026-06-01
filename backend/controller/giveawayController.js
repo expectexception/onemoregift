@@ -314,7 +314,7 @@ const getWinners = async (req, res) => {
             winners: { $ne: [] } // Ensure winners array is not empty
         }).select("-participants").populate({
             path: "winners",
-            select: "-_id name"
+            select: "_id name fullName avatar"
         }).sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);

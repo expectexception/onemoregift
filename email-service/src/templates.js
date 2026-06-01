@@ -173,7 +173,7 @@ function renderWelcome(payload = {}) {
     ...payload,
     title: payload.title || `Welcome to ${normalizeTheme(payload).appName}`,
   }, (theme) => `
-    <h1 style="margin:0 0 12px;color:${theme.text};font-size:30px;line-height:1.18;letter-spacing:-.04em;">${escapeHtml(payload.title || "Welcome Aboard")}</h1>
+    <h1 style="margin:0 0 12px;color:${theme.text};font-size:30px;line-height:1.18;letter-spacing:-.04em;">${escapeHtml(payload.title || "Welcome  d")}</h1>
     ${paragraph(payload.message || `Your ${theme.appName} account is ready. You can now explore giveaways, winners, and rewards.`, theme)}
     ${button({ url: payload.actionUrl || theme.appUrl, label: payload.actionLabel || "Start Exploring" }, theme)}
     ${notice(payload.footer || "We are glad to have you here. Keep your account details private and enjoy responsibly.", theme)}

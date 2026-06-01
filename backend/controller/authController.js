@@ -15,7 +15,10 @@ const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'no-reply@onemoregi
 const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'OneMoreGift';
 const MAIL_USER = process.env.MAIL_USER;
 const MAIL_APP_PASSWORD = process.env.MAIL_APP_PASSWORD;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
 const COOKIE_SECURE = process.env.NODE_ENV === 'production';
 const USER_COOKIE_NAME = 'user_token';
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
@@ -27,8 +30,9 @@ const EMAIL_SERVICE_REQUIRED = process.env.EMAIL_SERVICE_REQUIRED === 'true';
 const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 15000);
 const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
+const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test';
 
-const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
+const googleClient = GOOGLE_CLIENT_IDS.length ? new OAuth2Client() : null;
 
 const userCookieOptions = {
     httpOnly: true,
@@ -54,10 +58,18 @@ const signUserToken = (user) => {
     const data = {
         _id: user._id,
         name: user.name,
+        fullName: user.fullName || "",
         phone: user.phone,
         email: user.email,
     };
     return jwt.sign({ data }, JWT_SECRET, { expiresIn: '90d' });
+};
+
+const getDisplayName = (user = {}) => {
+    if (user.fullName && String(user.fullName).trim()) return String(user.fullName).trim();
+    if (user.name && String(user.name).trim()) return String(user.name).trim();
+    if (user.email && String(user.email).trim()) return String(user.email).trim();
+    return "there";
 };
 
 const sendEmailFallback = async ({ to, subject, html }) => {
@@ -189,8 +201,20 @@ const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #000000; color: #ffffff; margin: 0; padding: 0; }
         .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #0a0a0a; border: 1px solid #1f1f1f; border-radius: 16px; margin-top: 40px; }
         .logo { text-align: center; margin-bottom: 30px; }
-        .logo span { font-size: 24px; font-weight: 900; letter-spacing: -1px; color: #ffffff; }
-        .logo .brand { color: #ef4444; }
+        .logo-wrap { display: inline-flex; align-items: center; gap: 12px; }
+        .logo-badge {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(145deg, #ef4444 0%, #991b1b 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+        }
+        .logo-text { font-size: 34px; line-height: 1; font-weight: 900; letter-spacing: -0.5px; color: #ffffff; }
+        .logo-text .brand { color: #ef4444; }
         .content { background: #111111; padding: 30px; border-radius: 12px; border: 1px solid #222222; text-align: center; }
         h1 { color: #ffffff; font-size: 24px; margin-top: 0; margin-bottom: 10px; font-weight: 800; }
         p { color: #a3a3a3; font-size: 15px; line-height: 1.6; margin-bottom: 25px; }
@@ -202,7 +226,12 @@ const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!
 </head>
 <body>
     <div class="container">
-        <div class="logo"><span>OneMore<span class="brand">Gift</span></span></div>
+        <div class="logo">
+            <div class="logo-wrap">
+                <span class="logo-badge">🎁</span>
+                <span class="logo-text">OneMore<span class="brand">Gift</span></span>
+            </div>
+        </div>
         <div class="content">
             <h1>${title}</h1>
             <p>${message}</p>
@@ -218,6 +247,7 @@ const register = async (req, res) => {
     try {
         const {
             name,
+            fullName,
             phone,
             email,
             password,
@@ -225,6 +255,8 @@ const register = async (req, res) => {
             privacyAccepted,
             policyVersion
         } = req.body;
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+
         if (!name) return res.status(400).json({ error: true, msg: 'Name is required' });
         if (!email || !password) {
             return res.status(400).json({ error: true, msg: 'Email and password are required' });
@@ -252,19 +284,21 @@ const register = async (req, res) => {
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
-        console.log('[OTP_DEBUG] Generated registration OTP for', email, 'is:', otpCode);
+        console.log('[OTP_DEBUG] Generated registration OTP for', normalizedEmail, 'is:', otpCode);
 
-        let isTest = process.env.NODE_ENV === 'test' || (email && email.endsWith('@test.com'));
+        let isTest = process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com');
 
-        const query = normalizedPhone ? { $or: [{ email }, { phone: normalizedPhone }] } : { email };
+        const query = normalizedPhone ? { $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] } : { email: normalizedEmail };
         let user = await Users.findOne(query);
 
         if (user) {
             if (user.isVerified === false) {
                 user.name = name;
-                user.email = email;
+                user.fullName = fullName ? fullName.trim() : (user.fullName || "");
+                user.email = normalizedEmail;
                 user.phone = normalizedPhone;
                 user.password = hashedPassword;
+                user.localPasswordSet = true;
                 user.legalConsent = consentPayload;
                 if (isTest) {
                     user.isVerified = true;
@@ -276,15 +310,17 @@ const register = async (req, res) => {
             } else {
                 let errorMessage = 'A user with these details already exists';
                 if (normalizedPhone && user.phone === normalizedPhone) errorMessage = 'A user with that phone number already exists';
-                if (user.email === email) errorMessage = 'A user with that email already exists';
+                if (user.email === normalizedEmail) errorMessage = 'A user with that email already exists';
                 return res.status(409).json({ error: true, msg: errorMessage });
             }
         } else {
             user = await Users.create({
                 phone: normalizedPhone,
-                email,
+                email: normalizedEmail,
                 name,
+                fullName: fullName ? fullName.trim() : "",
                 password: hashedPassword,
+                localPasswordSet: true,
                 legalConsent: consentPayload,
                 isVerified: isTest ? true : false,
                 ...(isTest ? {} : { loginOtp: { token: otpHash, expires: otpExpiry, attempts: 0 } })
@@ -298,7 +334,7 @@ const register = async (req, res) => {
         }
 
         const sent = await sendEmail({
-            to: email,
+            to: normalizedEmail,
             subject: 'Verify your OneMoreGift account',
             template: 'otp',
             data: {
@@ -338,19 +374,26 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: true, msg: 'Invalid email or password' });
+        const { email, password, loginId } = req.body;
+        const identifier = (loginId || email || "").trim();
+        if (!identifier || !password) {
+            return res.status(400).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
-        const user = await Users.findOne({ email });
+        const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const user = await Users.findOne({
+            $or: [
+                { email: { $regex: `^${escaped}$`, $options: 'i' } },
+                { name: { $regex: `^${escaped}$`, $options: 'i' } }
+            ]
+        });
         if (!user) {
-            return res.status(401).json({ error: true, msg: 'Invalid email or password' });
+            return res.status(401).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ error: true, msg: 'Invalid email or password' });
+            return res.status(401).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
         if (user.isVerified === false) {
@@ -376,12 +419,12 @@ const login = async (req, res) => {
 
 const requestOtp = async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) {
+        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        if (!normalizedEmail) {
             return res.status(400).json({ error: true, msg: 'Email is required' });
         }
 
-        const user = await Users.findOne({ email });
+        const user = await Users.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(404).json({ error: true, msg: 'User not found. Please register first.' });
         }
@@ -393,7 +436,7 @@ const requestOtp = async (req, res) => {
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000;
-        console.log('[OTP_DEBUG] Generated login OTP for', email, 'is:', otpCode);
+        console.log('[OTP_DEBUG] Generated login OTP for', normalizedEmail, 'is:', otpCode);
 
         await Users.findByIdAndUpdate(user._id, {
             $set: {
@@ -404,7 +447,7 @@ const requestOtp = async (req, res) => {
         });
 
         const sent = await sendEmail({
-            to: email,
+            to: normalizedEmail,
             subject: 'Your One-Time Login Code',
             template: 'otp',
             data: {
@@ -423,7 +466,7 @@ const requestOtp = async (req, res) => {
         });
 
         if (!sent) {
-            console.error(`Failed to send OTP email to ${email}`);
+            console.error(`Failed to send OTP email to ${normalizedEmail}`);
             return res.status(500).json({ error: true, msg: 'Failed to send OTP email due to server configuration' });
         }
 
@@ -441,12 +484,13 @@ const requestOtp = async (req, res) => {
 
 const verifyOtp = async (req, res) => {
     try {
-        const { email, otp } = req.body;
-        if (!email || !otp) {
+        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const otp = String(req.body?.otp || "").trim();
+        if (!normalizedEmail || !otp) {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const user = await Users.findOne({ email });
+        const user = await Users.findOne({ email: normalizedEmail });
         if (!user || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'OTP is invalid or expired' });
         }
@@ -456,7 +500,7 @@ const verifyOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'OTP is invalid or expired' });
         }
 
-        const isOtpMatch = otp === '123456' || await bcrypt.compare(otp, user.loginOtp.token);
+        const isOtpMatch = (TEST_OTP_BYPASS_ENABLED && otp === '123456') || await bcrypt.compare(otp, user.loginOtp.token);
         if (!isOtpMatch) {
             const nextAttempts = (user.loginOtp.attempts || 0) + 1;
             if (nextAttempts >= 5) {
@@ -478,18 +522,18 @@ const verifyOtp = async (req, res) => {
 
         if (firstVerification) {
             await sendEmail({
-                to: email,
+                to: normalizedEmail,
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome Aboard!',
-                    message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
+                    title: 'Welcome  d!',
+                    message: `Hello ${getDisplayName(user)}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome Aboard!',
-                    `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
+                    'Welcome  d!',
+                    `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
                 )
@@ -506,7 +550,7 @@ const verifyOtp = async (req, res) => {
 
 const googleSignin = async (req, res) => {
     try {
-        const { credential, termsAccepted, privacyAccepted, policyVersion } = req.body;
+        const { credential, termsAccepted, privacyAccepted, policyVersion, mode } = req.body;
 
         if (!credential) {
             return res.status(400).json({ error: true, msg: 'Google credential is required' });
@@ -518,7 +562,7 @@ const googleSignin = async (req, res) => {
 
         const ticket = await googleClient.verifyIdToken({
             idToken: credential,
-            audience: GOOGLE_CLIENT_ID,
+            audience: GOOGLE_CLIENT_IDS,
         });
 
         const payload = ticket.getPayload();
@@ -527,6 +571,20 @@ const googleSignin = async (req, res) => {
         }
 
         let user = await Users.findOne({ email: payload.email });
+
+        if (mode === 'register' && user) {
+            return res.status(409).json({
+                error: true,
+                msg: 'An account with this email already exists. Please sign in instead.'
+            });
+        }
+
+        if (mode === 'login' && !user) {
+            return res.status(404).json({
+                error: true,
+                msg: 'No account found for this Google email. Please register first.'
+            });
+        }
 
         if (!user) {
             if (!termsAccepted || !privacyAccepted) {
@@ -542,9 +600,11 @@ const googleSignin = async (req, res) => {
 
             user = await Users.create({
                 name: payload.name || 'Google User',
+                fullName: payload.name || '',
                 email: payload.email,
                 phone: null,
                 password: hashedPassword,
+                localPasswordSet: false,
                 googleId: payload.sub,
                 isGoogleAuth: true,
                 avatar: payload.picture || '',
@@ -563,14 +623,14 @@ const googleSignin = async (req, res) => {
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome Aboard!',
-                    message: `Hello ${user.name}, your OneMoreGift account is ready. Start exploring giveaways and rewards now.`,
+                    title: 'Welcome  d!',
+                    message: `Hello ${getDisplayName(user)}, your OneMoreGift account is ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome Aboard!',
-                    `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
+                    'Welcome  d!',
+                    `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
                 )
@@ -581,6 +641,9 @@ const googleSignin = async (req, res) => {
             if (!user.googleId) {
                 updates.googleId = payload.sub;
                 updates.isGoogleAuth = true;
+            }
+            if (user.isGoogleAuth && user.localPasswordSet !== true) {
+                updates.localPasswordSet = false;
             }
             if (!user.isVerified) {
                 updates.isVerified = true;
@@ -612,14 +675,14 @@ const googleSignin = async (req, res) => {
 
 const resetPass = async (req, res) => {
     try {
-        const { email } = req.body;
+        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
         const resetRequestMsg = 'If an account exists for this email, a password reset link has been sent.';
 
-        if (!email) {
+        if (!normalizedEmail) {
             return res.status(400).json({ error: true, msg: 'Email is required.' });
         }
 
-        const findUser = await Users.findOne({ email });
+        const findUser = await Users.findOne({ email: normalizedEmail });
         if (!findUser) {
             return res.status(200).json({
                 error: false,
@@ -639,10 +702,10 @@ const resetPass = async (req, res) => {
             },
         });
 
-        const resetLink = `${CLIENT_URL}/login/reset-pass?token=${resetToken}&email=${encodeURIComponent(email)}`;
+        const resetLink = `${CLIENT_URL}/login/reset-pass?token=${resetToken}&email=${encodeURIComponent(normalizedEmail)}`;
 
         const emailSent = await sendEmail({
-            to: email,
+            to: normalizedEmail,
             subject: 'Password Reset Request',
             template: 'reset-password',
             data: {
@@ -680,13 +743,14 @@ const resetPass = async (req, res) => {
 
 const setPass = async (req, res) => {
     try {
-        const { email, token, password } = req.body;
+        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const { token, password } = req.body;
 
-        if (!token || !password || !email) {
+        if (!token || !password || !normalizedEmail) {
             return res.status(400).json({ error: true, msg: 'Token, email, and password fields are required.' });
         }
 
-        const user = await Users.findOne({ email });
+        const user = await Users.findOne({ email: normalizedEmail });
         if (!user || !user.resetToken || !user.resetToken.token) {
             return res.status(400).json({ error: true, msg: 'Token is invalid or has expired. Please request a new password reset.' });
         }
@@ -699,15 +763,15 @@ const setPass = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         await Users.updateOne(
-            { email },
+            { email: normalizedEmail },
             {
-                $set: { password: hashedPassword },
+                $set: { password: hashedPassword, localPasswordSet: true },
                 $unset: { resetToken: '' },
             }
         );
 
         await sendEmail({
-            to: email,
+            to: normalizedEmail,
             subject: 'Password Changed Successfully',
             template: 'notification',
             data: {
@@ -773,12 +837,13 @@ const logout = async (req, res) => {
 
 const verifyRegistrationOtp = async (req, res) => {
     try {
-        const { email, otp } = req.body;
-        if (!email || !otp) {
+        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const otp = String(req.body?.otp || "").trim();
+        if (!normalizedEmail || !otp) {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const user = await Users.findOne({ email });
+        const user = await Users.findOne({ email: normalizedEmail });
         if (!user || user.isVerified || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'Invalid request or already verified' });
         }
@@ -788,7 +853,7 @@ const verifyRegistrationOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'OTP has expired' });
         }
 
-        const isOtpMatch = otp === '123456' || await bcrypt.compare(otp, user.loginOtp.token);
+        const isOtpMatch = (TEST_OTP_BYPASS_ENABLED && otp === '123456') || await bcrypt.compare(otp, user.loginOtp.token);
         if (!isOtpMatch) {
             const nextAttempts = (user.loginOtp.attempts || 0) + 1;
             if (nextAttempts >= 5) {
@@ -806,17 +871,17 @@ const verifyRegistrationOtp = async (req, res) => {
         });
 
         await sendEmail({
-            to: email,
+            to: normalizedEmail,
             subject: 'Welcome to OneMoreGift!',
             template: 'welcome',
             data: {
-                title: 'Welcome Aboard!',
+                title: 'Welcome  d!',
                 message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                 actionUrl: CLIENT_URL,
                 actionLabel: 'Explore Giveaways',
             },
             html: generateEmailTemplate(
-                'Welcome Aboard!',
+                'Welcome  d!',
                 `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                 '',
                 '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'

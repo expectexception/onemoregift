@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import api from "../utils/apiClient";
 import { useAuth } from "../context/AuthContext";
 import { VerificationIcon, UserIcon, ShieldIcon } from "./SVGIcons";
+import RevealOnScroll from "./RevealOnScroll";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -54,7 +55,7 @@ export default function Giveaways() {
     return (
         <section className="section-dark py-20 px-4">
             {/* Section Header */}
-            <div className="max-w-7xl mx-auto mb-12 text-center">
+            <RevealOnScroll className="max-w-7xl mx-auto mb-12 text-center" delayMs={80}>
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-4 border border-white/[0.06]">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     <span className="text-neutral-400 text-sm font-medium">Live Contests</span>
@@ -65,7 +66,7 @@ export default function Giveaways() {
                 <p className="text-neutral-500 text-lg max-w-2xl mx-auto">
                     Enter our exclusive giveaways and stand a chance to win amazing prizes. New contests added daily!
                 </p>
-            </div>
+            </RevealOnScroll>
 
             {/* Giveaways Grid/Carousel */}
             <div className="max-w-7xl mx-auto">
@@ -95,7 +96,6 @@ export default function Giveaways() {
                                         item={item}
                                         loggedIn={loggedIn}
                                         router={router}
-                                        delay={index * 0.1}
                                     />
                                 </CarouselItem>
                             ))}
@@ -122,7 +122,7 @@ export default function Giveaways() {
     );
 }
 
-function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
+function GiveawayCard({ item, loggedIn, router }) {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showDialog, setShowDialog] = useState(false);
 
@@ -167,8 +167,12 @@ function GiveawayCard({ item, loggedIn, router, delay = 0 }) {
     return (
         <>
             <div
-                className="giveaway-card p-4 sm:p-6 h-full flex flex-col animate-fade-up border border-white/5"
-                style={{ animationDelay: `${delay}s` }}
+                className="giveaway-card p-4 sm:p-6 h-full flex flex-col border border-white/5"
+                style={{
+                    opacity: 1,
+                    transform: "translateY(0)",
+                    transition: "transform 260ms cubic-bezier(0.22,1,0.36,1), border-color 260ms ease, box-shadow 260ms ease"
+                }}
             >
                 {/* Image Container */}
                 <div className="relative h-40 sm:h-48 w-full mb-4 sm:mb-6 rounded-xl overflow-hidden bg-neutral-900/50 flex items-center justify-center">

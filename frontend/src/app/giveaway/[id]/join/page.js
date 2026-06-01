@@ -45,7 +45,8 @@ function Home() {
     });
     const [countries, setCountries] = useState([]);
     const [states, setStates] = useState([]);
-    const [isProfileUpdated, setIsProfileUpdated] = useState(false);
+    const [addressSelection, setAddressSelection] = useState("saved");
+    const [savedAddressIndex, setSavedAddressIndex] = useState(0);
     const [alreadyJoined, setAlreadyJoined] = useState(false);
     const [isGiveawayEnded, setIsGiveawayEnded] = useState(false);
     const [isGiveawayNotStarted, setIsGiveawayNotStarted] = useState(false);
@@ -94,7 +95,6 @@ function Home() {
                     title: "Success",
                     description: (<div className="flex items-center space-x-2"><CheckCircle className="text-green-500 w-5 h-5" /><span>Profile Updated</span></div>),
                 });
-                setIsProfileUpdated(false);
             } else {
                 toast({ title: "Error", description: data.msg || "Profile change failed.", variant: "destructive" });
             }
@@ -107,14 +107,20 @@ function Home() {
 
     useEffect(() => {
         if (user) {
+            const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+            const defaultAddressIndex = savedAddresses.findIndex((a) => a.isDefault);
+            const fallbackAddress = user.address || "";
+            const hasSavedAddress = savedAddresses.length > 0 || Boolean(fallbackAddress && String(fallbackAddress).trim());
             setFormData({
                 name: user.name || "",
                 phone: user.phone || "",
                 email: user.email || "",
-                address: user.address || "",
+                address: fallbackAddress,
             });
-            if (user.address) {
-                setAddressData(prev => ({ ...prev, line1: user.address }));
+            setAddressSelection(hasSavedAddress ? "saved" : "new");
+            setSavedAddressIndex(defaultAddressIndex >= 0 ? defaultAddressIndex : 0);
+            if (hasSavedAddress && !savedAddresses.length) {
+                setAddressData(prev => ({ ...prev, line1: fallbackAddress }));
             }
             checkGiveawayStatus();
         } else {
@@ -167,32 +173,32 @@ function Home() {
         }).catch(err => console.error("Failed to load Altcha", err));
     }, [currentStep]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => {
-            const updated = { ...prev, [name]: value };
-            if (JSON.stringify(updated) !== JSON.stringify(user)) setIsProfileUpdated(true);
-            return updated;
-        });
-    };
-
     const handleNext = async () => {
-        let currentFormData = formData;
-        let isChanged = isProfileUpdated;
-
         if (currentStep === 2) {
+            if (addressSelection === "new") {
+                if (!addressData.line1 || !addressData.country || !addressData.state || !addressData.pincode) {
+                    toast({
+                        title: "Missing address fields",
+                        description: "Please fill address line 1, country, state, and pincode.",
+                        variant: "destructive"
+                    });
+                    return;
+                }
+            }
             const parts = [addressData.line1, addressData.line2, addressData.state, addressData.country, addressData.pincode].filter(Boolean);
             const fullAddress = parts.join(", ");
-            currentFormData = { ...formData, address: fullAddress };
-            setFormData(currentFormData);
+            const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+            const selectedSavedAddress = savedAddresses[savedAddressIndex];
+            const selectedSavedAddressText = selectedSavedAddress
+                ? [selectedSavedAddress.line1, selectedSavedAddress.line2, selectedSavedAddress.city, selectedSavedAddress.state, selectedSavedAddress.country, selectedSavedAddress.postalCode]
+                    .filter(Boolean).join(", ")
+                : (user.address || "");
+            const selectedAddress = addressSelection === "saved" ? selectedSavedAddressText : fullAddress;
+            setFormData((prev) => ({ ...prev, address: selectedAddress }));
 
-            if (fullAddress !== user.address) {
-                isChanged = true;
+            if (addressSelection === "new" && selectedAddress && selectedAddress !== (user.address || "")) {
+                await saveProfileData({ address: selectedAddress });
             }
-        }
-
-        if (isChanged) {
-            await saveProfileData(currentFormData);
         }
         if (currentStep < 3) setCurrentStep(currentStep + 1);
     };
@@ -258,38 +264,32 @@ function Home() {
             case 1:
                 return (
                     <div className="space-y-5">
-                        <div className="flex flex-col space-y-2">
-                            <label className="text-neutral-300 text-sm font-medium">Your Name</label>
-                            <input
-                                type="text"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                placeholder="Full name"
-                                className="premium-input h-11 px-4 rounded-xl text-white placeholder:text-neutral-600"
-                            />
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-neutral-300 text-sm font-medium">Profile Information</span>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.push("/my-profile/edit")}
+                                    className="h-9 px-3 rounded-lg border-white/[0.08] text-neutral-200 hover:bg-white/[0.04]"
+                                >
+                                    Edit Profile
+                                </Button>
+                            </div>
+                            <div className="premium-input h-11 px-4 rounded-xl text-white flex items-center">
+                                {formData.name || "Not set"}
+                            </div>
                         </div>
                         <div className="flex flex-col space-y-2">
                             <label className="text-neutral-300 text-sm font-medium">Phone</label>
-                            <input
-                                type="text"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                placeholder="Phone number"
-                                className="premium-input h-11 px-4 rounded-xl text-white placeholder:text-neutral-600"
-                            />
+                            <div className="premium-input h-11 px-4 rounded-xl text-white flex items-center">
+                                {formData.phone || "Not set"}
+                            </div>
                         </div>
                         <div className="flex flex-col space-y-2">
                             <label className="text-neutral-300 text-sm font-medium">Email</label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                placeholder="Email address"
-                                className="premium-input h-11 px-4 rounded-xl text-white placeholder:text-neutral-600"
-                            />
+                            <div className="premium-input h-11 px-4 rounded-xl text-white flex items-center">
+                                {formData.email || "Not set"}
+                            </div>
                         </div>
                     </div>
                 );
@@ -298,6 +298,63 @@ function Home() {
                     <div className="space-y-4">
                         <label className="text-neutral-300 text-sm font-medium">Shipping Address</label>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setAddressSelection("saved")}
+                                disabled={!((Array.isArray(user.addresses) && user.addresses.length) || user.address)}
+                                className={`h-10 px-3 rounded-lg text-sm border transition-all ${
+                                    addressSelection === "saved"
+                                        ? "bg-red-600 text-white border-red-500"
+                                        : "bg-white/[0.03] text-neutral-300 border-white/[0.08]"
+                                } ${!((Array.isArray(user.addresses) && user.addresses.length) || user.address) ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                                Use Saved Address
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAddressSelection("new")}
+                                className={`h-10 px-3 rounded-lg text-sm border transition-all ${
+                                    addressSelection === "new"
+                                        ? "bg-red-600 text-white border-red-500"
+                                        : "bg-white/[0.03] text-neutral-300 border-white/[0.08]"
+                                }`}
+                            >
+                                Add New Address
+                            </button>
+                        </div>
+
+                        {addressSelection === "saved" && (Array.isArray(user.addresses) && user.addresses.length > 0) ? (
+                            <div className="space-y-3">
+                                <select
+                                    value={savedAddressIndex}
+                                    onChange={(e) => setSavedAddressIndex(Number(e.target.value))}
+                                    className="premium-input h-11 px-4 rounded-xl text-white bg-black placeholder:text-neutral-600 form-select"
+                                >
+                                    {user.addresses.map((addr, idx) => (
+                                        <option key={idx} value={idx}>
+                                            {addr.label || `Address ${idx + 1}`}{addr.isDefault ? " (Default)" : ""}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="premium-input min-h-20 px-4 py-3 rounded-xl text-white whitespace-pre-wrap">
+                                    {[user.addresses[savedAddressIndex]?.fullName, user.addresses[savedAddressIndex]?.line1, user.addresses[savedAddressIndex]?.line2, user.addresses[savedAddressIndex]?.city, user.addresses[savedAddressIndex]?.state, user.addresses[savedAddressIndex]?.country, user.addresses[savedAddressIndex]?.postalCode]
+                                        .filter(Boolean).join(", ")}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {addressSelection === "saved" && !(Array.isArray(user.addresses) && user.addresses.length > 0) && user.address ? (
+                            <div className="premium-input min-h-20 px-4 py-3 rounded-xl text-white whitespace-pre-wrap">{user.address}</div>
+                        ) : null}
+
+                        {addressSelection === "saved" && !((Array.isArray(user.addresses) && user.addresses.length > 0) || user.address) ? (
+                            <p className="text-sm text-neutral-400">
+                                No saved address found. Please add a new address.
+                            </p>
+                        ) : null}
+
+                        {addressSelection === "new" ? (
                         <div className="space-y-3">
                             <input
                                 type="text"
@@ -351,6 +408,7 @@ function Home() {
                                 className="premium-input w-full h-11 px-4 rounded-xl text-white placeholder:text-neutral-600"
                             />
                         </div>
+                        ) : null}
                     </div>
                 );
             case 3:

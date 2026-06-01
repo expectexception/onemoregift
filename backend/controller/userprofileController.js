@@ -1,11 +1,78 @@
 const Giveaway = require("../model/Giveaway");
 const User = require("../model/Users");
 const bcrypt = require('bcryptjs')
+
+const formatAddress = (addressObj = {}) => {
+    return [
+        addressObj.line1,
+        addressObj.line2,
+        addressObj.city,
+        addressObj.state,
+        addressObj.country,
+        addressObj.postalCode,
+    ].map((item) => (item || "").trim()).filter(Boolean).join(", ");
+};
+
+const normalizeAddresses = (addresses = []) => {
+    if (!Array.isArray(addresses)) return [];
+    const cleaned = addresses
+        .map((item) => ({
+            label: (item.label || "Address").trim(),
+            fullName: (item.fullName || "").trim(),
+            line1: (item.line1 || "").trim(),
+            line2: (item.line2 || "").trim(),
+            city: (item.city || "").trim(),
+            state: (item.state || "").trim(),
+            country: (item.country || "").trim(),
+            postalCode: (item.postalCode || "").trim(),
+            phone: (item.phone || "").trim(),
+            isDefault: Boolean(item.isDefault),
+        }))
+        .filter((item) => item.line1 || item.city || item.state || item.country || item.postalCode);
+
+    if (!cleaned.length) return [];
+
+    if (!cleaned.some((a) => a.isDefault)) {
+        cleaned[0].isDefault = true;
+    } else {
+        let foundDefault = false;
+        cleaned.forEach((item) => {
+            if (item.isDefault && !foundDefault) {
+                foundDefault = true;
+                return;
+            }
+            item.isDefault = false;
+        });
+    }
+
+    return cleaned;
+};
+
 const myProfile = async (req, res) => {
     let userId = req.user.data._id;
 
     try {
-        const myProfile = await User.findById(userId).select("-password -resetToken");
+        const myProfile = await User.findById(userId).select("-password -resetToken -loginOtp");
+        if (myProfile) {
+            if (!Array.isArray(myProfile.addresses) || myProfile.addresses.length === 0) {
+                if (myProfile.address) {
+                    myProfile.addresses = [{
+                        label: "Home",
+                        fullName: myProfile.name || "",
+                        line1: myProfile.address,
+                        line2: "",
+                        city: "",
+                        state: "",
+                        country: "",
+                        postalCode: "",
+                        phone: myProfile.phone || "",
+                        isDefault: true,
+                    }];
+                } else {
+                    myProfile.addresses = [];
+                }
+            }
+        }
         const giveaways = await Giveaway.find({
             $or: [
                 { participants: userId },
@@ -19,10 +86,61 @@ const myProfile = async (req, res) => {
 };
 const updateProfile = async (req, res) => {
     let userId = req.user.data._id;
-    let { name, email, phone, address, avatar } = req.body;
-    const normalizedPhone = (phone && phone.trim() !== "") ? phone.trim() : null;
+    let { name, fullName, email, phone, address, avatar, addresses } = req.body;
     try {
-        const updatedProfile = await User.findByIdAndUpdate(userId, { name, email, phone: normalizedPhone, address, avatar }, { new: true }).select("-password -resetToken");
+        const existingUser = await User.findById(userId).select("name fullName email phone");
+        if (!existingUser) {
+            return res.status(404).json({ error: true, msg: "User not found" });
+        }
+
+        // Support partial updates (join flow sends only address on step 2).
+        const resolvedName = typeof name === "string" ? name.trim() : existingUser.name;
+        const resolvedEmail = typeof email === "string" ? email.trim().toLowerCase() : existingUser.email;
+        const resolvedPhone = phone === undefined
+            ? existingUser.phone
+            : ((phone && phone.trim() !== "") ? phone.trim() : null);
+
+        if (!resolvedName) {
+            return res.status(400).json({ error: true, msg: "Name is required" });
+        }
+        if (!resolvedEmail || !/^\S+@\S+\.\S+$/.test(resolvedEmail)) {
+            return res.status(400).json({ error: true, msg: "A valid email is required" });
+        }
+        if (resolvedPhone && !/^[6-9]\d{9}$/.test(resolvedPhone)) {
+            return res.status(400).json({ error: true, msg: "Phone number must be a valid 10-digit number starting with 6-9" });
+        }
+
+        const duplicate = await User.findOne({
+            _id: { $ne: userId },
+            $or: resolvedPhone ? [{ email: resolvedEmail }, { phone: resolvedPhone }] : [{ email: resolvedEmail }]
+        });
+        if (duplicate) {
+            const msg = duplicate.email === resolvedEmail
+                ? "A user with that email already exists"
+                : "A user with that phone number already exists";
+            return res.status(409).json({ error: true, msg });
+        }
+
+        const updates = {
+            name: resolvedName,
+            fullName: typeof fullName === "string" ? fullName.trim() : (existingUser.fullName || ""),
+            email: resolvedEmail,
+            phone: resolvedPhone,
+        };
+        if (address !== undefined) updates.address = address;
+        if (avatar !== undefined) updates.avatar = avatar;
+        if (addresses !== undefined) {
+            const normalizedAddresses = normalizeAddresses(addresses);
+            updates.addresses = normalizedAddresses;
+            const defaultAddress = normalizedAddresses.find((item) => item.isDefault) || normalizedAddresses[0];
+            updates.address = defaultAddress ? formatAddress(defaultAddress) : "";
+        }
+
+        const updatedProfile = await User.findByIdAndUpdate(
+            userId,
+            updates,
+            { new: true, runValidators: true }
+        ).select("-password -resetToken -loginOtp");
         if (updatedProfile) {
             return res.status(200).json({ error: false, updatedProfile });
         }
@@ -39,19 +157,32 @@ const changePassword = async (req, res) => {
     let userId = req.user.data._id;
     let { oldPassword, newPassword } = req.body;
     try {
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: true, msg: "New password must be at least 6 characters" });
+        }
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: true, msg: "User not found" });
         }
-        const isMatch = await bcrypt.compare(oldPassword, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: true, msg: "Old password is incorrect" });
+        const canSetFirstPassword = user.isGoogleAuth && user.localPasswordSet !== true;
+        if (!canSetFirstPassword) {
+            if (!oldPassword) {
+                return res.status(400).json({ error: true, msg: "Old password is required" });
+            }
+            const isMatch = await bcrypt.compare(oldPassword, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ error: true, msg: "Old password is incorrect" });
+            }
         }
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
+        user.localPasswordSet = true;
         await user.save();
-        return res.status(200).json({ error: false, msg: "Password changed successfully" });
+        return res.status(200).json({ error: false, msg: canSetFirstPassword ? "Password set successfully" : "Password changed successfully" });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({ error: true, msg: "A user with these details already exists" });
+        }
         return res.status(500).json({ error: true, msg: error.message });
     }
 }

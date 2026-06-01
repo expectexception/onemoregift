@@ -8,6 +8,8 @@ const { createApp } = require("../app");
 const Admin = require("../model/Admin");
 const Giveaway = require("../model/Giveaway");
 const Users = require("../model/Users");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = createApp();
 
@@ -111,5 +113,63 @@ test("auth/reset-pass contract: unknown email returns generic success", async ()
     assert.equal(res.body.emailSent, false);
   } finally {
     Users.findOne = originalFindOne;
+  }
+});
+
+test("profile/change-pass contract: Google user can set first local password without old password", async () => {
+  const originalFindById = Users.findById;
+  const userId = "507f1f77bcf86cd799439011";
+  const token = jwt.sign({ data: { _id: userId, email: "google@example.com", name: "Google User" } }, process.env.JWT_SECRET);
+  let saved = false;
+
+  Users.findById = async () => ({
+    _id: userId,
+    isGoogleAuth: true,
+    localPasswordSet: false,
+    password: await bcrypt.hash("unknown-random-password", 10),
+    save: async function save() {
+      saved = true;
+      assert.equal(this.localPasswordSet, true);
+    },
+  });
+
+  try {
+    const res = await request(app)
+      .patch("/api/v1/profile/change-pass")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ newPassword: "NewPass123!" });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.error, false);
+    assert.equal(saved, true);
+  } finally {
+    Users.findById = originalFindById;
+  }
+});
+
+test("profile/change-pass contract: normal user must provide old password", async () => {
+  const originalFindById = Users.findById;
+  const userId = "507f1f77bcf86cd799439012";
+  const token = jwt.sign({ data: { _id: userId, email: "local@example.com", name: "Local User" } }, process.env.JWT_SECRET);
+
+  Users.findById = async () => ({
+    _id: userId,
+    isGoogleAuth: false,
+    localPasswordSet: true,
+    password: await bcrypt.hash("OldPass123!", 10),
+    save: async () => {},
+  });
+
+  try {
+    const res = await request(app)
+      .patch("/api/v1/profile/change-pass")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ newPassword: "NewPass123!" });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, true);
+    assert.equal(res.body.msg, "Old password is required");
+  } finally {
+    Users.findById = originalFindById;
   }
 });

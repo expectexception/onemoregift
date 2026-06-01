@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { HiSparkles, HiLightBulb, HiEye, HiHeart, HiShieldCheck, HiGift, HiUsers, HiStar } from "react-icons/hi";
 import { HiGift as HiGiftLogo } from "react-icons/hi2";
+import { GiveawayMetricSvg, TrustMetricSvg, UsersMetricSvg, WinnerMetricSvg } from "../components/MetricSvgs";
 
 function useCountUp(target, duration = 2000, startWhen = false) {
     const [count, setCount] = useState(0);
@@ -84,18 +85,27 @@ export default function AboutUs() {
                         About <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">OneMoreGift</span>
                     </h1>
                     <p className="text-lg md:text-xl text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-                        India&apos;s trusted destination for premium giveaways — where real people win real prizes, every single day.
+                        India&apos;s trusted destination for premium giveaways, where real people win real prizes, every single day.
                     </p>
                 </div>
             </section>
 
             {/* Animated Stats Section */}
-            <section ref={statsRef} className="py-12 px-6 border-y border-white/5 bg-white/[0.02] backdrop-blur-sm relative z-10">
-                <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
-                    <StatCounter target={platformStats.users} suffix="+" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
-                    <StatCounter target={platformStats.giveaways} suffix="+" label="Giveaways Hosted" color="from-purple-400 to-pink-400" startWhen={statsVisible} />
-                    <StatCounter target={platformStats.winners} suffix="+" label="Winners Announced" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
-                    <StatCounter target={platformStats.satisfaction} suffix="%" label="Satisfaction Rate" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
+            <section ref={statsRef} className="py-14 px-4 sm:px-6 border-y border-white/5 bg-white/[0.02] backdrop-blur-sm relative z-10 overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[260px] bg-red-600/10 blur-[100px]" />
+                </div>
+                <div className="relative max-w-6xl mx-auto">
+                    <div className="text-center mb-8">
+                        <h3 className="text-2xl md:text-3xl font-bold text-white">Platform Highlights</h3>
+                        <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing giveaway community.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.users} suffix="+" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
+                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.giveaways} suffix="+" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
+                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.winners} suffix="+" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
+                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.satisfaction} suffix="%" label="Trusted Platform" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
+                    </div>
                 </div>
             </section>
 
@@ -225,14 +235,20 @@ function ValueCard({ icon, title, description, delay }) {
     );
 }
 
-function StatCounter({ target, suffix, label, color, startWhen }) {
+function StatCounter({ icon, target, suffix, label, color, startWhen }) {
     const count = useCountUp(target, 1800, startWhen);
     return (
-        <div className="text-center p-4">
-            <div className={`text-4xl md:text-5xl font-black mb-3 tabular-nums text-transparent bg-clip-text bg-gradient-to-br ${color} drop-shadow-sm`}>
+        <div className="premium-card rounded-2xl p-5 border border-white/[0.08] bg-black/45 backdrop-blur-md hover:border-white/[0.16] transition-all duration-300 group">
+            <div className="flex items-start justify-between mb-4">
+                <div className={`w-10 h-10 rounded-xl border border-white/[0.14] bg-gradient-to-br ${color} text-white text-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform`}>
+                    {icon}
+                </div>
+                <span className="text-[10px] uppercase tracking-wider text-neutral-500">Live</span>
+            </div>
+            <div className={`text-3xl md:text-4xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-br ${color}`}>
                 {startWhen ? count.toLocaleString() : "0"}{suffix}
             </div>
-            <div className="text-sm md:text-base text-neutral-400 font-medium tracking-wide uppercase">{label}</div>
+            <div className="mt-2 text-xs md:text-sm text-neutral-400 font-medium uppercase tracking-wide">{label}</div>
         </div>
     );
 }

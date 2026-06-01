@@ -1,0 +1,65 @@
+services:
+  - type: web
+    name: onemoregift-email-service
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EMAIL_SERVICE_ENABLED
+        value: true
+      - key: EMAIL_REQUIRE_API_KEY
+        value: true
+      - key: EMAIL_REQUIRE_SIGNATURE
+        value: true
+      - key: EMAIL_SERVICE_API_KEY
+        sync: false
+      - key: EMAIL_SERVICE_SIGNING_SECRET
+        sync: false
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: EMAIL_FALLBACK_PROVIDERS
+        value: brevo
+      - key: SMTP_ENABLED
+        value: true
+      - key: BREVO_ENABLED
+        value: true
+      - key: EMAIL_DELIVERY_MODE
+        value: queue
+      - key: EMAIL_QUEUE_ENABLED
+        value: true
+      - key: EMAIL_QUEUE_AUTOSTART
+        value: true
+      - key: EMAIL_QUEUE_CONCURRENCY
+        value: 3
+      - key: EMAIL_QUEUE_MAX_SIZE
+        value: 1000
+      - key: EMAIL_QUEUE_RETRIES
+        value: 2
+      - key: EMAIL_QUEUE_RETRY_DELAY_MS
+        value: 3000
+      - key: SENDER_EMAIL
+        value: no-reply@onemoregift.in
+      - key: SENDER_NAME
+        value: OneMoreGift
+      - key: APP_NAME
+        value: OneMoreGift
+      - key: APP_URL
+        value: https://onemoregift.in
+      - key: SUPPORT_EMAIL
+        value: support@onemoregift.in
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false

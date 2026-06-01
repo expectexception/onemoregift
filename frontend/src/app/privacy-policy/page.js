@@ -37,21 +37,7 @@ export default function PrivacyPolicy() {
                             title="Scope"
                             content="This Privacy Policy explains how OneMoreGift collects, uses, stores, shares, and protects personal data when you use our Platform in India."
                         />
-                        <PolicySection
-                            number="02"
-                            title="Data Fiduciary Details"
-                            content={
-                                <>
-                                    Data Fiduciary: OneMoreGift
-                                    <br />
-                                    Contact: <a href="mailto:contact@onemoregift.in" className="text-red-400 hover:text-red-300">contact@onemoregift.in</a>
-                                    <br />
-                                    Grievance Officer: [Add Name]
-                                    <br />
-                                    Registered Address: [Add Registered Office Address]
-                                </>
-                            }
-                        />
+                        
                         <PolicySection
                             number="03"
                             title="Personal Data We Collect"
