@@ -12,6 +12,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    fullName: {
+        type: String,
+        default: "",
+    },
     email: {
         type: String,
         required: true,
@@ -55,12 +59,58 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    localPasswordSet: {
+        type: Boolean,
+        default: true,
+    },
     avatar: {
         type: String,
     },
     address: {
         type: String
     },
+    addresses: [{
+        label: {
+            type: String,
+            default: "Home",
+        },
+        fullName: {
+            type: String,
+            default: "",
+        },
+        line1: {
+            type: String,
+            default: "",
+        },
+        line2: {
+            type: String,
+            default: "",
+        },
+        city: {
+            type: String,
+            default: "",
+        },
+        state: {
+            type: String,
+            default: "",
+        },
+        country: {
+            type: String,
+            default: "",
+        },
+        postalCode: {
+            type: String,
+            default: "",
+        },
+        phone: {
+            type: String,
+            default: "",
+        },
+        isDefault: {
+            type: Boolean,
+            default: false,
+        }
+    }],
     isVerified: {
         type: Boolean,
         default: true

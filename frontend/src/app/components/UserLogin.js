@@ -38,6 +38,10 @@ const ShieldOtpIcon = ({ className = "w-6 h-6" }) => (
 );
 
 const AUTH_HEADER_ICON_CLASS = "w-[72px] h-[72px] mx-auto mb-5";
+const POLICY_VERSION = "2026-05-28";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+const ENABLE_GOOGLE_LOGIN = process.env.NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN === "true";
+const SHOW_GOOGLE_LOGIN = ENABLE_GOOGLE_LOGIN && Boolean(GOOGLE_CLIENT_ID);
 
 export default function UserLoginForm() {
     const router = useRouter();
@@ -105,7 +109,7 @@ export default function UserLoginForm() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const { data } = await api.post("auth/login", { email, password });
+            const { data } = await api.post("auth/login", { loginId: email, password });
             if (data.error === false) {
                 showSuccessToast("Signed in", "Welcome back.");
                 localStorage.setItem("token", data.token);
@@ -203,7 +207,13 @@ export default function UserLoginForm() {
 
     const handleGoogleSuccess = async (credentialResponse) => {
         try {
-            const { data } = await api.post("auth/google-signin", { credential: credentialResponse.credential });
+            const { data } = await api.post("auth/google-signin", {
+                credential: credentialResponse?.credential,
+                termsAccepted: true,
+                privacyAccepted: true,
+                policyVersion: POLICY_VERSION,
+                mode: "login",
+            });
             if (!data.error) {
                 localStorage.setItem("token", data.token);
                 await refreshUserSession();
@@ -231,7 +241,7 @@ export default function UserLoginForm() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(220,38,38,0.16),transparent_32%),radial-gradient(circle_at_90%_85%,rgba(127,29,29,0.18),transparent_38%)]" />
             <div className="absolute inset-0 noise-overlay" />
 
-            <div className="relative w-full max-w-md premium-card rounded-2xl p-5 sm:p-6 animate-scale-in">
+            <div className="relative w-full max-w-md premium-card rounded-2xl p-5 sm:p-6 animate-scale-in shadow-[0_30px_70px_-40px_rgba(239,68,68,0.65)]">
                 <div className="text-center mb-3">
                     {screen === "reset" ? <ResetPasswordIcon className={AUTH_HEADER_ICON_CLASS} /> : loginMode === "otp" ? <ShieldOtpIcon className={AUTH_HEADER_ICON_CLASS} /> : <MailSparkIcon className={AUTH_HEADER_ICON_CLASS} />}
                     <h1 className="text-xl font-bold text-white mb-0.5">
@@ -269,13 +279,13 @@ export default function UserLoginForm() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="premium-input h-9 text-white placeholder:text-neutral-600 text-sm"
+                                className="premium-input h-10 text-white placeholder:text-neutral-600 text-sm"
                             />
                         </div>
 
                         <Button
                             type="submit"
-                            className="w-full h-9 btn-gradient rounded-xl font-semibold text-sm"
+                            className="w-full h-10 btn-gradient rounded-xl font-semibold text-sm"
                             disabled={resetLoading || resetCountdown > 0}
                         >
                             {resetLoading ? "Sending reset link..." : resetCountdown > 0 ? `Resend in ${resetCountdown}s` : resetSent ? "Send Reset Link Again" : "Send Reset Link"}
@@ -283,7 +293,7 @@ export default function UserLoginForm() {
 
                         <Button
                             type="button"
-                            className="w-full h-9 btn-outline-premium rounded-xl text-sm"
+                            className="w-full h-10 btn-outline-premium rounded-xl text-sm"
                             onClick={resetSigninState}
                         >
                             Back to Sign In
@@ -294,14 +304,14 @@ export default function UserLoginForm() {
                         <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06]">
                             <Button
                                 type="button"
-                                className={`rounded-lg transition-all h-8 text-xs ${loginMode === "password" ? "btn-gradient" : "bg-transparent text-neutral-400 hover:text-white"}`}
+                                className={`rounded-lg transition-all h-9 text-xs ${loginMode === "password" ? "btn-gradient" : "bg-transparent text-neutral-400 hover:text-white"}`}
                                 onClick={() => setLoginMode("password")}
                             >
                                 Password
                             </Button>
                             <Button
                                 type="button"
-                                className={`rounded-lg transition-all h-8 text-xs ${loginMode === "otp" ? "btn-gradient" : "bg-transparent text-neutral-400 hover:text-white"}`}
+                                className={`rounded-lg transition-all h-9 text-xs ${loginMode === "otp" ? "btn-gradient" : "bg-transparent text-neutral-400 hover:text-white"}`}
                                 onClick={() => {
                                     setLoginMode("otp");
                                     setOtpSent(false);
@@ -312,15 +322,15 @@ export default function UserLoginForm() {
                         </div>
 
                         <div className="flex flex-col space-y-0.5">
-                            <Label htmlFor="email" className="text-neutral-300 text-xs flex items-center gap-1.5"><EmailIcon className="w-4 h-4" />Email</Label>
+                            <Label htmlFor="email" className="text-neutral-300 text-xs flex items-center gap-1.5"><EmailIcon className="w-4 h-4" />Email or Username</Label>
                             <Input
                                 id="email"
-                                type="email"
-                                placeholder="Enter your email"
+                                type="text"
+                                placeholder="Enter email or username"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="premium-input h-9 text-white placeholder:text-neutral-600 text-sm"
+                                className="premium-input h-10 text-white placeholder:text-neutral-600 text-sm"
                             />
                         </div>
 
@@ -336,13 +346,13 @@ export default function UserLoginForm() {
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             required
-                                            className="premium-input h-9 text-white placeholder:text-neutral-600 pr-12 text-sm"
+                                            className="premium-input h-10 text-white placeholder:text-neutral-600 pr-12 text-sm"
                                         />
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="icon"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white h-7 w-7"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white h-8 w-8"
                                             onClick={() => setShowPassword(!showPassword)}
                                         >
                                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -350,7 +360,7 @@ export default function UserLoginForm() {
                                     </div>
                                 </div>
 
-                                <Button type="submit" className="w-full h-9 btn-gradient rounded-xl font-semibold text-sm">
+                                <Button type="submit" className="w-full h-10 btn-gradient rounded-xl font-semibold text-sm">
                                     Sign In
                                 </Button>
                             </>
@@ -389,21 +399,21 @@ export default function UserLoginForm() {
                                         value={otp}
                                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                                         required={otpSent}
-                                        className="premium-input h-9 text-white placeholder:text-neutral-600 tracking-[0.3em] text-center text-sm font-mono focus:border-red-500/50"
+                                        className="premium-input h-10 text-white placeholder:text-neutral-600 tracking-[0.3em] text-center text-sm font-mono focus:border-red-500/50"
                                     />
                                 </div>
 
                                 {!otpSent ? (
                                     <Button
                                         type="button"
-                                        className="w-full h-9 btn-outline-premium rounded-xl font-semibold text-sm"
+                                        className="w-full h-10 btn-outline-premium rounded-xl font-semibold text-sm"
                                         onClick={handleRequestOtp}
                                         disabled={otpLoading}
                                     >
                                         {otpLoading ? "Sending OTP..." : "Send OTP to Email"}
                                     </Button>
                                 ) : (
-                                    <Button type="submit" className="w-full h-9 btn-gradient rounded-xl font-semibold text-sm">
+                                    <Button type="submit" className="w-full h-10 btn-gradient rounded-xl font-semibold text-sm">
                                         Verify & Sign In
                                     </Button>
                                 )}
@@ -424,22 +434,26 @@ export default function UserLoginForm() {
                             </div>
                         </button>
 
-                        <div className="relative flex items-center py-0.5">
-                            <div className="flex-1 h-px bg-white/[0.06]" />
-                            <span className="px-4 text-[10px] text-neutral-600">or continue with</span>
-                            <div className="flex-1 h-px bg-white/[0.06]" />
-                        </div>
+                        {SHOW_GOOGLE_LOGIN && (
+                            <>
+                                <div className="relative flex items-center py-0.5">
+                                    <div className="flex-1 h-px bg-white/[0.06]" />
+                                    <span className="px-4 text-[10px] text-neutral-600">or continue with</span>
+                                    <div className="flex-1 h-px bg-white/[0.06]" />
+                                </div>
 
-                        <div className="flex justify-center">
-                            <GoogleLogin
-                                onSuccess={handleGoogleSuccess}
-                                onError={handleGoogleError}
-                                theme="filled_black"
-                                size="large"
-                                text="signin_with"
-                                shape="pill"
-                            />
-                        </div>
+                                <div className="flex justify-center">
+                                    <GoogleLogin
+                                        onSuccess={handleGoogleSuccess}
+                                        onError={handleGoogleError}
+                                        theme="filled_black"
+                                        size="large"
+                                        text="signin_with"
+                                        shape="pill"
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div className="text-center pt-2.5 border-t border-white/[0.06]">
                             <span className="text-neutral-500 text-xs">Don&apos;t have an account? </span>

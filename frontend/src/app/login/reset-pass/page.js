@@ -105,12 +105,12 @@ export default function ResetPass() {
             <div className="flex-1 flex items-center justify-center px-4 py-12 relative overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(220,38,38,0.16),transparent_32%),radial-gradient(circle_at_90%_85%,rgba(127,29,29,0.18),transparent_38%)]" />
                 <div className="absolute inset-0 noise-overlay" />
-                <div className="w-full max-w-md premium-card rounded-2xl p-8 animate-scale-in">
+                <div className="w-full max-w-md premium-card rounded-2xl p-5 sm:p-6 animate-scale-in shadow-[0_30px_70px_-40px_rgba(239,68,68,0.65)]">
                     {/* Header */}
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-6">
                         <ResetPasswordIcon className={AUTH_HEADER_ICON_CLASS} />
-                        <h1 className="text-2xl font-bold text-white mb-2">Reset Password</h1>
-                        <p className="text-neutral-500">
+                        <h1 className="text-xl font-bold text-white mb-1">Reset Password</h1>
+                        <p className="text-neutral-500 text-sm">
                             {token && email ? `Create a new password for ${email}` : "This reset link is missing required details."}
                         </p>
                     </div>
@@ -134,45 +134,59 @@ export default function ResetPass() {
                                     </div>
                                 </div>
                             </div>
-                            <Button type="button" className="w-full h-12 btn-gradient rounded-xl" onClick={() => router.push('/login')}>
+                            <Button type="button" className="w-full h-10 btn-gradient rounded-xl text-sm" onClick={() => router.push('/login')}>
                                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Login
                             </Button>
                         </div>
                     ) : (
                     <form onSubmit={handleResetPass} className="space-y-5">
-                        <div className="flex flex-col space-y-2 relative">
+                        <div className="flex flex-col space-y-2">
                             <Label htmlFor="password" className="text-neutral-300">New Password</Label>
-                            <Input
-                                id="password"
-                                type={showPassword ? "text" : "password"}
-                                placeholder="Enter new password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                className="premium-input h-12 text-white placeholder:text-neutral-600 pr-12"
-                            />
-                            <Button type="button" variant="ghost" size="icon" className="absolute right-2 top-8 text-neutral-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
-                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </Button>
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Enter new password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    className="premium-input h-10 text-white placeholder:text-neutral-600 pr-12 text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                >
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex flex-col space-y-2 relative">
+                        <div className="flex flex-col space-y-2">
                             <Label htmlFor="confirmPassword" className="text-neutral-300">Confirm Password</Label>
-                            <Input
-                                id="confirmPassword"
-                                type={showConfirmPassword ? "text" : "password"}
-                                placeholder="Confirm new password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                                className="premium-input h-12 text-white placeholder:text-neutral-600 pr-12"
-                            />
-                            <Button type="button" variant="ghost" size="icon" className="absolute right-2 top-8 text-neutral-500 hover:text-white" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                            </Button>
+                            <div className="relative">
+                                <Input
+                                    id="confirmPassword"
+                                    type={showConfirmPassword ? "text" : "password"}
+                                    placeholder="Confirm new password"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                    className="premium-input h-10 text-white placeholder:text-neutral-600 pr-12 text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                                >
+                                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
                         </div>
 
-                        <Button type="submit" disabled={isSubmitting} className="w-full h-12 btn-gradient rounded-xl font-semibold text-base">
+                        <Button type="submit" disabled={isSubmitting} className="w-full h-10 btn-gradient rounded-xl font-semibold text-sm">
                             {isSubmitting ? "Updating Password..." : "Reset Password"}
                         </Button>
                     </form>

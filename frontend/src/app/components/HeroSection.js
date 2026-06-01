@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import api from "../utils/apiClient";
 import { CheckIcon, TrophyIcon, VerificationIcon, ShieldIcon } from "./SVGIcons";
+import RevealOnScroll from "./RevealOnScroll";
 
 const heroImages = [
     "/images/giftsa.webp",
@@ -94,7 +95,7 @@ export default function HeroSection() {
             {heroImages.map((img, i) => (
                 <div
                     key={img}
-                    className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+                    className="absolute inset-0 transition-opacity duration-[1600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
                     style={{
                         opacity: i === currentImage ? 0.5 : 0,
                         willChange: 'opacity',
@@ -154,46 +155,54 @@ export default function HeroSection() {
             {/* Content */}
             <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-10 sm:pt-14 lg:pt-16 pb-14 lg:pb-20">
                 {/* Main Heading */}
-                <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1] animate-fade-up" style={{ animationDelay: '0.1s' }}>
-                    <span className="text-white">Win </span>
-                    <span className="text-gradient">Premium</span>
-                    <br className="hidden sm:block" />
-                    <span className="text-white"> Rewards Daily</span>
-                </h1>
+                <RevealOnScroll delayMs={60}>
+                    <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1]">
+                        <span className="text-white">Win </span>
+                        <span className="text-gradient">Premium</span>
+                        <br className="hidden sm:block" />
+                        <span className="text-white"> Rewards Daily</span>
+                    </h1>
+                </RevealOnScroll>
 
                 {/* Subtitle */}
-                <p className="text-sm sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-up font-medium drop-shadow-lg" style={{ animationDelay: '0.2s' }}>
-                    Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
-                    <span className="text-red-400 font-semibold"> real prizes </span>
-                    delivered straight to your doorstep.
-                </p>
+                <RevealOnScroll delayMs={140}>
+                    <p className="text-sm sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed font-medium drop-shadow-lg">
+                        Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
+                        <span className="text-red-400 font-semibold"> real prizes </span>
+                        delivered straight to your doorstep.
+                    </p>
+                </RevealOnScroll>
 
                 {/* CTA Buttons */}
-                <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10 sm:mb-16 animate-fade-up px-4 sm:px-0" style={{ animationDelay: '0.3s' }}>
-                    <button
-                        className="w-full sm:w-auto btn-gradient px-8 sm:px-10 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 hover:scale-105 shadow-glow"
-                        onClick={() => router.push('/register')}
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                            <CheckIcon className="w-5 h-5" />
-                            Start Winning Now
-                        </span>
-                    </button>
-                    <button
-                        className="w-full sm:w-auto btn-outline-premium px-8 sm:px-10 py-4 rounded-xl text-base sm:text-lg font-medium backdrop-blur-sm"
-                        onClick={() => router.push('/giveaway')}
-                    >
-                        Browse Giveaways
-                    </button>
-                </div>
+                <RevealOnScroll delayMs={210}>
+                    <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10 sm:mb-16 px-4 sm:px-0">
+                        <button
+                            className="w-full sm:w-auto btn-gradient px-8 sm:px-10 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 hover:scale-105 shadow-glow"
+                            onClick={() => router.push('/register')}
+                        >
+                            <span className="flex items-center justify-center gap-2">
+                                <CheckIcon className="w-5 h-5" />
+                                Start Winning Now
+                            </span>
+                        </button>
+                        <button
+                            className="w-full sm:w-auto btn-outline-premium px-8 sm:px-10 py-4 rounded-xl text-base sm:text-lg font-medium backdrop-blur-sm"
+                            onClick={() => router.push('/giveaway')}
+                        >
+                            Browse Giveaways
+                        </button>
+                    </div>
+                </RevealOnScroll>
 
                 {/* Stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto animate-fade-up" style={{ animationDelay: '0.4s' }}>
-                    <StatCard Icon={CheckIcon} value={stats.activeGiveaways} label="Active" />
-                    <StatCard Icon={TrophyIcon} value={stats.totalWinners} label="Winners" />
-                    <StatCard Icon={VerificationIcon} value={stats.totalPrizeValue} label="Prizes" />
-                    <StatCard Icon={ShieldIcon} value={stats.verifiedLegit} label="Legit" />
-                </div>
+                <RevealOnScroll delayMs={290}>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
+                        <StatCard Icon={CheckIcon} value={stats.activeGiveaways} label="Active" />
+                        <StatCard Icon={TrophyIcon} value={stats.totalWinners} label="Winners" />
+                        <StatCard Icon={VerificationIcon} value={stats.totalPrizeValue} label="Prizes" />
+                        <StatCard Icon={ShieldIcon} value={stats.verifiedLegit} label="Legit" />
+                    </div>
+                </RevealOnScroll>
             </div>
 
             {/* Bottom gradient fade */}

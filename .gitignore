@@ -9,10 +9,16 @@ yarn-error.log*
 !.env.example
 *.pem
 
-# Backend Specific
+# Runtime artifacts
+.run/
+logs/
+*.pid
+*.log
+
+# Backend specific
 backend/public/uploads/images/*
 
-# Frontend Specific
+# Frontend specific
 frontend/.next/
 frontend/out/
 frontend/build/

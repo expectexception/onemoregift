@@ -1,4 +1,0 @@
-Email service running on port 8080
-[0mGET /health [32m200[0m 11.454 ms - 304[0m
-[0mPOST /v1/email/send [32m202[0m 830.151 ms - 89[0m
-[0mPOST /v1/email/send [32m202[0m 797.617 ms - 89[0m

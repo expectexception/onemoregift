@@ -31,7 +31,27 @@ is_running() {
 
 port_running() {
   local port="$1"
-  lsof -ti TCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+  [[ -n "$(port_pids "$port")" ]]
+}
+
+port_pids() {
+  local port="$1"
+  {
+    lsof -ti TCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+    ss -ltnp "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' || true
+    fuser "$port/tcp" 2>/dev/null || true
+  } | tr ' ' '\n' | sed '/^$/d' | sort -u
+}
+
+stop_pid_group() {
+  local pid="$1"
+  local pgid
+  pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)"
+  if [[ -n "$pgid" && "$pgid" != "$(ps -o pgid= -p $$ | tr -d ' ')" ]]; then
+    kill -- "-$pgid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+  else
+    kill "$pid" 2>/dev/null || true
+  fi
 }
 
 service_port() {
@@ -48,7 +68,7 @@ stop_one() {
   file="$(pid_file "$name")"
   if is_running "$file"; then
     echo "Stopping $name (pid $(cat "$file"))"
-    kill "$(cat "$file")" 2>/dev/null || true
+    stop_pid_group "$(cat "$file")"
     for _ in {1..20}; do
       if ! kill -0 "$(cat "$file")" 2>/dev/null; then
         break
@@ -56,7 +76,7 @@ stop_one() {
       sleep 0.2
     done
     if kill -0 "$(cat "$file")" 2>/dev/null; then
-      kill -9 "$(cat "$file")" 2>/dev/null || true
+      kill -9 -- "-$(cat "$file")" 2>/dev/null || kill -9 "$(cat "$file")" 2>/dev/null || true
     fi
   fi
   rm -f "$file"
@@ -65,10 +85,12 @@ stop_one() {
 stop_ports() {
   for port in "$FRONTEND_PORT" "$BACKEND_PORT" "$EMAIL_PORT"; do
     local pids
-    pids="$(lsof -ti TCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+    pids="$(port_pids "$port")"
     if [[ -n "$pids" ]]; then
       echo "Stopping process(es) on port $port: $pids"
-      kill $pids 2>/dev/null || true
+      while IFS= read -r pid; do
+        [[ -n "$pid" ]] && stop_pid_group "$pid"
+      done <<< "$pids"
       sleep 0.5
     fi
   done
@@ -150,18 +172,16 @@ start_backend() {
 }
 
 start_frontend() {
-  echo "Starting frontend on :$FRONTEND_PORT"
+  echo "Starting frontend dev server on :$FRONTEND_PORT"
   (
     cd "$ROOT_DIR/frontend"
-    rm -rf .next
     setsid env \
       PORT="$FRONTEND_PORT" \
       NEXT_PUBLIC_BASE_URL="http://localhost:$BACKEND_PORT/api/v1/" \
       NEXT_PUBLIC_API_URL="http://localhost:$BACKEND_PORT/api/v1" \
       NEXT_PUBLIC_ALTCHA_CHALLENGE_URL="http://localhost:$FRONTEND_PORT/api/altcha/challenge" \
       ALTCHA_HMAC_KEY="$ALTCHA_HMAC_KEY" \
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID="${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}" \
-      node node_modules/next/dist/bin/next dev -p "$FRONTEND_PORT" >"$(log_file frontend)" 2>&1 < /dev/null &
+      npm run dev -- -H 0.0.0.0 -p "$FRONTEND_PORT" >"$(log_file frontend)" 2>&1 < /dev/null &
     echo $! >"$(pid_file frontend)"
   )
 }
