@@ -1,25 +1,9 @@
 import localFont from "next/font/local";
 import "./globals.css";
-import { Teko, Inter } from 'next/font/google'
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Toaster } from "@/components/ui/toaster"
 import AppProviders from "./components/AppProviders";
-
-// Display font for headings
-const teko = Teko({
-  weight: ['300', '400', '500', '600', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-teko',
-})
-
-// Body font for readability
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-})
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -39,8 +23,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${teko.variable} ${inter.variable}`} suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body className={`${geistSans.className} antialiased`}>
         <AppProviders>
           {children}
           <Toaster />
