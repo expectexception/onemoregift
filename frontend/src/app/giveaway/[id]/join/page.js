@@ -366,6 +366,9 @@ function Home() {
                             <div className="premium-input h-11 px-4 rounded-xl text-white flex items-center">
                                 {formData.email || "Not set"}
                             </div>
+                            <p className="text-xs text-emerald-300/90">
+                                Winner notice will be sent to this email address.
+                            </p>
                         </div>
                     </div>
                 );
@@ -713,6 +716,7 @@ function CelebrationOverlay() {
                 <div className="text-center">
                     <p className="text-white font-semibold text-lg">Participation Confirmed</p>
                     <p className="text-emerald-100/90 text-sm">Gift entry locked. You are in the draw.</p>
+                    <p className="text-emerald-200/90 text-xs mt-1">Winner notice will be sent by email.</p>
                 </div>
             </div>
 
