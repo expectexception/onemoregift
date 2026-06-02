@@ -18,6 +18,12 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const ALTCHA_CHALLENGE_URL = process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL;
+const getApiErrorMessage = (error, fallback) => (
+    error?.response?.data?.msg
+    || error?.response?.data?.message
+    || error?.message
+    || fallback
+);
 
 function Home() {
     const { toast } = useToast();
@@ -99,7 +105,7 @@ function Home() {
                 toast({ title: "Error", description: data.msg || "Profile change failed.", variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "An error occurred while saving the profile.", variant: "destructive" });
+            toast({ title: "Error", description: getApiErrorMessage(error, "An error occurred while saving the profile."), variant: "destructive" });
         }
     };
 
@@ -245,7 +251,7 @@ function Home() {
                 toast({ title: "Error", description: data.msg || "Participation failed.", variant: "destructive" });
             }
         } catch (error) {
-            const message = error?.response?.data?.msg || "Participation failed.";
+            const message = getApiErrorMessage(error, "Participation failed.");
             toast({ title: "Error", description: message, variant: "destructive" });
         }
     };

@@ -12,12 +12,27 @@ const toPositiveInt = (value) => {
     return Number.isInteger(number) && number > 0 ? number : null;
 };
 
+const combineDateAndTime = (date, time) => {
+    const normalizedDate = String(date || "").trim();
+    const normalizedTime = String(time || "").trim();
+
+    if (normalizedDate && normalizedTime && /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+        return `${normalizedDate} ${normalizedTime}`;
+    }
+
+    return normalizedDate;
+};
+
 const parseGiveawayDates = (startDate, endDate) => {
     const start = dayjs.tz(`${startDate}`, "Asia/Kolkata");
     const end = dayjs.tz(`${endDate}`, "Asia/Kolkata");
+    const nowIst = dayjs().tz("Asia/Kolkata");
 
     if (!start.isValid() || !end.isValid()) {
         return { error: "Start and end dates must be valid" };
+    }
+    if (start.isBefore(nowIst)) {
+        return { error: "Start date and time cannot be in the past (IST)" };
     }
     if (!end.isAfter(start)) {
         return { error: "End date must be after start date" };
@@ -27,7 +42,7 @@ const parseGiveawayDates = (startDate, endDate) => {
 };
 
 const normalizeGiveawayInput = (body) => {
-    const { title, description, startDate, endDate, prize, image, prizeValue } = body;
+    const { title, description, startDate, startTime, endDate, endTime, prize, image, prizeValue } = body;
     const winnerCount = toPositiveInt(body.winnerCount);
     const maxParticipants = toPositiveInt(body.maxParticipants);
 
@@ -38,7 +53,10 @@ const normalizeGiveawayInput = (body) => {
         return { error: "Winner count cannot exceed participant cap" };
     }
 
-    const dates = parseGiveawayDates(startDate, endDate);
+    const dates = parseGiveawayDates(
+        combineDateAndTime(startDate, startTime),
+        combineDateAndTime(endDate, endTime)
+    );
     if (dates.error) return dates;
 
     return {
@@ -265,15 +283,7 @@ const participate = async (req, res) => {
             return res.status(409).json({ error: true, msg: "This giveaway has ended" });
         }
 
-        let userId = req.user.data._id;
-        if (giveaway.maxParticipants && giveaway.participants.length >= giveaway.maxParticipants) {
-            return res.status(409).json({ error: true, msg: "Maximum participants limit reached" });
-        }
-
-        if (giveaway.participants.some(participant => participant.equals(userId))) {
-            return res.status(409).json({ error: true, msg: "You have already participated in this giveaway" });
-        }
-        giveaway.participants.push(userId);
+        const userId = req.user.data._id;
         try {
             await JoinedGiveaway.create({ user: userId, giveaway: giveaway._id });
         } catch (dupError) {
@@ -282,7 +292,35 @@ const participate = async (req, res) => {
             }
             throw dupError;
         }
-        await giveaway.save();
+
+        const updateQuery = {
+            _id: giveaway._id,
+            participants: { $ne: userId },
+        };
+
+        if (giveaway.maxParticipants) {
+            updateQuery.$expr = {
+                $lt: [{ $size: "$participants" }, "$maxParticipants"],
+            };
+        }
+
+        const updatedGiveaway = await Giveaway.findOneAndUpdate(
+            updateQuery,
+            { $addToSet: { participants: userId } },
+            { new: true }
+        );
+
+        if (!updatedGiveaway) {
+            await JoinedGiveaway.deleteOne({ user: userId, giveaway: giveaway._id });
+
+            const latestGiveaway = await Giveaway.findById(giveaway._id).select("participants maxParticipants");
+            if (latestGiveaway?.participants?.some(participant => participant.equals(userId))) {
+                return res.status(409).json({ error: true, msg: "You have already participated in this giveaway" });
+            }
+
+            return res.status(409).json({ error: true, msg: "Maximum participants limit reached" });
+        }
+
         return res.status(200).json({ error: false, msg: "Participation successful" });
 
     } catch (error) {

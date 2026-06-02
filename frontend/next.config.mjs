@@ -6,6 +6,7 @@ const nextConfig = {
         NEXT_PUBLIC_ALTCHA_CHALLENGE_URL: process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL,
     },
     images: {
+        unoptimized: true,
         remotePatterns: [
             {
                 protocol: 'http',

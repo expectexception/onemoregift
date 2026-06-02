@@ -1,4 +1,5 @@
 const Users = require('../model/Users');
+const PendingRegistration = require('../model/PendingRegistration');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -31,8 +32,18 @@ const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 
 const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
 const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test';
+const OTP_DEBUG_LOGGING = process.env.NODE_ENV !== 'production' && process.env.LOG_OTP_DEBUG === 'true';
 
 const googleClient = GOOGLE_CLIENT_IDS.length ? new OAuth2Client() : null;
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(0, 10);
+const isValidIndianPhone = (value) => /^[6-9]\d{9}$/.test(value);
+const logOtpForLocalDebug = (purpose, email, otp) => {
+    if (OTP_DEBUG_LOGGING) {
+        console.log(`[OTP_DEBUG] ${purpose} OTP for ${email}: ${otp}`);
+    }
+};
 
 const userCookieOptions = {
     httpOnly: true,
@@ -255,11 +266,18 @@ const register = async (req, res) => {
             privacyAccepted,
             policyVersion
         } = req.body;
-        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePhone(phone);
 
         if (!name) return res.status(400).json({ error: true, msg: 'Name is required' });
         if (!email || !password) {
             return res.status(400).json({ error: true, msg: 'Email and password are required' });
+        }
+        if (!normalizedPhone) {
+            return res.status(400).json({ error: true, msg: 'Phone number is required' });
+        }
+        if (!isValidIndianPhone(normalizedPhone)) {
+            return res.status(400).json({ error: true, msg: 'Phone number must be a valid 10-digit Indian number starting with 6-9' });
         }
         if (!termsAccepted || !privacyAccepted) {
             return res.status(400).json({
@@ -267,8 +285,6 @@ const register = async (req, res) => {
                 msg: 'You must accept the Terms and Privacy Policy to create an account'
             });
         }
-
-        const normalizedPhone = phone ? phone.trim() : null;
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -284,37 +300,23 @@ const register = async (req, res) => {
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
-        console.log('[OTP_DEBUG] Generated registration OTP for', normalizedEmail, 'is:', otpCode);
+        logOtpForLocalDebug('registration', normalizedEmail, otpCode);
 
         let isTest = process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com');
 
-        const query = normalizedPhone ? { $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] } : { email: normalizedEmail };
-        let user = await Users.findOne(query);
+        const existingUser = await Users.findOne({ $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] });
+        if (existingUser && existingUser.isVerified !== false) {
+            const errorMessage = existingUser.email === normalizedEmail
+                ? 'A user with that email already exists'
+                : 'A user with that phone number already exists';
+            return res.status(409).json({ error: true, msg: errorMessage });
+        }
 
-        if (user) {
-            if (user.isVerified === false) {
-                user.name = name;
-                user.fullName = fullName ? fullName.trim() : (user.fullName || "");
-                user.email = normalizedEmail;
-                user.phone = normalizedPhone;
-                user.password = hashedPassword;
-                user.localPasswordSet = true;
-                user.legalConsent = consentPayload;
-                if (isTest) {
-                    user.isVerified = true;
-                    user.loginOtp = undefined;
-                } else {
-                    user.loginOtp = { token: otpHash, expires: otpExpiry, attempts: 0 };
-                }
-                await user.save();
-            } else {
-                let errorMessage = 'A user with these details already exists';
-                if (normalizedPhone && user.phone === normalizedPhone) errorMessage = 'A user with that phone number already exists';
-                if (user.email === normalizedEmail) errorMessage = 'A user with that email already exists';
-                return res.status(409).json({ error: true, msg: errorMessage });
+        if (isTest) {
+            if (existingUser && existingUser.isVerified === false) {
+                await Users.deleteOne({ _id: existingUser._id });
             }
-        } else {
-            user = await Users.create({
+            const user = await Users.create({
                 phone: normalizedPhone,
                 email: normalizedEmail,
                 name,
@@ -322,16 +324,38 @@ const register = async (req, res) => {
                 password: hashedPassword,
                 localPasswordSet: true,
                 legalConsent: consentPayload,
-                isVerified: isTest ? true : false,
-                ...(isTest ? {} : { loginOtp: { token: otpHash, expires: otpExpiry, attempts: 0 } })
+                isVerified: true,
             });
-        }
-
-        if (isTest) {
             const token = signUserToken(user);
             setUserCookie(res, token);
             return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
         }
+
+        if (existingUser && existingUser.isVerified === false) {
+            await Users.deleteOne({ _id: existingUser._id });
+        }
+
+        const pendingPhoneOwner = await PendingRegistration.findOne({ phone: normalizedPhone, email: { $ne: normalizedEmail } });
+        if (pendingPhoneOwner) {
+            return res.status(409).json({ error: true, msg: 'A pending registration already uses that phone number' });
+        }
+
+        await PendingRegistration.findOneAndUpdate(
+            { email: normalizedEmail },
+            {
+                $set: {
+                    phone: normalizedPhone,
+                    email: normalizedEmail,
+                    name,
+                    fullName: fullName ? fullName.trim() : "",
+                    password: hashedPassword,
+                    localPasswordSet: true,
+                    legalConsent: consentPayload,
+                    loginOtp: { token: otpHash, expires: otpExpiry, attempts: 0 },
+                }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
 
         const sent = await sendEmail({
             to: normalizedEmail,
@@ -436,7 +460,7 @@ const requestOtp = async (req, res) => {
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000;
-        console.log('[OTP_DEBUG] Generated login OTP for', normalizedEmail, 'is:', otpCode);
+        logOtpForLocalDebug('login', normalizedEmail, otpCode);
 
         await Users.findByIdAndUpdate(user._id, {
             $set: {
@@ -526,13 +550,13 @@ const verifyOtp = async (req, res) => {
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome  d!',
+                    title: 'Welcome!',
                     message: `Hello ${getDisplayName(user)}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome  d!',
+                    'Welcome!',
                     `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
@@ -572,6 +596,11 @@ const googleSignin = async (req, res) => {
 
         let user = await Users.findOne({ email: payload.email });
 
+        if (mode === 'register' && user && user.isVerified === false) {
+            await Users.deleteOne({ _id: user._id });
+            user = null;
+        }
+
         if (mode === 'register' && user) {
             return res.status(409).json({
                 error: true,
@@ -602,7 +631,6 @@ const googleSignin = async (req, res) => {
                 name: payload.name || 'Google User',
                 fullName: payload.name || '',
                 email: payload.email,
-                phone: null,
                 password: hashedPassword,
                 localPasswordSet: false,
                 googleId: payload.sub,
@@ -623,13 +651,13 @@ const googleSignin = async (req, res) => {
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome  d!',
+                    title: 'Welcome!',
                     message: `Hello ${getDisplayName(user)}, your OneMoreGift account is ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome  d!',
+                    'Welcome!',
                     `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
@@ -638,6 +666,7 @@ const googleSignin = async (req, res) => {
         } else {
             // Update Google metadata; also clear legacy fake phone values
             const updates = {};
+            const unset = {};
             if (!user.googleId) {
                 updates.googleId = payload.sub;
                 updates.isGoogleAuth = true;
@@ -653,11 +682,15 @@ const googleSignin = async (req, res) => {
             }
             // Clear old fake phone numbers stored as 'google_XXXXXXXXXX'
             if (user.phone && user.phone.startsWith('google_')) {
-                updates.phone = null;
+                unset.phone = '';
             }
-            if (Object.keys(updates).length > 0) {
-                await Users.findByIdAndUpdate(user._id, { $set: updates });
+            if (Object.keys(updates).length > 0 || Object.keys(unset).length > 0) {
+                const updateDoc = {};
+                if (Object.keys(updates).length > 0) updateDoc.$set = updates;
+                if (Object.keys(unset).length > 0) updateDoc.$unset = unset;
+                await Users.findByIdAndUpdate(user._id, updateDoc);
                 user = { ...user.toObject(), ...updates };
+                if (unset.phone !== undefined) delete user.phone;
             }
         }
 
@@ -669,13 +702,14 @@ const googleSignin = async (req, res) => {
         setUserCookie(res, token);
         return res.status(200).json({ error: false, token });
     } catch (error) {
+        console.error('googleSignin Exception:', error?.message || error);
         return res.status(500).json({ error: true, msg: 'Google Sign-In failed' });
     }
 };
 
 const resetPass = async (req, res) => {
     try {
-        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(req.body?.email);
         const resetRequestMsg = 'If an account exists for this email, a password reset link has been sent.';
 
         if (!normalizedEmail) {
@@ -837,10 +871,74 @@ const logout = async (req, res) => {
 
 const verifyRegistrationOtp = async (req, res) => {
     try {
-        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(req.body?.email);
         const otp = String(req.body?.otp || "").trim();
         if (!normalizedEmail || !otp) {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
+        }
+
+        const pending = await PendingRegistration.findOne({ email: normalizedEmail });
+        if (pending) {
+            if (Date.now() > new Date(pending.loginOtp.expires).getTime()) {
+                await PendingRegistration.deleteOne({ _id: pending._id });
+                return res.status(400).json({ error: true, msg: 'OTP has expired. Please register again.' });
+            }
+
+            const isPendingOtpMatch = (TEST_OTP_BYPASS_ENABLED && otp === '123456') || await bcrypt.compare(otp, pending.loginOtp.token);
+            if (!isPendingOtpMatch) {
+                const nextAttempts = (pending.loginOtp.attempts || 0) + 1;
+                if (nextAttempts >= 5) {
+                    await PendingRegistration.deleteOne({ _id: pending._id });
+                    return res.status(429).json({ error: true, msg: 'Too many wrong attempts, please register again' });
+                }
+
+                await PendingRegistration.findByIdAndUpdate(pending._id, { $set: { 'loginOtp.attempts': nextAttempts } });
+                return res.status(400).json({ error: true, msg: 'Invalid OTP' });
+            }
+
+            const existingUser = await Users.findOne({ $or: [{ email: pending.email }, { phone: pending.phone }] });
+            if (existingUser && existingUser.isVerified !== false) {
+                await PendingRegistration.deleteOne({ _id: pending._id });
+                return res.status(409).json({ error: true, msg: 'A user with these details already exists' });
+            }
+            if (existingUser && existingUser.isVerified === false) {
+                await Users.deleteOne({ _id: existingUser._id });
+            }
+
+            const user = await Users.create({
+                phone: pending.phone,
+                email: pending.email,
+                name: pending.name,
+                fullName: pending.fullName || "",
+                password: pending.password,
+                localPasswordSet: true,
+                legalConsent: pending.legalConsent,
+                isVerified: true,
+            });
+
+            await PendingRegistration.deleteOne({ _id: pending._id });
+
+            await sendEmail({
+                to: normalizedEmail,
+                subject: 'Welcome to OneMoreGift!',
+                template: 'welcome',
+                data: {
+                    title: 'Welcome!',
+                    message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
+                    actionUrl: CLIENT_URL,
+                    actionLabel: 'Explore Giveaways',
+                },
+                html: generateEmailTemplate(
+                    'Welcome!',
+                    `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
+                    '',
+                    '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
+                )
+            });
+
+            const token = signUserToken(user);
+            setUserCookie(res, token);
+            return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
         }
 
         const user = await Users.findOne({ email: normalizedEmail });
@@ -875,13 +973,13 @@ const verifyRegistrationOtp = async (req, res) => {
             subject: 'Welcome to OneMoreGift!',
             template: 'welcome',
             data: {
-                title: 'Welcome  d!',
+                title: 'Welcome!',
                 message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                 actionUrl: CLIENT_URL,
                 actionLabel: 'Explore Giveaways',
             },
             html: generateEmailTemplate(
-                'Welcome  d!',
+                'Welcome!',
                 `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                 '',
                 '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'

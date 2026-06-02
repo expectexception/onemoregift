@@ -30,6 +30,13 @@ const emptyAddress = () => ({
     isDefault: false,
 });
 
+const getApiErrorMessage = (error, fallback) => (
+    error?.response?.data?.msg
+    || error?.response?.data?.message
+    || error?.message
+    || fallback
+);
+
 function Home() {
     const { toast } = useToast();
     const router = useRouter();
@@ -128,8 +135,8 @@ function Home() {
             } else {
                 toast({ title: "Error", description: data.msg || "Password change failed.", variant: "destructive" });
             }
-        } catch {
-            toast({ title: "Error", description: "An error occurred while changing the password.", variant: "destructive" });
+        } catch (error) {
+            toast({ title: "Error", description: getApiErrorMessage(error, "An error occurred while changing the password."), variant: "destructive" });
         }
     };
 
@@ -171,7 +178,11 @@ function Home() {
             toast({ title: "Validation Error", description: "Please enter a valid email address.", variant: "destructive" });
             return;
         }
-        if (normalizedPhone && !/^[6-9]\d{9}$/.test(normalizedPhone)) {
+        if (!normalizedPhone) {
+            toast({ title: "Validation Error", description: "Phone number is required.", variant: "destructive" });
+            return;
+        }
+        if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
             toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
             return;
         }
@@ -196,10 +207,26 @@ function Home() {
             cleanedAddresses[0].isDefault = true;
         }
 
+        for (const [index, address] of cleanedAddresses.entries()) {
+            const addressNumber = index + 1;
+            if (!address.fullName) {
+                toast({ title: "Validation Error", description: `Receiver name is required for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (!address.line1 || !address.city || !address.state || !address.country || !address.postalCode) {
+                toast({ title: "Validation Error", description: `Complete address line, city, state, country, and pincode for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (address.phone && !/^[6-9]\d{9}$/.test(address.phone)) {
+                toast({ title: "Validation Error", description: `Receiver phone must be a valid 10-digit Indian number for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+        }
+
         try {
             const { data } = await api.patch(
                 "profile/update",
-                { name: normalizedName, fullName: fullName.trim(), email: normalizedEmail, phone: normalizedPhone || "", avatar, addresses: cleanedAddresses },
+                { name: normalizedName, fullName: fullName.trim(), email: normalizedEmail, phone: normalizedPhone, avatar, addresses: cleanedAddresses },
                 { meta: { auth: "user" } }
             );
 
@@ -213,12 +240,14 @@ function Home() {
                         </div>
                     ),
                 });
-                await fetchUserProfile();
+                setTimeout(() => {
+                    router.push("/my-profile");
+                }, 700);
             } else {
                 toast({ title: "Error", description: data.msg || "Profile change failed.", variant: "destructive" });
             }
-        } catch {
-            toast({ title: "Error", description: "An error occurred while saving profile.", variant: "destructive" });
+        } catch (error) {
+            toast({ title: "Error", description: getApiErrorMessage(error, "An error occurred while saving profile."), variant: "destructive" });
         }
     };
 
@@ -302,7 +331,7 @@ function Home() {
                                         <div className="space-y-3 pt-1">
                                             <div className="flex items-center justify-between flex-wrap gap-2">
                                                 <h4 className="text-white font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-red-400" />Saved Addresses</h4>
-                                                <Button type="button" variant="outline" onClick={addAddress} className="h-9 rounded-lg border-white/[0.14] bg-white/[0.02] text-neutral-100 hover:bg-white/[0.08]">
+                                                <Button type="button" variant="outline" onClick={addAddress} className="h-9 w-full sm:w-auto rounded-lg border-white/[0.14] bg-white/[0.02] text-neutral-100 hover:bg-white/[0.08]">
                                                     <Plus className="w-4 h-4 mr-1" /> Add Address
                                                 </Button>
                                             </div>
@@ -314,16 +343,16 @@ function Home() {
                                                             ? "border-amber-400/35 bg-amber-500/5 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]"
                                                             : "border-white/[0.08] bg-white/[0.02]"
                                                     }`}>
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="flex items-center gap-2 w-full max-w-[220px]">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                            <div className="flex items-center gap-2 w-full sm:max-w-[220px]">
                                                                 <Input value={address.label} onChange={(e) => updateAddressField(idx, "label", e.target.value)} className="premium-input h-10 text-white" placeholder="Label (Home)" />
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Button type="button" variant="outline" onClick={() => setDefaultAddress(idx)} className={`h-9 rounded-lg ${address.isDefault ? "border-amber-400/40 text-amber-300 bg-amber-500/10" : "border-white/[0.1] text-neutral-300 hover:bg-white/[0.06]"}`}>
+                                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                                                                <Button type="button" variant="outline" onClick={() => setDefaultAddress(idx)} className={`h-9 w-full sm:w-auto rounded-lg ${address.isDefault ? "border-amber-400/40 text-amber-300 bg-amber-500/10" : "border-white/[0.1] text-neutral-300 hover:bg-white/[0.06]"}`}>
                                                                     <Star className="w-4 h-4 mr-1" /> {address.isDefault ? "Default" : "Set Default"}
                                                                 </Button>
                                                                 {addresses.length > 1 ? (
-                                                                    <Button type="button" variant="outline" onClick={() => removeAddress(idx)} className="h-9 rounded-lg border-red-500/40 text-red-300 hover:bg-red-500/10">
+                                                                    <Button type="button" variant="outline" onClick={() => removeAddress(idx)} className="h-9 w-full sm:w-auto rounded-lg border-red-500/40 text-red-300 hover:bg-red-500/10">
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </Button>
                                                                 ) : null}

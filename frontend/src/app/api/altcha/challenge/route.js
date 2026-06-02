@@ -2,8 +2,14 @@ import { createChallenge } from 'altcha-lib';
 
 export async function GET() {
     try {
+        const hmacKey = process.env.ALTCHA_HMAC_KEY;
+        if (!hmacKey) {
+            console.error('ALTCHA_HMAC_KEY is not configured');
+            return new Response(JSON.stringify({ error: 'Captcha is not configured' }), { status: 500 });
+        }
+
         const challenge = await createChallenge({
-            hmacKey: process.env.ALTCHA_HMAC_KEY || 'default_dev_hmac_secret_key_12345',
+            hmacKey,
             maxNumber: 100000,
         });
 

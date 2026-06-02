@@ -88,7 +88,7 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
     return (
         <div
             className={cn(
-                "relative flex flex-col border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out z-50",
+                "relative flex h-screen shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out z-50 lg:sticky lg:top-0",
                 mobileWidth
                     ? (isMobileOpen ? "fixed inset-y-0 left-0 w-[260px] translate-x-0" : "fixed inset-y-0 left-0 w-[260px] -translate-x-full")
                     : (isCollapsed ? "w-[80px]" : "w-[260px]")

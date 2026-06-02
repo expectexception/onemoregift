@@ -13,8 +13,11 @@ const formatAddress = (addressObj = {}) => {
     ].map((item) => (item || "").trim()).filter(Boolean).join(", ");
 };
 
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(0, 10);
+const isValidIndianPhone = (value) => /^[6-9]\d{9}$/.test(value);
+
 const normalizeAddresses = (addresses = []) => {
-    if (!Array.isArray(addresses)) return [];
+    if (!Array.isArray(addresses)) return { addresses: [] };
     const cleaned = addresses
         .map((item) => ({
             label: (item.label || "Address").trim(),
@@ -25,12 +28,24 @@ const normalizeAddresses = (addresses = []) => {
             state: (item.state || "").trim(),
             country: (item.country || "").trim(),
             postalCode: (item.postalCode || "").trim(),
-            phone: (item.phone || "").trim(),
+            phone: normalizePhone(item.phone),
             isDefault: Boolean(item.isDefault),
         }))
         .filter((item) => item.line1 || item.city || item.state || item.country || item.postalCode);
 
-    if (!cleaned.length) return [];
+    if (!cleaned.length) return { addresses: [] };
+
+    for (const [index, item] of cleaned.entries()) {
+        if (!item.fullName) {
+            return { error: `Receiver name is required for address ${index + 1}` };
+        }
+        if (!item.line1 || !item.city || !item.state || !item.country || !item.postalCode) {
+            return { error: `Complete address line, city, state, country, and pincode for address ${index + 1}` };
+        }
+        if (item.phone && !isValidIndianPhone(item.phone)) {
+            return { error: `Receiver phone must be a valid 10-digit Indian number for address ${index + 1}` };
+        }
+    }
 
     if (!cleaned.some((a) => a.isDefault)) {
         cleaned[0].isDefault = true;
@@ -45,7 +60,7 @@ const normalizeAddresses = (addresses = []) => {
         });
     }
 
-    return cleaned;
+    return { addresses: cleaned };
 };
 
 const myProfile = async (req, res) => {
@@ -98,7 +113,7 @@ const updateProfile = async (req, res) => {
         const resolvedEmail = typeof email === "string" ? email.trim().toLowerCase() : existingUser.email;
         const resolvedPhone = phone === undefined
             ? existingUser.phone
-            : ((phone && phone.trim() !== "") ? phone.trim() : null);
+            : normalizePhone(phone);
 
         if (!resolvedName) {
             return res.status(400).json({ error: true, msg: "Name is required" });
@@ -106,7 +121,10 @@ const updateProfile = async (req, res) => {
         if (!resolvedEmail || !/^\S+@\S+\.\S+$/.test(resolvedEmail)) {
             return res.status(400).json({ error: true, msg: "A valid email is required" });
         }
-        if (resolvedPhone && !/^[6-9]\d{9}$/.test(resolvedPhone)) {
+        if (phone !== undefined && !resolvedPhone) {
+            return res.status(400).json({ error: true, msg: "Phone number is required" });
+        }
+        if (resolvedPhone && !isValidIndianPhone(resolvedPhone)) {
             return res.status(400).json({ error: true, msg: "Phone number must be a valid 10-digit number starting with 6-9" });
         }
 
@@ -117,7 +135,7 @@ const updateProfile = async (req, res) => {
         if (duplicate) {
             const msg = duplicate.email === resolvedEmail
                 ? "A user with that email already exists"
-                : "A user with that phone number already exists";
+                : "This phone number is already linked to another account";
             return res.status(409).json({ error: true, msg });
         }
 
@@ -130,7 +148,11 @@ const updateProfile = async (req, res) => {
         if (address !== undefined) updates.address = address;
         if (avatar !== undefined) updates.avatar = avatar;
         if (addresses !== undefined) {
-            const normalizedAddresses = normalizeAddresses(addresses);
+            const normalizedResult = normalizeAddresses(addresses);
+            if (normalizedResult.error) {
+                return res.status(400).json({ error: true, msg: normalizedResult.error });
+            }
+            const normalizedAddresses = normalizedResult.addresses;
             updates.addresses = normalizedAddresses;
             const defaultAddress = normalizedAddresses.find((item) => item.isDefault) || normalizedAddresses[0];
             updates.address = defaultAddress ? formatAddress(defaultAddress) : "";

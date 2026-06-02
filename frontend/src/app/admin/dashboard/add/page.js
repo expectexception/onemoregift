@@ -25,7 +25,7 @@ import {
     CardHeader,
     CardTitle,
 } from "../../../../components/ui/card"
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle } from "lucide-react";
 import { TimePicker } from "@/app/components/TimePicker";
@@ -34,6 +34,12 @@ import { useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import { useAuth } from "@/app/context/AuthContext";
 import { compressImage } from "@/app/utils/imageCompressor";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 function AddGiveawayPage() {
     let [title, setTitle] = useState("");
@@ -44,6 +50,12 @@ function AddGiveawayPage() {
     let [startTime, setStartTime] = useState("");
     let [endTime, setEndTime] = useState("");
     let [uploadProgress, setUploadProgress] = useState(null);
+    let [localPreviewUrl, setLocalPreviewUrl] = useState("");
+    useEffect(() => {
+        return () => {
+            if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+        };
+    }, [localPreviewUrl]);
     let [winnerCount, setwinnerCount] = useState("");
     let [maxParticipants, setMaxParticipants] = useState("");
     let [prize, setPrize] = useState("");
@@ -53,16 +65,22 @@ function AddGiveawayPage() {
     const { logoutAdmin } = useAuth();
     const winnerTotal = Number(winnerCount || 0);
     const participantCap = Number(maxParticipants || 0);
-    const startAt = startDate && startTime ? new Date(`${startDate}T${startTime}`) : null;
-    const endAt = endDate && endTime ? new Date(`${endDate}T${endTime}`) : null;
-    const hasValidTimeline = startAt && endAt && endAt > startAt;
+    const nowIst = dayjs().tz("Asia/Kolkata");
+    const istToday = nowIst.format("YYYY-MM-DD");
+    const startAt = startDate && startTime ? dayjs.tz(`${startDate} ${startTime}`, "Asia/Kolkata") : null;
+    const endAt = endDate && endTime ? dayjs.tz(`${endDate} ${endTime}`, "Asia/Kolkata") : null;
+    const hasValidTimeline = startAt && endAt && endAt.isAfter(startAt);
+    const hasValidStartDate = startAt && !startAt.isBefore(nowIst);
     const hasValidCounts = winnerTotal > 0 && participantCap > 0 && winnerTotal <= participantCap;
-    const canSubmit = title && description && startDate && startTime && endDate && endTime && prize && prizeValue && hasValidCounts && hasValidTimeline;
+    const canSubmit = title && description && startDate && startTime && endDate && endTime && prize && prizeValue && hasValidCounts && hasValidTimeline && hasValidStartDate;
     let uploadImage = async (imageFile) => {
         if (!imageFile) return;
         try {
             setUploadProgress(0);
-            const compressed = await compressImage(imageFile, 1200, 1200, 0.85);
+            const previewUrl = URL.createObjectURL(imageFile);
+            setLocalPreviewUrl(previewUrl);
+
+            const compressed = await compressImage(imageFile, 1600, 1600, 0.85, 1.5 * 1024 * 1024);
             let form = new FormData();
             form.append("image", compressed || imageFile)
             let { data } = await api.post(`upload`, form, {
@@ -76,6 +94,7 @@ function AddGiveawayPage() {
             })
             if (data.error == false) {
                 setImage(data.url)
+                setLocalPreviewUrl("");
                 setUploadProgress(null);
                 toast({
                     title: "Success",
@@ -88,6 +107,7 @@ function AddGiveawayPage() {
                 });
             } else {
                 setUploadProgress(null);
+                setLocalPreviewUrl("");
                 toast({
                     title: "Upload Error",
                     variant: "destructive",
@@ -101,6 +121,7 @@ function AddGiveawayPage() {
             }
         } catch (error) {
             setUploadProgress(null);
+            setLocalPreviewUrl("");
             toast({
                 title: "Server Error",
                 variant: "destructive",
@@ -111,6 +132,10 @@ function AddGiveawayPage() {
 
     let handleSubmit = async (e) => {
         e.preventDefault();
+        if (!hasValidStartDate) {
+            toast({ title: "Invalid start time", variant: "destructive", description: "Start date and time cannot be in the past (IST)." });
+            return;
+        }
         if (!hasValidTimeline) {
             toast({ title: "Invalid timeline", variant: "destructive", description: "End date and time must be after the start." });
             return;
@@ -161,7 +186,7 @@ function AddGiveawayPage() {
             toast({
                 title: "Error",
                 variant: "destructive",
-                description: "An unexpected error occurred while saving."
+                description: error?.response?.data?.msg || "An unexpected error occurred while saving."
             });
         }
     };
@@ -224,12 +249,13 @@ function AddGiveawayPage() {
                             <CardContent className="p-8">
                                 <div className="space-y-6">
                                     <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] hover:border-red-600/40 transition-all aspect-video flex items-center justify-center bg-black/40">
-                                        {image ? (
+                                        {(image || localPreviewUrl) ? (
                                             <Image
-                                                src={image}
+                                                src={image || localPreviewUrl}
                                                 fill
                                                 className="object-contain p-3"
                                                 alt="Giveaway Preview"
+                                                unoptimized
                                             />
                                         ) : (
                                             <div className="flex flex-col items-center gap-3 text-neutral-600 group-hover:text-red-500 transition-all duration-500">
@@ -376,6 +402,7 @@ function AddGiveawayPage() {
                                                     type="date"
                                                     value={startDate}
                                                     onChange={(e) => setStartDate(e.target.value)}
+                                                    min={istToday}
                                                     className="h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-lg font-mono text-xs"
                                                     required
                                                 />
@@ -399,6 +426,7 @@ function AddGiveawayPage() {
                                                     type="date"
                                                     value={endDate}
                                                     onChange={(e) => setendDate(e.target.value)}
+                                                    min={startDate || istToday}
                                                     className="h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-lg font-mono text-xs"
                                                     required
                                                 />
@@ -457,6 +485,9 @@ function AddGiveawayPage() {
                                     )}
                                     {startAt && endAt && !hasValidTimeline && (
                                         <p className="text-xs text-red-400 text-center">End date and time must be after the start.</p>
+                                    )}
+                                    {startAt && !hasValidStartDate && (
+                                        <p className="text-xs text-red-400 text-center">Start date and time cannot be in the past (IST).</p>
                                     )}
                                     <div className="flex items-center justify-center gap-2 text-xs font-medium text-neutral-600">
                                         <ShieldCheck className="w-2.5 h-2.5" />

@@ -38,7 +38,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Desktop Navigation */}
-                <div className="hidden md:flex items-center gap-8">
+                <div className="hidden lg:flex items-center gap-5 xl:gap-8">
                     <NavLink href="/" label="Home" />
                     <NavLink href="/giveaway" label="Giveaways" />
                     <NavLink href="/winners" label="Winners" />
@@ -47,9 +47,9 @@ export default function Navbar() {
 
                 {/* Desktop Auth Buttons */}
                 {isUserLoggedIn ? (
-                    <div className="hidden lg:flex items-center gap-3">
+                    <div className="hidden lg:flex items-center gap-2 xl:gap-3">
                         <button
-                            className="px-6 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium transition-all duration-300 border border-white/10 hover:border-white/20"
+                            className="px-4 xl:px-6 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium transition-all duration-300 border border-white/10 hover:border-white/20"
                             onClick={() => router.push('/my-profile')}
                         >
                             <span className="flex items-center gap-2">
@@ -58,22 +58,22 @@ export default function Navbar() {
                             </span>
                         </button>
                         <button
-                            className="px-6 py-2.5 text-neutral-400 hover:text-white transition-colors duration-300"
+                            className="px-3 xl:px-6 py-2.5 text-neutral-400 hover:text-white transition-colors duration-300"
                             onClick={handleUserLogout}
                         >
                             Logout
                         </button>
                     </div>
                 ) : (
-                    <div className="hidden lg:flex items-center gap-3">
+                    <div className="hidden lg:flex items-center gap-2 xl:gap-3">
                         <button
-                            className="px-6 py-2.5 text-neutral-400 hover:text-white transition-colors duration-300 font-medium"
+                            className="px-3 xl:px-6 py-2.5 text-neutral-400 hover:text-white transition-colors duration-300 font-medium"
                             onClick={() => router.push('/login')}
                         >
                             Sign in
                         </button>
                         <button
-                            className="btn-gradient px-6 py-2.5 rounded-xl font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300"
+                            className="btn-gradient px-4 xl:px-6 py-2.5 rounded-xl font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300"
                             onClick={() => router.push('/register')}
                         >
                             <span className="flex items-center gap-2">
