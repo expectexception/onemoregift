@@ -19,16 +19,15 @@ const isRootAdmin = async (req, res, next) => {
       return next();
     }
 
-    // Safe fallback: when ROOT_ADMIN_EMAILS is not configured, allow only
-    // the very first admin account (bootstrap owner) to execute root actions.
-    if (ROOT_ADMIN_EMAILS.length === 0) {
-      const firstAdmin = await Admin.findOne({ isAdmin: true })
-        .sort({ createdAt: 1 })
-        .select('email');
+    // Safe fallback: allow the very first admin account (bootstrap owner)
+    // to execute root actions. This avoids lockout when ROOT_ADMIN_EMAILS
+    // is misconfigured or rotated without updating the current root account.
+    const firstAdmin = await Admin.findOne({ isAdmin: true })
+      .sort({ createdAt: 1 })
+      .select('email');
 
-      if (firstAdmin?.email?.toLowerCase() === email) {
-        return next();
-      }
+    if (firstAdmin?.email?.toLowerCase() === email) {
+      return next();
     }
 
     return res.status(403).json({
