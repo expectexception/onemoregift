@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, Sparkles, PartyPopper } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import withUserAuth from "@/app/components/withUserAuth";
@@ -33,8 +33,10 @@ function Home() {
     const giveawayId = path.split("/")[2];
     const [isCaptchaValid, setIsCaptchaValid] = useState(false);
     const [currentStep, setCurrentStep] = useState(1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [user, setUser] = useState({});
     const [participated, setParticipated] = useState(false);
+    const [showCelebration, setShowCelebration] = useState(false);
     const [formData, setFormData] = useState({
         name: "",
         phone: "",
@@ -57,6 +59,12 @@ function Home() {
     const [isGiveawayEnded, setIsGiveawayEnded] = useState(false);
     const [isGiveawayNotStarted, setIsGiveawayNotStarted] = useState(false);
     const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+
+    const hasPhone = Boolean(formData.phone && String(formData.phone).trim());
+    const hasSavedAddress = Boolean(
+        (Array.isArray(user.addresses) && user.addresses.length > 0)
+        || (user.address && String(user.address).trim())
+    );
 
     const checkGiveawayStatus = useCallback(async () => {
         if (!user?._id || !giveawayId) return;
@@ -179,7 +187,36 @@ function Home() {
         }).catch(err => console.error("Failed to load Altcha", err));
     }, [currentStep]);
 
+    const getSelectedSavedAddress = () => {
+        const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+        const selectedSavedAddress = savedAddresses[savedAddressIndex];
+
+        if (selectedSavedAddress) {
+            return [
+                selectedSavedAddress.line1,
+                selectedSavedAddress.line2,
+                selectedSavedAddress.city,
+                selectedSavedAddress.state,
+                selectedSavedAddress.country,
+                selectedSavedAddress.postalCode,
+            ].filter(Boolean).join(", ");
+        }
+
+        return user.address || "";
+    };
+
     const handleNext = async () => {
+        if (currentStep === 1) {
+            if (!hasPhone) {
+                toast({
+                    title: "Mobile number required",
+                    description: "Add your mobile number in profile before continuing.",
+                    variant: "destructive"
+                });
+                return;
+            }
+        }
+
         if (currentStep === 2) {
             if (addressSelection === "new") {
                 if (!addressData.line1 || !addressData.country || !addressData.state || !addressData.pincode) {
@@ -191,15 +228,21 @@ function Home() {
                     return;
                 }
             }
+
             const parts = [addressData.line1, addressData.line2, addressData.state, addressData.country, addressData.pincode].filter(Boolean);
             const fullAddress = parts.join(", ");
-            const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
-            const selectedSavedAddress = savedAddresses[savedAddressIndex];
-            const selectedSavedAddressText = selectedSavedAddress
-                ? [selectedSavedAddress.line1, selectedSavedAddress.line2, selectedSavedAddress.city, selectedSavedAddress.state, selectedSavedAddress.country, selectedSavedAddress.postalCode]
-                    .filter(Boolean).join(", ")
-                : (user.address || "");
+            const selectedSavedAddressText = getSelectedSavedAddress();
             const selectedAddress = addressSelection === "saved" ? selectedSavedAddressText : fullAddress;
+
+            if (!selectedAddress || !selectedAddress.trim()) {
+                toast({
+                    title: "Address required",
+                    description: "Please provide a valid shipping address to continue.",
+                    variant: "destructive"
+                });
+                return;
+            }
+
             setFormData((prev) => ({ ...prev, address: selectedAddress }));
 
             if (addressSelection === "new" && selectedAddress && selectedAddress !== (user.address || "")) {
@@ -218,17 +261,27 @@ function Home() {
     };
 
     const handleJoin = async () => {
+        if (!hasPhone) {
+            toast({ title: "Mobile number required", description: "Please add your mobile number in profile first.", variant: "destructive" });
+            return;
+        }
+        if (!formData.address || !formData.address.trim()) {
+            toast({ title: "Address required", description: "Please provide your shipping address before submitting.", variant: "destructive" });
+            return;
+        }
+
         try {
+            setIsSubmitting(true);
             let { data } = await api.post("giveaway/participate/" + giveawayId, {}, { meta: { auth: "user" } });
             if (!data.error) {
                 setParticipated(true);
+                setShowCelebration(true);
                 import("canvas-confetti").then((module) => {
                     const confetti = module.default;
-                    // Premium, expensive multi-burst fireworks animation
                     const count = 250;
                     const defaults = {
                         origin: { y: 0.6 },
-                        colors: ['#dc2626', '#991b1b', '#fbbf24', '#f59e0b', '#ffffff'], // Deep Red, Crimson, Gold, Light Gold, Silver
+                        colors: ['#ef4444', '#dc2626', '#f97316', '#fbbf24', '#ffffff'],
                         zIndex: 9999
                     };
 
@@ -243,9 +296,18 @@ function Home() {
                     fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
                     fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
                     fire(0.1, { spread: 120, startVelocity: 45 });
+
+                    // Side cannon stream for a premium celebration finish.
+                    const end = Date.now() + 1400;
+                    const shoot = () => {
+                        confetti({ ...defaults, particleCount: 8, angle: 60, spread: 55, origin: { x: 0, y: 0.68 } });
+                        confetti({ ...defaults, particleCount: 8, angle: 120, spread: 55, origin: { x: 1, y: 0.68 } });
+                        if (Date.now() < end) requestAnimationFrame(shoot);
+                    };
+                    shoot();
                 }).catch(err => console.error("Failed to load confetti", err));
-                
-                setTimeout(() => { router.push("/thank-you"); }, 3500); // Give the premium confetti time to shine
+
+                setTimeout(() => { router.push("/thank-you"); }, 4200);
             }
             if (data.error) {
                 toast({ title: "Error", description: data.msg || "Participation failed.", variant: "destructive" });
@@ -253,6 +315,8 @@ function Home() {
         } catch (error) {
             const message = getApiErrorMessage(error, "Participation failed.");
             toast({ title: "Error", description: message, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -270,6 +334,12 @@ function Home() {
             case 1:
                 return (
                     <div className="space-y-5">
+                        {!hasPhone ? (
+                            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 text-sm flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                <span>Mobile number is mandatory to confirm participation. Update your profile to continue.</span>
+                            </div>
+                        ) : null}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between gap-3">
                                 <span className="text-neutral-300 text-sm font-medium">Profile Information</span>
@@ -302,18 +372,21 @@ function Home() {
             case 2:
                 return (
                     <div className="space-y-4">
-                        <label className="text-neutral-300 text-sm font-medium">Shipping Address</label>
+                        <div className="flex items-center gap-2">
+                            <label className="text-neutral-300 text-sm font-medium">Shipping Address</label>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">Required</span>
+                        </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <button
                                 type="button"
                                 onClick={() => setAddressSelection("saved")}
-                                disabled={!((Array.isArray(user.addresses) && user.addresses.length) || user.address)}
+                                disabled={!hasSavedAddress}
                                 className={`h-10 px-3 rounded-lg text-sm border transition-all ${
                                     addressSelection === "saved"
                                         ? "bg-red-600 text-white border-red-500"
                                         : "bg-white/[0.03] text-neutral-300 border-white/[0.08]"
-                                } ${!((Array.isArray(user.addresses) && user.addresses.length) || user.address) ? "opacity-50 cursor-not-allowed" : ""}`}
+                                } ${!hasSavedAddress ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                                 Use Saved Address
                             </button>
@@ -354,7 +427,7 @@ function Home() {
                             <div className="premium-input min-h-20 px-4 py-3 rounded-xl text-white whitespace-pre-wrap">{user.address}</div>
                         ) : null}
 
-                        {addressSelection === "saved" && !((Array.isArray(user.addresses) && user.addresses.length > 0) || user.address) ? (
+                        {addressSelection === "saved" && !hasSavedAddress ? (
                             <p className="text-sm text-neutral-400">
                                 No saved address found. Please add a new address.
                             </p>
@@ -454,11 +527,14 @@ function Home() {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-black p-3 sm:p-4">
+        <div className="relative flex flex-col items-center justify-center min-h-screen bg-black p-3 sm:p-4 overflow-hidden">
+            {showCelebration ? (
+                <CelebrationOverlay />
+            ) : null}
             <Image src={medal} height={100} width={100} alt="Medal" className="mb-4 sm:mb-6 w-16 sm:w-24 h-16 sm:h-24" />
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-4 sm:mb-6 text-center px-2">
                 {participated
-                    ? "Participation Successful!"
+                    ? "Entry Confirmed!"
                     : alreadyJoined
                         ? "Already Participated"
                         : isGiveawayEnded
@@ -551,14 +627,78 @@ function Home() {
                             <Button
                                 onClick={currentStep === 3 ? handleJoin : handleNext}
                                 className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 btn-gradient rounded-xl font-medium text-sm sm:text-base"
-                                disabled={currentStep === 3 && !!ALTCHA_CHALLENGE_URL && !isCaptchaValid && process.env.NODE_ENV !== 'development'}
+                                disabled={
+                                    isSubmitting
+                                    || (currentStep === 1 && !hasPhone)
+                                    || (currentStep === 3 && !!ALTCHA_CHALLENGE_URL && !isCaptchaValid && process.env.NODE_ENV !== 'development')
+                                }
                             >
-                                {currentStep === 3 ? "Submit Entry" : "Next"}
+                                {currentStep === 3 ? (isSubmitting ? "Submitting..." : "Submit Entry") : "Next"}
                             </Button>
                         </div>
                     </>
                 )}
             </div>
+
+            <style jsx>{`
+                @keyframes trophy-float {
+                    0%, 100% { transform: translateY(0px) scale(1); }
+                    50% { transform: translateY(-10px) scale(1.03); }
+                }
+                @keyframes ring-pulse {
+                    0% { transform: scale(0.85); opacity: 0.55; }
+                    100% { transform: scale(1.15); opacity: 0; }
+                }
+                @keyframes sparkle-rise {
+                    0% { transform: translateY(0) scale(0.8) rotate(0deg); opacity: 0; }
+                    15% { opacity: 1; }
+                    100% { transform: translateY(-120px) scale(1.15) rotate(120deg); opacity: 0; }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+function CelebrationOverlay() {
+    const sparkles = Array.from({ length: 14 }, (_, index) => ({
+        id: index,
+        left: 8 + (index * 6),
+        delay: (index % 6) * 0.18,
+        duration: 1.6 + (index % 4) * 0.2,
+    }));
+
+    return (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 via-transparent to-transparent" />
+
+            <div className="relative flex flex-col items-center gap-3">
+                <div className="relative">
+                    <div className="absolute inset-0 rounded-full border border-red-400/50 animate-[ring-pulse_1.1s_ease-out_infinite]" />
+                    <div className="absolute inset-[-10px] rounded-full border border-amber-300/35 animate-[ring-pulse_1.7s_ease-out_infinite]" />
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_40px_rgba(239,68,68,0.45)] flex items-center justify-center animate-[trophy-float_2.2s_ease-in-out_infinite]">
+                        <PartyPopper className="w-10 h-10 text-white" />
+                    </div>
+                </div>
+
+                <div className="text-center">
+                    <p className="text-white font-semibold text-lg">Participation Confirmed</p>
+                    <p className="text-red-200/90 text-sm">You are now officially in the draw</p>
+                </div>
+            </div>
+
+            {sparkles.map((sparkle) => (
+                <div
+                    key={sparkle.id}
+                    className="absolute"
+                    style={{
+                        left: `${sparkle.left}%`,
+                        bottom: '18%',
+                        animation: `sparkle-rise ${sparkle.duration}s ease-out ${sparkle.delay}s infinite`,
+                    }}
+                >
+                    <Sparkles className="w-4 h-4 text-amber-300/90" />
+                </div>
+            ))}
         </div>
     );
 }
