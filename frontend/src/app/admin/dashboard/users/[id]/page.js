@@ -121,7 +121,7 @@ const UserProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-[#070707] p-4 md:p-8">
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-[1400px] mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <button
@@ -139,9 +139,9 @@ const UserProfilePage = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                     {/* Left Column: Profile Card */}
-                    <div className="lg:col-span-1 space-y-8">
+                    <div className="xl:col-span-5 space-y-6 min-w-0">
                         <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                             <div className="h-24 bg-gradient-to-r from-red-600/20 to-neutral-900" />
                             <CardContent className="relative px-6 pb-8">
@@ -154,7 +154,7 @@ const UserProfilePage = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="mt-6 text-center sm:text-left">
+                                <div className="mt-6 text-center sm:text-left min-w-0">
                                     <h2 className="text-2xl font-bold text-white mb-1 break-words">{user.name}</h2>
                                     <p className="text-neutral-500 text-sm mb-6 break-all">{user.email}</p>
 
@@ -176,7 +176,7 @@ const UserProfilePage = () => {
                     </div>
 
                     {/* Right Column: Actions & Details */}
-                    <div className="lg:col-span-2 space-y-8">
+                    <div className="xl:col-span-7 space-y-8 min-w-0">
                         {/* Security Management */}
                         <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
                             <CardHeader>
