@@ -27,7 +27,8 @@ function AdminSettings() {
                 toast({ title: "Error", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Failed", description: "Maintenance action failed.", variant: "destructive" });
+            const message = error?.response?.data?.msg || "Maintenance action failed.";
+            toast({ title: "Failed", description: message, variant: "destructive" });
         } finally {
             setLoading(false);
         }
@@ -113,6 +114,10 @@ function SecurityCard() {
     const handleUpdate = async (e) => {
         e.preventDefault();
         if (!currentPassword || !newPassword) return;
+        if (newPassword.length < 6) {
+            toast({ title: "Invalid Password", description: "New password must be at least 6 characters.", variant: "destructive" });
+            return;
+        }
 
         setLoading(true);
         try {
@@ -137,7 +142,8 @@ function SecurityCard() {
                 toast({ title: "Update Failed", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "Request failed.", variant: "destructive" });
+            const message = error?.response?.data?.msg || "Request failed.";
+            toast({ title: "Error", description: message, variant: "destructive" });
         } finally {
             setLoading(false);
         }

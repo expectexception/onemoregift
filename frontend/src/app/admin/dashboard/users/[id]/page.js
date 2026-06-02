@@ -90,7 +90,8 @@ const UserProfilePage = () => {
                 toast({ title: "Update Failed", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "Failed to update password", variant: "destructive" });
+            const message = error?.response?.data?.msg || "Failed to update password";
+            toast({ title: "Error", description: message, variant: "destructive" });
         } finally {
             setResetLoading(false);
         }
@@ -143,9 +144,9 @@ const UserProfilePage = () => {
                     <div className="lg:col-span-1 space-y-8">
                         <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                             <div className="h-24 bg-gradient-to-r from-red-600/20 to-neutral-900" />
-                            <CardContent className="relative pt-0 px-6 pb-8">
-                                <div className="absolute -top-12 left-6">
-                                    <div className="w-24 h-24 rounded-lg bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
+                            <CardContent className="relative px-6 pb-8">
+                                <div className="-mt-12 flex justify-center sm:justify-start">
+                                    <div className="w-24 h-24 rounded-xl bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
                                         {user.avatar ? (
                                             <Image src={user.avatar || "/images/user.png"} alt={user.name || "User"} width={96} height={96} className="w-full h-full object-cover" />
                                         ) : (
@@ -153,9 +154,9 @@ const UserProfilePage = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="mt-16">
-                                    <h2 className="text-2xl font-bold text-white mb-1">{user.name}</h2>
-                                    <p className="text-neutral-500 text-sm mb-6 truncate">{user.email}</p>
+                                <div className="mt-6 text-center sm:text-left">
+                                    <h2 className="text-2xl font-bold text-white mb-1 break-words">{user.name}</h2>
+                                    <p className="text-neutral-500 text-sm mb-6 break-all">{user.email}</p>
 
                                     <div className="space-y-4">
                                         <ProfileInfo icon={Mail} label="Email Address" value={user.email} />
@@ -191,7 +192,7 @@ const UserProfilePage = () => {
                                 <form onSubmit={handlePasswordReset} className="space-y-6">
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold text-neutral-500">Set new password</label>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col sm:flex-row gap-3">
                                             <Input
                                                 type="password"
                                                 placeholder="Enter secure password"
@@ -202,7 +203,7 @@ const UserProfilePage = () => {
                                             <Button
                                                 type="submit"
                                                 disabled={resetLoading}
-                                                className="px-6 rounded-lg h-12 font-semibold whitespace-nowrap bg-red-600 text-white hover:bg-red-500"
+                                                className="px-6 rounded-lg h-12 font-semibold whitespace-nowrap bg-red-600 text-white hover:bg-red-500 sm:min-w-[170px]"
                                             >
                                                 {resetLoading ? <RefreshCw className="animate-spin" /> : "Reset Access"}
                                             </Button>
@@ -233,13 +234,13 @@ const UserProfilePage = () => {
 };
 
 const ProfileInfo = ({ icon: Icon, label, value }) => (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-3 text-left">
         <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
             <Icon className="w-4 h-4 text-neutral-500" />
         </div>
-        <div className="overflow-hidden">
+        <div className="overflow-hidden min-w-0">
             <p className="text-xs font-semibold text-neutral-500">{label}</p>
-            <p className="text-neutral-300 text-sm truncate">{value}</p>
+            <p className="text-neutral-300 text-sm break-words">{value}</p>
         </div>
     </div>
 );
