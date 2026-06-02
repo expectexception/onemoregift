@@ -121,9 +121,9 @@ const UserProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-[#070707] p-4 md:p-8">
-            <div className="max-w-[1400px] mx-auto">
+            <div className="max-w-[1500px] mx-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <button
                         onClick={() => router.back()}
                         className="flex items-center gap-2 text-neutral-500 hover:text-white transition-colors group"
@@ -141,12 +141,12 @@ const UserProfilePage = () => {
 
                 <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                     {/* Left Column: Profile Card */}
-                    <div className="xl:col-span-5 space-y-6 min-w-0">
+                    <div className="xl:col-span-5 2xl:col-span-4 space-y-6 min-w-0">
                         <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                             <div className="h-24 bg-gradient-to-r from-red-600/20 to-neutral-900" />
-                            <CardContent className="relative px-6 pb-8">
+                            <CardContent className="relative px-6 md:px-7 pb-8">
                                 <div className="-mt-12 flex justify-center sm:justify-start">
-                                    <div className="w-24 h-24 rounded-xl bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
+                                    <div className="w-24 h-24 rounded-xl bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl shrink-0">
                                         {user.avatar ? (
                                             <Image src={user.avatar || "/images/user.png"} alt={user.name || "User"} width={96} height={96} className="w-full h-full object-cover" />
                                         ) : (
@@ -155,10 +155,10 @@ const UserProfilePage = () => {
                                     </div>
                                 </div>
                                 <div className="mt-6 text-center sm:text-left min-w-0">
-                                    <h2 className="text-2xl font-bold text-white mb-1 break-words">{user.name}</h2>
-                                    <p className="text-neutral-500 text-sm mb-6 break-all">{user.email}</p>
+                                    <h2 className="text-2xl font-bold text-white mb-1 break-words leading-tight">{user.name}</h2>
+                                    <p className="text-neutral-500 text-sm mb-6 break-all leading-relaxed">{user.email}</p>
 
-                                    <div className="space-y-4">
+                                    <div className="space-y-5">
                                         <ProfileInfo icon={Mail} label="Email Address" value={user.email} />
                                         <ProfileInfo icon={Phone} label="Phone Number" value={user.phone || "Not set"} />
                                         <ProfileInfo icon={MapPin} label="Location" value={user.address || "No address provided"} />
@@ -176,7 +176,7 @@ const UserProfilePage = () => {
                     </div>
 
                     {/* Right Column: Actions & Details */}
-                    <div className="xl:col-span-7 space-y-8 min-w-0">
+                    <div className="xl:col-span-7 2xl:col-span-8 space-y-8 min-w-0">
                         {/* Security Management */}
                         <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
                             <CardHeader>
@@ -234,13 +234,13 @@ const UserProfilePage = () => {
 };
 
 const ProfileInfo = ({ icon: Icon, label, value }) => (
-    <div className="flex items-start gap-3 text-left">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+    <div className="flex items-start gap-4 text-left min-w-0">
+        <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
             <Icon className="w-4 h-4 text-neutral-500" />
         </div>
         <div className="overflow-hidden min-w-0">
-            <p className="text-xs font-semibold text-neutral-500">{label}</p>
-            <p className="text-neutral-300 text-sm break-words">{value}</p>
+            <p className="text-[11px] font-semibold text-neutral-500 tracking-wide uppercase">{label}</p>
+            <p className="text-neutral-200 text-sm leading-6 break-words">{value}</p>
         </div>
     </div>
 );
@@ -248,8 +248,8 @@ const ProfileInfo = ({ icon: Icon, label, value }) => (
 const StatBox = ({ icon: Icon, label, value, color }) => (
     <div className="border border-white/[0.06] bg-white/[0.02] p-5 rounded-lg flex flex-col items-center text-center hover:bg-white/[0.04] transition-all">
         <Icon className={`w-6 h-6 ${color} mb-3 group-hover:scale-110 transition-transform`} />
-        <span className="text-2xl font-semibold text-white">{value}</span>
-        <span className="text-xs font-semibold text-neutral-500 mt-1">{label}</span>
+        <span className="text-2xl font-semibold text-white leading-none">{value}</span>
+        <span className="text-xs font-semibold text-neutral-500 mt-2 tracking-wide uppercase">{label}</span>
     </div>
 );
 
