@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle, AlertCircle, Sparkles, PartyPopper } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, Sparkles } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import withUserAuth from "@/app/components/withUserAuth";
@@ -641,13 +641,21 @@ function Home() {
             </div>
 
             <style jsx>{`
-                @keyframes trophy-float {
+                @keyframes badge-float {
                     0%, 100% { transform: translateY(0px) scale(1); }
-                    50% { transform: translateY(-10px) scale(1.03); }
+                    50% { transform: translateY(-7px) scale(1.03); }
                 }
                 @keyframes ring-pulse {
                     0% { transform: scale(0.85); opacity: 0.55; }
                     100% { transform: scale(1.15); opacity: 0; }
+                }
+                @keyframes orbit-spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                @keyframes badge-glow {
+                    0%, 100% { box-shadow: 0 0 0 rgba(16, 185, 129, 0.0), 0 0 55px rgba(16, 185, 129, 0.18); }
+                    50% { box-shadow: 0 0 22px rgba(16, 185, 129, 0.28), 0 0 80px rgba(16, 185, 129, 0.3); }
                 }
                 @keyframes sparkle-rise {
                     0% { transform: translateY(0) scale(0.8) rotate(0deg); opacity: 0; }
@@ -660,29 +668,51 @@ function Home() {
 }
 
 function CelebrationOverlay() {
-    const sparkles = Array.from({ length: 14 }, (_, index) => ({
+    const sparkles = Array.from({ length: 16 }, (_, index) => ({
         id: index,
-        left: 8 + (index * 6),
+        left: 5 + (index * 6),
         delay: (index % 6) * 0.18,
         duration: 1.6 + (index % 4) * 0.2,
     }));
 
+    const orbitDots = [
+        { id: 1, top: "10%", left: "50%", color: "#34d399" },
+        { id: 2, top: "28%", left: "83%", color: "#fbbf24" },
+        { id: 3, top: "70%", left: "81%", color: "#f59e0b" },
+        { id: 4, top: "82%", left: "20%", color: "#ef4444" },
+        { id: 5, top: "24%", left: "18%", color: "#facc15" },
+    ];
+
     return (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.2),transparent_58%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,185,129,0.08)_1px,transparent_1px),linear-gradient(rgba(16,185,129,0.08)_1px,transparent_1px)] bg-[size:42px_42px] opacity-35" />
+
+            <div className="absolute w-[420px] h-[420px] sm:w-[520px] sm:h-[520px] rounded-full border border-emerald-400/20 animate-[orbit-spin_24s_linear_infinite]">
+                {orbitDots.map((dot) => (
+                    <span
+                        key={dot.id}
+                        className="absolute w-3 h-3 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+                        style={{ top: dot.top, left: dot.left, backgroundColor: dot.color }}
+                    />
+                ))}
+            </div>
+
+            <div className="absolute w-[350px] h-[350px] sm:w-[430px] sm:h-[430px] rounded-full border border-emerald-300/15" />
+            <div className="absolute w-[280px] h-[280px] sm:w-[340px] sm:h-[340px] rounded-full border border-emerald-200/15" />
 
             <div className="relative flex flex-col items-center gap-3">
                 <div className="relative">
-                    <div className="absolute inset-0 rounded-full border border-red-400/50 animate-[ring-pulse_1.1s_ease-out_infinite]" />
-                    <div className="absolute inset-[-10px] rounded-full border border-amber-300/35 animate-[ring-pulse_1.7s_ease-out_infinite]" />
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_40px_rgba(239,68,68,0.45)] flex items-center justify-center animate-[trophy-float_2.2s_ease-in-out_infinite]">
-                        <PartyPopper className="w-10 h-10 text-white" />
+                    <div className="absolute inset-[-16px] rounded-full border border-emerald-300/40 animate-[ring-pulse_1.3s_ease-out_infinite]" />
+                    <div className="absolute inset-[-28px] rounded-full border border-rose-300/35 animate-[ring-pulse_1.9s_ease-out_infinite]" />
+                    <div className="relative animate-[badge-float_2.3s_ease-in-out_infinite] animate-[badge-glow_2.1s_ease-in-out_infinite]">
+                        <GiftTicketBadge />
                     </div>
                 </div>
 
                 <div className="text-center">
                     <p className="text-white font-semibold text-lg">Participation Confirmed</p>
-                    <p className="text-red-200/90 text-sm">You are now officially in the draw</p>
+                    <p className="text-emerald-100/90 text-sm">Gift entry locked. You are in the draw.</p>
                 </div>
             </div>
 
@@ -696,10 +726,45 @@ function CelebrationOverlay() {
                         animation: `sparkle-rise ${sparkle.duration}s ease-out ${sparkle.delay}s infinite`,
                     }}
                 >
-                    <Sparkles className="w-4 h-4 text-amber-300/90" />
+                    <Sparkles className="w-4 h-4 text-emerald-200/90" />
                 </div>
             ))}
         </div>
+    );
+}
+
+function GiftTicketBadge() {
+    return (
+        <svg width="190" height="190" viewBox="0 0 190 190" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gift confirmation badge">
+            <defs>
+                <radialGradient id="giftGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(95 95) rotate(90) scale(95)">
+                    <stop stopColor="#10B981" stopOpacity="0.28" />
+                    <stop offset="1" stopColor="#10B981" stopOpacity="0" />
+                </radialGradient>
+                <linearGradient id="ticketStroke" x1="46" y1="32" x2="143" y2="151" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#D1FAE5" />
+                    <stop offset="0.5" stopColor="#FBCFE8" />
+                    <stop offset="1" stopColor="#FCA5A5" />
+                </linearGradient>
+                <linearGradient id="checkGrad" x1="67" y1="101" x2="121" y2="77" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#34D399" />
+                    <stop offset="1" stopColor="#6EE7B7" />
+                </linearGradient>
+            </defs>
+
+            <circle cx="95" cy="95" r="94" fill="url(#giftGlow)" />
+            <circle cx="95" cy="95" r="67" stroke="#FCA5A5" strokeWidth="3" strokeDasharray="9 10" strokeLinecap="round" opacity="0.9" />
+            <circle cx="95" cy="95" r="74" stroke="#A7F3D0" strokeWidth="2.5" strokeDasharray="10 9" strokeLinecap="round" opacity="0.85" />
+
+            <path
+                d="M58 56C58 49.3726 63.3726 44 70 44H120C126.627 44 132 49.3726 132 56V72.5C142.217 75.0903 149.75 84.3465 149.75 95.5C149.75 106.654 142.217 115.91 132 118.5V135C132 141.627 126.627 147 120 147H70C63.3726 147 58 141.627 58 135V118.5C47.7826 115.91 40.25 106.654 40.25 95.5C40.25 84.3465 47.7826 75.0903 58 72.5V56Z"
+                fill="#05080B"
+                stroke="url(#ticketStroke)"
+                strokeWidth="3"
+            />
+
+            <path d="M74 95L90.5 111L118.5 77.5" stroke="url(#checkGrad)" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
     );
 }
 
