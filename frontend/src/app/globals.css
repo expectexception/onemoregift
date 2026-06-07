@@ -429,3 +429,39 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .box-design {}
+
+/* ===== ALTCHA WIDGET CUSTOM PREMIUM DARK THEME ===== */
+altcha-widget {
+  --altcha-max-width: 100%;
+  --altcha-color-base: #ffffff;
+  --altcha-color-text: #e5e5e5;
+  --altcha-color-bg: rgba(14, 14, 14, 0.7);
+  --altcha-color-border: rgba(255, 255, 255, 0.08);
+  --altcha-color-border-focus: rgba(220, 38, 38, 0.5);
+  --altcha-color-accent: #dc2626;
+  --altcha-color-accent-bg: rgba(220, 38, 38, 0.1);
+  --altcha-color-error: #ef4444;
+  --altcha-color-footer: #737373;
+  --altcha-border-radius: 0.75rem;
+  font-family: inherit;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+altcha-widget::part(button) {
+  background-color: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #ffffff;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+altcha-widget::part(button):hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+altcha-widget::part(label) {
+  font-weight: 500;
+}

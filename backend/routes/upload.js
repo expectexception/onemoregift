@@ -1,14 +1,31 @@
+'use strict';
+
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const sharp = require('sharp');
 const isAdmin = require('../middleware/isAdmin');
+const ImageStore = require('../model/ImageStore');
 require('dotenv').config();
 
-const uploadDir = path.join(__dirname, '../public', 'uploads', 'images');
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+// ── Config ────────────────────────────────────────────────────────────────────
+const IMAGE_STORAGE = (process.env.IMAGE_STORAGE || 'disk').toLowerCase().trim();
+const SERVER_URL = (process.env.SERVER_URL || 'http://localhost:9000').replace(/\/$/, '');
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB input limit
+
+// Disk storage path — configurable, defaults to public/uploads/images
+const MEDIA_DIR = process.env.MEDIA_DIR
+    ? path.resolve(process.env.MEDIA_DIR)
+    : path.join(__dirname, '../public/uploads/images');
+
+// Sharp compression settings
+const SHARP_MAX_WIDTH = 1920;
+const SHARP_MAX_HEIGHT = 1920;
+const SHARP_QUALITY = 82; // JPEG/WebP quality (0-100)
+
 const ALLOWED_IMAGE_TYPES = new Map([
     ['image/jpeg', '.jpg'],
     ['image/png', '.png'],
@@ -16,137 +33,181 @@ const ALLOWED_IMAGE_TYPES = new Map([
     ['image/gif', '.gif'],
 ]);
 
-fs.mkdirSync(uploadDir, { recursive: true });
+console.log(`[Upload] IMAGE_STORAGE=${IMAGE_STORAGE} | ${IMAGE_STORAGE === 'disk' ? `MEDIA_DIR=${MEDIA_DIR}` : 'MongoDB'}`);
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const safeExt = ALLOWED_IMAGE_TYPES.get(file.mimetype) || path.extname(path.basename(file.originalname)).toLowerCase();
-        cb(null, `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${safeExt}`);
-    }
-});
+if (IMAGE_STORAGE === 'disk') {
+    fs.mkdirSync(MEDIA_DIR, { recursive: true });
+}
 
-const fileFilter = (req, file, cb) => {
-    const ext = path.extname(path.basename(file.originalname)).toLowerCase();
-    const expectedExt = ALLOWED_IMAGE_TYPES.get(file.mimetype);
-    const extensionAllowed = [...ALLOWED_IMAGE_TYPES.values()].includes(ext);
-
-    if (!expectedExt || !extensionAllowed) {
-        return cb(new Error('Only JPG, PNG, WEBP, or GIF images are allowed'));
-    }
-
-    cb(null, true);
-};
-
-const uploadStorage = multer({
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: MAX_IMAGE_SIZE_BYTES,
-        files: 10,
-    },
-});
-
-const hasAllowedImageSignature = (filePath, mimetype) => {
-    const buffer = fs.readFileSync(filePath);
-    if (mimetype === 'image/jpeg') {
-        return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-    }
-    if (mimetype === 'image/png') {
-        return buffer.length >= 8
-            && buffer[0] === 0x89
-            && buffer[1] === 0x50
-            && buffer[2] === 0x4e
-            && buffer[3] === 0x47
-            && buffer[4] === 0x0d
-            && buffer[5] === 0x0a
-            && buffer[6] === 0x1a
-            && buffer[7] === 0x0a;
-    }
-    if (mimetype === 'image/gif') {
-        return buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'));
-    }
-    if (mimetype === 'image/webp') {
-        return buffer.length >= 12
-            && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
-            && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
-    }
+// ── Magic-byte validation ─────────────────────────────────────────────────────
+const hasAllowedSignature = (buf, mimetype) => {
+    if (mimetype === 'image/jpeg')
+        return buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    if (mimetype === 'image/png')
+        return buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    if (mimetype === 'image/gif')
+        return buf.length >= 6 && ['GIF87a', 'GIF89a'].includes(buf.subarray(0, 6).toString('ascii'));
+    if (mimetype === 'image/webp')
+        return buf.length >= 12 && buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP';
     return false;
 };
 
-const removeFileQuietly = (filePath) => {
-    fs.unlink(filePath, () => {});
-};
-
-const validateStoredImage = (file) => {
-    if (!file || !hasAllowedImageSignature(file.path, file.mimetype)) {
-        if (file?.path) removeFileQuietly(file.path);
-        return false;
+// ── Multer — always use memory storage so we can compress before saving ───────
+const fileFilter = (req, file, cb) => {
+    if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+        return cb(new Error('Only JPG, PNG, WEBP, or GIF images are allowed'));
     }
-    return true;
+    cb(null, true);
 };
 
-router.post('/', isAdmin, uploadStorage.single('image'), async (req, res) => {
+const upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter,
+    limits: { fileSize: MAX_IMAGE_SIZE_BYTES, files: 10 },
+});
+
+// ── Sharp compress ────────────────────────────────────────────────────────────
+async function compressBuffer(buffer, mimetype) {
+    const isGif = mimetype === 'image/gif';
+    if (isGif) return buffer; // skip compression for GIF (animated support)
+
+    const pipeline = sharp(buffer)
+        .resize(SHARP_MAX_WIDTH, SHARP_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true });
+
+    if (mimetype === 'image/png') {
+        return pipeline.png({ compressionLevel: 8, adaptiveFiltering: true }).toBuffer();
+    }
+    if (mimetype === 'image/webp') {
+        return pipeline.webp({ quality: SHARP_QUALITY }).toBuffer();
+    }
+    // JPEG default
+    return pipeline.jpeg({ quality: SHARP_QUALITY, progressive: true }).toBuffer();
+}
+
+// ── Save to disk ──────────────────────────────────────────────────────────────
+async function saveToDisk(file) {
+    const ext = ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg';
+    const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+    const compressed = await compressBuffer(file.buffer, file.mimetype);
+    const filePath = path.join(MEDIA_DIR, filename);
+    await fs.promises.writeFile(filePath, compressed);
+
+    console.log(`[Upload/disk] ${filename} | ${file.size}B → ${compressed.length}B`);
+
+    // Always return a relative URL — in dev it proxies through Next.js (no CORP issue),
+    // in prod the same origin serves it. Only use SERVER_URL if explicitly set for external CDN.
+    const isPublic = MEDIA_DIR.includes(path.join('public', 'uploads', 'images'));
+    const url = isPublic
+        ? `/uploads/images/${filename}`
+        : `/media/${filename}`;
+
+    return { filename, url, size: compressed.length, originalSize: file.size };
+}
+
+// ── Save to MongoDB ───────────────────────────────────────────────────────────
+async function saveToMongo(file) {
+    const originalSize = file.size;
+    const compressed = await compressBuffer(file.buffer, file.mimetype);
+    const ext = ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg';
+    const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+
+    const doc = await ImageStore.create({
+        filename,
+        mimetype: file.mimetype,
+        size: compressed.length,
+        originalSize,
+        data: compressed,
+    });
+
+    console.log(`[Upload/mongo] ${filename} | ${originalSize}B → ${compressed.length}B | id=${doc._id}`);
+
+    // Relative URL — proxied through Next.js in dev, same-origin in prod
+    const url = `/api/v1/upload/image/${doc._id}`;
+    return { filename, url, size: compressed.length, originalSize, id: doc._id };
+}
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+// Serve MongoDB images
+router.get('/image/:id', async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: true, msg: 'No valid image file provided' });
-        }
-        if (!validateStoredImage(req.file)) {
+        const doc = await ImageStore.findById(req.params.id).select('data mimetype filename');
+        if (!doc) return res.status(404).json({ error: true, msg: 'Image not found' });
+        res.set('Content-Type', doc.mimetype);
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+        res.set('Content-Disposition', `inline; filename="${doc.filename}"`);
+        return res.send(doc.data);
+    } catch {
+        return res.status(500).json({ error: true, msg: 'Failed to retrieve image' });
+    }
+});
+
+// Serve disk images from custom MEDIA_DIR (if not inside public/)
+router.get('/media/:filename', async (req, res) => {
+    try {
+        const filename = path.basename(req.params.filename); // prevent path traversal
+        const filePath = path.join(MEDIA_DIR, filename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: true, msg: 'Image not found' });
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.sendFile(filePath);
+    } catch {
+        return res.status(500).json({ error: true, msg: 'Failed to retrieve image' });
+    }
+});
+
+// Upload single image
+router.post('/', isAdmin, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: true, msg: 'No valid image file provided' });
+
+        if (!hasAllowedSignature(req.file.buffer, req.file.mimetype)) {
             return res.status(400).json({ error: true, msg: 'Uploaded file is not a valid image' });
         }
-        // Return same-origin relative URL so it works across domain/IP/https without mixed-content issues.
-        res.status(200).json({ error: false, url: `/uploads/images/${req.file.filename}` });
+
+        const result = IMAGE_STORAGE === 'mongodb'
+            ? await saveToMongo(req.file)
+            : await saveToDisk(req.file);
+
+        return res.status(200).json({
+            error: false,
+            url: result.url,
+            filename: result.filename,
+            storage: IMAGE_STORAGE,
+            originalSize: result.originalSize,
+            compressedSize: result.size,
+        });
     } catch (error) {
-        res.status(500).json({ error: true, msg: 'File Upload Failed, only Image files are accepted' });
+        console.error('[Upload] Error:', error.message);
+        return res.status(500).json({ error: true, msg: 'File upload failed: ' + error.message });
     }
 });
 
-// router.post('/', uploadStorage.single('image'), (req, res) => {
-//     // Check if filename is present in the request
-//     console.log(req.file);
-//     if (!req.file || !req.file.originalname) {
-//         return res.status(400).json({ error: 'Filename is required' });
-//     }
-
-//     const filename = req.file.originalname;
-//     // Handle the filename and uploaded file
-//     res.json({ filename });
-// });
-
-// Route to upload multiple images
-router.post('/multiple', isAdmin, uploadStorage.array('images', 10), async (req, res) => {
+// Upload multiple images
+router.post('/multiple', isAdmin, upload.array('images', 10), async (req, res) => {
     try {
-        if (!req.files || req.files.length === 0) {
+        if (!req.files || req.files.length === 0)
             return res.status(400).json({ error: true, msg: 'No valid image files provided' });
-        }
-        const invalidFile = req.files.find(file => !validateStoredImage(file));
-        if (invalidFile) {
-            req.files.forEach(file => removeFileQuietly(file.path));
-            return res.status(400).json({ error: true, msg: 'One or more uploaded files are not valid images' });
-        }
-        const urls = req.files.map(file => `/uploads/images/${file.filename}`);
-        res.status(200).json({ error: false, urls });
+
+        const invalid = req.files.find(f => !hasAllowedSignature(f.buffer, f.mimetype));
+        if (invalid) return res.status(400).json({ error: true, msg: 'One or more files are not valid images' });
+
+        const save = IMAGE_STORAGE === 'mongodb' ? saveToMongo : saveToDisk;
+        const results = await Promise.all(req.files.map(save));
+        const urls = results.map(r => r.url);
+
+        return res.status(200).json({ error: false, urls, storage: IMAGE_STORAGE });
     } catch (error) {
-        res.status(500).json({ error: true, msg: 'An error occurred while processing the uploaded files' });
+        return res.status(500).json({ error: true, msg: 'Upload failed: ' + error.message });
     }
 });
 
-// Error handling middleware
-router.use((err, req, res, next) => {
+// Error handler
+router.use((err, req, res, _next) => {
     if (err instanceof multer.MulterError) {
-        if (err.code === "LIMIT_FILE_SIZE") {
-            res.status(400).json({ error: true, msg: 'File size too large. Maximum allowed size is 5MB' });
-        } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
-            res.status(400).json({ error: true, msg: 'Too many files uploaded' });
-        } else {
-            res.status(400).json({ error: true, msg: 'Upload failed: ' + err.message });
-        }
-    } else if (err) {
-        res.status(400).json({ error: true, msg: err.message || 'Invalid upload' });
-    } else {
-        next();
+        const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File too large (max 5MB)' : err.message;
+        return res.status(400).json({ error: true, msg });
     }
+    return res.status(400).json({ error: true, msg: err.message || 'Upload error' });
 });
+
 module.exports = router;

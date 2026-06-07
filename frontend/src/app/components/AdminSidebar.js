@@ -13,10 +13,8 @@ import {
     Trophy,
     ChevronLeft
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
-import { Menu, X } from "lucide-react";
 
 function AdminMonogram() {
     return (
@@ -27,16 +25,15 @@ function AdminMonogram() {
     );
 }
 
-export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
+export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed, setIsCollapsed }) {
     const [mounted, setMounted] = useState(false);
     const onlyWidth = useWindowWidth();
-    const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const mobileWidth = mounted ? onlyWidth < 768 : false;
+    const mobileWidth = mounted ? onlyWidth < 1024 : false;
 
     function toggleSidebar() {
         setIsCollapsed(!isCollapsed);
@@ -88,7 +85,7 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
     return (
         <div
             className={cn(
-                "relative flex h-screen shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out z-50 lg:sticky lg:top-0",
+                "fixed inset-y-0 left-0 z-50 flex h-dvh shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out",
                 mobileWidth
                     ? (isMobileOpen ? "fixed inset-y-0 left-0 w-[260px] translate-x-0" : "fixed inset-y-0 left-0 w-[260px] -translate-x-full")
                     : (isCollapsed ? "w-[80px]" : "w-[260px]")

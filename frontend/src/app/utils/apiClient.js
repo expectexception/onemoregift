@@ -7,7 +7,9 @@ const api = axios.create({
     timeout: 15000,
     withCredentials: true,
     headers: {
-        // "Content-Type": "application/json", // Removed to allow auto-detection for FormData
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
     },
 });
 

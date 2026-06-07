@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
     AlertTriangle,
     ArrowLeft,
+    Calendar,
     CalendarClock,
     Gift,
     ImagePlus,
@@ -24,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import withAdminAuth from "../../../../../components/withAdminAuth";
 import api from "@/app/utils/apiClient";
 import { compressImage } from "@/app/utils/imageCompressor";
+import { TimePicker } from "@/app/components/TimePicker";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -209,8 +211,8 @@ function Page({ params }) {
 
     return (
         <div className="min-h-screen admin-shell-bg text-white">
-            <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-                <div className="relative overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 shadow-[0_30px_100px_-60px_rgba(220,38,38,0.7)] sm:p-6">
+            <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+                <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 shadow-[0_30px_100px_-60px_rgba(220,38,38,0.7)] sm:p-6">
                     <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-red-600/20 blur-[90px]" />
                     <div className="pointer-events-none absolute bottom-0 left-1/3 h-32 w-72 rounded-full bg-amber-500/10 blur-[80px]" />
                     <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -223,10 +225,7 @@ function Page({ params }) {
                                 <ArrowLeft className="h-5 w-5" />
                             </button>
                             <div>
-                                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-red-200">
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    Giveaway control room
-                                </div>
+                               
                                 <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">Edit Giveaway</h1>
                                 <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
                                     Fine tune campaign details, prize information, schedule and audience capacity with IST-safe validation.
@@ -247,10 +246,10 @@ function Page({ params }) {
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
-                    <div className="space-y-6 xl:sticky xl:top-6 xl:self-start">
-                        <Card className="overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.025] shadow-2xl">
-                            <CardHeader className="border-b border-white/[0.06] bg-gradient-to-r from-white/[0.045] to-transparent p-5">
+                <form onSubmit={handleSubmit} className="grid gap-5 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
+                    <div className="space-y-5 xl:sticky xl:top-6 xl:self-start">
+                        <Card className="overflow-hidden rounded-2xl border border-white/[0.08] bg-neutral-950/50 backdrop-blur-md shadow-2xl">
+                            <CardHeader className="border-b border-white/[0.06] bg-gradient-to-r from-white/[0.045] to-transparent p-4 sm:p-5">
                                 <CardTitle className="flex items-center gap-3 text-base font-black text-white">
                                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-600/15 text-red-300">
                                         <ImagePlus className="h-5 w-5" />
@@ -258,11 +257,11 @@ function Page({ params }) {
                                     Campaign Artwork
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-5 p-5 sm:p-6">
-                                <div className="relative aspect-[16/10] overflow-hidden rounded-[1.4rem] border border-white/[0.08] bg-[radial-gradient(circle_at_50%_20%,rgba(220,38,38,0.16),rgba(0,0,0,0.75)_55%)]">
+                            <CardContent className="space-y-5 p-4 sm:p-5">
+                                <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-white/[0.08] bg-[radial-gradient(circle_at_50%_20%,rgba(220,38,38,0.16),rgba(0,0,0,0.75)_55%)]">
                                     <Image src={image || "/images/gift.png"} fill className="object-contain p-4 transition duration-500 group-hover:scale-105" alt={title ? `${title} giveaway image preview` : "Giveaway image preview"} />
                                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                                    <label className="absolute inset-x-4 bottom-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/[0.1] bg-black/65 px-4 py-3 text-sm font-bold text-white backdrop-blur-xl transition hover:border-red-500/50 hover:bg-red-600/20">
+                                    <label className="absolute inset-x-4 bottom-4 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/[0.1] bg-black/65 px-4 py-3 text-sm font-bold text-white backdrop-blur-md transition hover:border-red-500/50 hover:bg-red-600/20">
                                         <UploadCloud className="h-4 w-4" />
                                         Replace image
                                         <input
@@ -291,8 +290,8 @@ function Page({ params }) {
                             </CardContent>
                         </Card>
 
-                        <Card className="rounded-[1.75rem] border border-white/[0.08] bg-white/[0.025]">
-                            <CardContent className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-1">
+                        <Card className="rounded-2xl border border-white/[0.08] bg-neutral-950/50 backdrop-blur-md">
+                            <CardContent className="grid grid-cols-1 gap-3 p-4 sm:p-5 sm:grid-cols-2 xl:grid-cols-1">
                                 <StatusPill icon={CalendarClock} label="Timeline" value={timelineLabel} tone={hasValidTimeline && hasValidStartDate ? "good" : "bad"} />
                                 <StatusPill icon={Trophy} label="Winner setup" value={hasValidCounts ? `${winnerTotal} winner(s), ${participantCap} max` : "Check winner and participant counts"} tone={hasValidCounts ? "good" : "bad"} />
                                 {hasWinners ? (
@@ -302,8 +301,8 @@ function Page({ params }) {
                         </Card>
                     </div>
 
-                    <Card className="overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-white/[0.025] shadow-2xl">
-                        <CardHeader className="border-b border-white/[0.06] bg-gradient-to-r from-white/[0.045] to-transparent p-5 sm:p-6">
+                    <Card className="overflow-hidden rounded-2xl border border-white/[0.08] bg-neutral-950/50 backdrop-blur-md shadow-2xl">
+                        <CardHeader className="border-b border-white/[0.06] bg-gradient-to-r from-white/[0.045] to-transparent p-4 sm:p-5">
                             <CardTitle className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
                                 <span className="flex items-center gap-3 text-lg font-black">
                                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
@@ -316,16 +315,16 @@ function Page({ params }) {
                                 </span>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-5 sm:p-6 lg:p-8">
-                            <div className="space-y-7">
-                                <section className="space-y-4">
+                        <CardContent className="p-4 sm:p-5 lg:p-6">
+                            <div className="space-y-5">
+                                <section className="space-y-3">
                                     <SectionTitle icon={Gift} title="Core details" />
                                     <div className="grid grid-cols-1 gap-4">
                                         <Field label="Title">
                                             <Input
                                                 value={title}
                                                 onChange={(e) => setTitle(e.target.value)}
-                                                className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white placeholder:text-neutral-600 focus-visible:ring-red-500/40"
+                                                className="h-10 rounded-xl border-white/[0.08] bg-black/35 text-white text-sm placeholder:text-neutral-600 focus-visible:ring-red-500/40"
                                                 placeholder="Giveaway title"
                                             />
                                         </Field>
@@ -333,45 +332,80 @@ function Page({ params }) {
                                             <Textarea
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
-                                                className="min-h-[112px] resize-none rounded-2xl border-white/[0.08] bg-black/35 text-white placeholder:text-neutral-600 focus-visible:ring-red-500/40"
+                                                className="min-h-[80px] resize-none rounded-xl border-white/[0.08] bg-black/35 text-white text-sm placeholder:text-neutral-600 focus-visible:ring-red-500/40"
                                                 placeholder="Describe the rules, prize and timing"
                                             />
                                         </Field>
                                     </div>
                                 </section>
 
-                                <section className="space-y-4">
+                                <section className="space-y-3">
                                     <SectionTitle icon={CalendarClock} title="Schedule in IST" />
-                                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                        <Field label="Start date and time">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
-                                                <Input type="date" value={startDate} min={istToday} onChange={(e) => setStartDate(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
-                                                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-neutral-500 ml-1 flex items-center gap-2">
+                                                    <Calendar className="w-3 h-3 text-emerald-500" />
+                                                    Start Date
+                                                </Label>
+                                                <div className="relative group/input">
+                                                    <Input
+                                                        type="date"
+                                                        value={startDate}
+                                                        onChange={(e) => setStartDate(e.target.value)}
+                                                        min={istToday}
+                                                        className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs focus-visible:ring-red-500/40"
+                                                        required
+                                                    />
+                                                </div>
                                             </div>
-                                        </Field>
-                                        <Field label="End date and time">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
-                                                <Input type="date" value={endDate} min={startDate || istToday} onChange={(e) => setEndDate(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
-                                                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
+                                            <TimePicker
+                                                label="Start time"
+                                                value={startTime}
+                                                onChange={setStartTime}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold text-neutral-500 ml-1 flex items-center gap-2">
+                                                    <Calendar className="w-3 h-3 text-red-500" />
+                                                    End Date
+                                                </Label>
+                                                <div className="relative group/input">
+                                                    <Input
+                                                        type="date"
+                                                        value={endDate}
+                                                        onChange={(e) => setEndDate(e.target.value)}
+                                                        min={startDate || istToday}
+                                                        className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs focus-visible:ring-red-500/40"
+                                                        required
+                                                    />
+                                                </div>
                                             </div>
-                                        </Field>
+                                            <TimePicker
+                                                label="End time"
+                                                value={endTime}
+                                                onChange={setEndTime}
+                                            />
+                                        </div>
                                     </div>
                                 </section>
 
-                                <section className="space-y-4">
+                                <section className="space-y-3">
                                     <SectionTitle icon={IndianRupee} title="Prize and limits" />
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                         <Field label="Prize name">
-                                            <Input value={prize} onChange={(e) => setPrize(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" placeholder="iPhone 17" />
+                                            <Input value={prize} onChange={(e) => setPrize(e.target.value)} className="h-10 text-sm rounded-xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" placeholder="iPhone 17" />
                                         </Field>
                                         <Field label="Prize value">
-                                            <Input type="number" min="0" value={prizeValue} onChange={(e) => setPrizeValue(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" placeholder="82000" />
+                                            <Input type="number" min="0" value={prizeValue} onChange={(e) => setPrizeValue(e.target.value)} className="h-10 text-sm rounded-xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" placeholder="82000" />
                                         </Field>
                                         <Field label="Winner slots">
-                                            <Input type="number" min="1" value={winnerCount} onChange={(e) => setWinnerCount(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
+                                            <Input type="number" min="1" value={winnerCount} onChange={(e) => setWinnerCount(e.target.value)} className="h-10 text-sm rounded-xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
                                         </Field>
                                         <Field label="Max participants">
-                                            <Input type="number" min="1" value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)} className="h-12 rounded-2xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
+                                            <Input type="number" min="1" value={maxParticipants} onChange={(e) => setMaxParticipants(e.target.value)} className="h-10 text-sm rounded-xl border-white/[0.08] bg-black/35 text-white focus-visible:ring-red-500/40" />
                                         </Field>
                                     </div>
                                 </section>
@@ -393,14 +427,14 @@ function Page({ params }) {
                                     <Button
                                         type="button"
                                         onClick={() => router.push(`/admin/dashboard/giveaways/${slug}`)}
-                                        className="h-12 rounded-2xl border border-white/[0.1] bg-white/[0.03] px-6 text-neutral-200 hover:bg-white/[0.07]"
+                                        className="h-10 text-sm rounded-xl border border-white/[0.1] bg-white/[0.03] px-6 text-neutral-200 hover:bg-white/[0.07]"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={!canUpdate}
-                                        className="btn-gradient h-12 rounded-2xl px-8 text-base font-black shadow-[0_18px_50px_-24px_rgba(220,38,38,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="btn-gradient h-10 rounded-xl px-8 text-sm font-black shadow-[0_18px_50px_-24px_rgba(220,38,38,0.9)] disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                         <Save className="mr-2 h-4 w-4" />
                                         Update Giveaway

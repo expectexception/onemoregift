@@ -1,51 +1,65 @@
+'use strict';
+
+/**
+ * CREATE ADMIN SCRIPT
+ * Creates/updates the root admin account from .env credentials.
+ * Run: node create-admin.js
+ */
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-const createAdmin = async () => {
-    try {
-        if (!process.env.MONGO_URI) {
-            console.error("MONGO_URI is not defined in .env");
-            process.exit(1);
-        }
-        await mongoose.connect(process.env.MONGO_URI);
+const MONGO_URI = process.env.MONGO_URI;
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'RootAdmin';
 
-        // Define Admin Schema matching model/Admin.js
-        const Admin = mongoose.model('admins', new mongoose.Schema({
-            username: String,
-            email: { type: String, unique: true },
-            password: { type: String, required: true },
-            isAdmin: { type: Boolean, default: false }
-        }), 'admins');
+if (!MONGO_URI) { console.error('MONGO_URI missing'); process.exit(1); }
+if (!ADMIN_EMAIL) { console.error('ADMIN_EMAIL missing'); process.exit(1); }
+if (!ADMIN_PASSWORD || ADMIN_PASSWORD === 'your_secure_password') {
+    console.error('Set a real ADMIN_PASSWORD in .env');
+    process.exit(1);
+}
 
-        const email = "expectexception@gmail.com";
-        const password = "OneMoreGift@2026"; // CHANGE THIS BEFORE RUNNING
+async function createAdmin() {
+    await mongoose.connect(MONGO_URI);
+    console.log('Connected to MongoDB');
 
-        if (password === "admin_password_here") {
-            console.error("ERROR: Please change the password in create-admin.js before running!");
-            process.exit(1);
-        }
+    // Load Admin model after connection
+    const Admin = require('./model/Admin');
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, salt);
 
-        const result = await Admin.findOneAndUpdate(
-            { email: email },
-            {
-                username: "SuperAdmin",
-                email: email,
-                password: hashedPassword,
-                isAdmin: true
-            },
-            { upsert: true, new: true }
-        );
+    const existing = await Admin.findOne({ email: ADMIN_EMAIL });
 
-        console.log("SUCCESS: Master Admin account is ready for " + email);
-        console.log("You can now login at https://onemoregift.in/admin");
-        process.exit(0);
-    } catch (err) {
-        console.error("ERROR:", err);
-        process.exit(1);
+    if (existing) {
+        existing.password = hashedPassword;
+        existing.username = ADMIN_USERNAME;
+        existing.isAdmin = true;
+        existing.role = 'admin';
+        await existing.save();
+        console.log(`✓ Admin updated: ${ADMIN_EMAIL}`);
+    } else {
+        await Admin.create({
+            email: ADMIN_EMAIL,
+            username: ADMIN_USERNAME,
+            password: hashedPassword,
+            isAdmin: true,
+            role: 'admin',
+        });
+        console.log(`✓ Admin created: ${ADMIN_EMAIL}`);
     }
-};
-createAdmin();
+
+    console.log(`  Username : ${ADMIN_USERNAME}`);
+    console.log(`  Email    : ${ADMIN_EMAIL}`);
+    console.log('\n✅ Done. You can now log in at /admin/login');
+
+    await mongoose.disconnect();
+}
+
+createAdmin().catch((err) => {
+    console.error('Error:', err);
+    process.exit(1);
+});

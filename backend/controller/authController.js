@@ -1,21 +1,16 @@
+'use strict';
+
 const Users = require('../model/Users');
 const PendingRegistration = require('../model/PendingRegistration');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const axios = require('axios');
-const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
-const sibApi = require('@getbrevo/brevo');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'no-reply@onemoregift.in';
-const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'OneMoreGift';
-const MAIL_USER = process.env.MAIL_USER;
-const MAIL_APP_PASSWORD = process.env.MAIL_APP_PASSWORD;
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map(id => id.trim())
@@ -83,47 +78,16 @@ const getDisplayName = (user = {}) => {
     return "there";
 };
 
-const sendEmailFallback = async ({ to, subject, html }) => {
-    if (!MAIL_USER || !MAIL_APP_PASSWORD) {
-        console.error('Email Fallback Error: MAIL_USER or MAIL_APP_PASSWORD not configured');
-        return false;
-    }
-
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: MAIL_USER,
-            pass: MAIL_APP_PASSWORD,
-        },
-    });
-
-    try {
-        await transporter.sendMail({
-            from: `OneMoreGift <${MAIL_USER}>`,
-            to,
-            subject,
-            html,
-        });
-        console.log(`Fallback Email sent successfully to: ${to}`);
-        return true;
-    } catch (error) {
-        console.error('Fallback SMTP Error:', error.message);
-        return false;
-    }
-};
-
 const signEmailServiceRequest = ({ method, path, body }) => {
     if (!EMAIL_SERVICE_SIGNING_ENABLED) return {};
     if (!EMAIL_SERVICE_SIGNING_SECRET) {
         throw new Error('EMAIL_SERVICE_SIGNING_SECRET is required when EMAIL_SERVICE_SIGNING_ENABLED=true');
     }
-
     const timestamp = `${Math.floor(Date.now() / 1000)}`;
     const nonce = crypto.randomBytes(16).toString('hex');
     const bodyHash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
     const payload = [timestamp, nonce, method.toUpperCase(), path, bodyHash].join('.');
     const signature = crypto.createHmac('sha256', EMAIL_SERVICE_SIGNING_SECRET).update(payload).digest('hex');
-
     return {
         'x-email-timestamp': timestamp,
         'x-email-nonce': nonce,
@@ -131,77 +95,46 @@ const signEmailServiceRequest = ({ method, path, body }) => {
     };
 };
 
+/**
+ * Send email exclusively via the email-service (Brevo API).
+ * No SMTP / nodemailer fallback.
+ */
 const sendEmail = async ({ to, subject, html, template, data }) => {
-    console.log(`[EmailService] Attempting to send email to: ${to} | Subject: ${subject}`);
+    console.log(`[EmailService] Sending to: ${to} | Subject: ${subject}`);
 
-    if (EMAIL_SERVICE_ENABLED && EMAIL_SERVICE_URL && EMAIL_SERVICE_API_KEY) {
-        try {
-            const path = '/v1/email/send';
-            const body = {
-                to,
-                subject,
-                ...(template ? { template, data } : { html }),
-            };
-            const { data: responseData } = await axios.post(
-                `${EMAIL_SERVICE_URL.replace(/\/$/, '')}${path}`,
-                body,
-                {
-                    timeout: EMAIL_SERVICE_TIMEOUT_MS,
-                    headers: {
-                        'x-api-key': EMAIL_SERVICE_API_KEY,
-                        ...signEmailServiceRequest({
-                            method: 'POST',
-                            path,
-                            body,
-                        }),
-                    },
-                }
-            );
-            if (!responseData?.error) {
-                console.log(`[EmailService] Email sent via remote service (${responseData.provider || 'unknown'})`);
-                return true;
-            }
-            console.error('[EmailService] Remote service rejected email:', responseData);
-        } catch (error) {
-            console.error('[EmailService] Remote service failed:', error?.response?.data || error.message);
-            if (EMAIL_SERVICE_REQUIRED) {
-                return false;
-            }
-        }
-    } else if (EMAIL_SERVICE_REQUIRED) {
-        console.error('[EmailService] Remote service is required but EMAIL_SERVICE_URL/API_KEY is not configured or service is disabled');
-        return false;
+    if (!EMAIL_SERVICE_ENABLED) {
+        console.warn('[EmailService] Disabled — skipping send');
+        return !EMAIL_SERVICE_REQUIRED;
+    }
+    if (!EMAIL_SERVICE_URL || !EMAIL_SERVICE_API_KEY) {
+        console.error('[EmailService] EMAIL_SERVICE_URL or EMAIL_SERVICE_API_KEY not set');
+        return !EMAIL_SERVICE_REQUIRED;
     }
 
-    if (BREVO_API_KEY) {
-        try {
-            const apiInstance = new sibApi.TransactionalEmailsApi();
-            apiInstance.setApiKey(sibApi.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
-
-            const sendSmtpEmail = new sibApi.SendSmtpEmail();
-            sendSmtpEmail.subject = subject;
-            sendSmtpEmail.htmlContent = html;
-            sendSmtpEmail.sender = { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL };
-            sendSmtpEmail.to = [{ email: to }];
-
-            await apiInstance.sendTransacEmail(sendSmtpEmail);
-            console.log('[EmailService] Email sent via Brevo successfully');
+    try {
+        const path = '/v1/email/send';
+        const body = { to, subject, ...(template ? { template, data } : { html }) };
+        const { data: responseData } = await axios.post(
+            `${EMAIL_SERVICE_URL.replace(/\/$/, '')}${path}`,
+            body,
+            {
+                timeout: EMAIL_SERVICE_TIMEOUT_MS,
+                headers: {
+                    'x-api-key': EMAIL_SERVICE_API_KEY,
+                    ...signEmailServiceRequest({ method: 'POST', path, body }),
+                },
+            }
+        );
+        if (!responseData?.error) {
+            console.log(`[EmailService] Sent via ${responseData.provider || 'unknown'}`);
             return true;
-        } catch (error) {
-            console.error('[EmailService] Brevo SDK failed:', error?.response?.body || error.message);
-            // If it's a "Key not found" error, we specifically want to log that it might be an invalid key
-            if (error?.response?.body?.code === 'unauthorized') {
-                console.warn('[EmailService] CRITICAL: Brevo API key is unauthorized. Please check your .env file.');
-            }
         }
+        console.error('[EmailService] Service rejected:', responseData);
+        return false;
+    } catch (error) {
+        console.error('[EmailService] Failed:', error?.response?.data || error.message);
+        return !EMAIL_SERVICE_REQUIRED;
     }
-
-    console.log('[EmailService] Falling back to SMTP (Gmail)...');
-    const fallbackSent = await sendEmailFallback({ to, subject, html });
-    if (!fallbackSent) {
-        console.error('[EmailService] FAILED: Both Brevo and SMTP fallback failed.');
-    }
-    return fallbackSent;
 };
 
 const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!DOCTYPE html>

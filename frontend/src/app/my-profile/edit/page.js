@@ -16,6 +16,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import withUserAuth from "../../components/withUserAuth";
 import Image from "next/image";
 import userImage from "../../../../public/images/user.png";
+import SearchableSelect from "../../components/SearchableSelect";
 
 const emptyAddress = () => ({
     label: "Home",
@@ -25,6 +26,7 @@ const emptyAddress = () => ({
     city: "",
     state: "",
     country: "",
+    countryCode: "",
     postalCode: "",
     phone: "",
     isDefault: false,
@@ -52,6 +54,8 @@ function Home() {
     const [avatar, setAvatar] = useState("");
     const [canSetFirstPassword, setCanSetFirstPassword] = useState(false);
     const [addresses, setAddresses] = useState([{ ...emptyAddress(), isDefault: true }]);
+    const [countries, setCountries] = useState([]);
+    const [statesMap, setStatesMap] = useState({});
 
     const handleAvatarChange = (e) => {
         const file = e.target.files[0];
@@ -142,6 +146,10 @@ function Home() {
 
     const fetchUserProfile = async () => {
         try {
+            const { Country, State } = await import("country-state-city");
+            const allCountries = Country.getAllCountries();
+            setCountries(allCountries);
+
             const { data } = await api.get("profile/", { meta: { auth: "user" } });
             const profile = data.myProfile || {};
             setName(profile.name || "");
@@ -157,11 +165,51 @@ function Home() {
                     ? [{ ...emptyAddress(), line1: profile.address, fullName: profile.fullName || profile.name || "", phone: profile.phone || "", isDefault: true }]
                     : [{ ...emptyAddress(), isDefault: true }];
 
-            if (!incomingAddresses.some((item) => item.isDefault)) incomingAddresses[0].isDefault = true;
-            setAddresses(incomingAddresses);
+            const mappedAddresses = incomingAddresses.map(addr => {
+                const c = allCountries.find(x => x.name.toLowerCase() === (addr.country || "").toLowerCase() || x.isoCode === addr.country);
+                return {
+                    ...addr,
+                    countryCode: c ? c.isoCode : "",
+                    country: c ? c.name : addr.country || "",
+                };
+            });
+
+            // Pre-populate statesMap for all loaded addresses
+            const uniqueCountryCodes = Array.from(new Set(mappedAddresses.map(a => a.countryCode).filter(Boolean)));
+            const newStatesMap = {};
+            for (const code of uniqueCountryCodes) {
+                newStatesMap[code] = State.getStatesOfCountry(code);
+            }
+            setStatesMap(newStatesMap);
+
+            if (!mappedAddresses.some((item) => item.isDefault)) mappedAddresses[0].isDefault = true;
+            setAddresses(mappedAddresses);
         } catch (error) {
             console.error(error);
         }
+    };
+
+    const handleCountryChange = async (idx, countryCode) => {
+        const { State, Country } = await import("country-state-city");
+        const countryObj = Country.getCountryByCode(countryCode);
+        const countryName = countryObj ? countryObj.name : "";
+        
+        if (countryCode && !statesMap[countryCode]) {
+            const countryStates = State.getStatesOfCountry(countryCode);
+            setStatesMap(prev => ({ ...prev, [countryCode]: countryStates }));
+        }
+
+        setAddresses(prev => prev.map((addr, index) => {
+            if (index === idx) {
+                return {
+                    ...addr,
+                    countryCode,
+                    country: countryName,
+                    state: "", // Reset state when country changes
+                };
+            }
+            return addr;
+        }));
     };
 
     const saveProfile = async (e) => {
@@ -366,9 +414,20 @@ function Home() {
                                                         <Input value={address.line1} onChange={(e) => updateAddressField(idx, "line1", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 1" />
                                                         <Input value={address.line2} onChange={(e) => updateAddressField(idx, "line2", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 2 (Optional)" />
                                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                            <SearchableSelect
+                                                                value={address.countryCode || ""}
+                                                                onChange={(val) => handleCountryChange(idx, val)}
+                                                                options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
+                                                                placeholder="Country *"
+                                                            />
+                                                            <SearchableSelect
+                                                                value={address.state || ""}
+                                                                onChange={(val) => updateAddressField(idx, "state", val)}
+                                                                options={(statesMap[address.countryCode] || []).map(s => ({ value: s.name, label: s.name }))}
+                                                                placeholder="State *"
+                                                                disabled={!address.countryCode}
+                                                            />
                                                             <Input value={address.city} onChange={(e) => updateAddressField(idx, "city", e.target.value)} className="premium-input h-10 text-white" placeholder="City" />
-                                                            <Input value={address.state} onChange={(e) => updateAddressField(idx, "state", e.target.value)} className="premium-input h-10 text-white" placeholder="State" />
-                                                            <Input value={address.country} onChange={(e) => updateAddressField(idx, "country", e.target.value)} className="premium-input h-10 text-white" placeholder="Country" />
                                                             <Input value={address.postalCode} onChange={(e) => updateAddressField(idx, "postalCode", e.target.value)} className="premium-input h-10 text-white" placeholder="Pincode" />
                                                         </div>
                                                     </div>

@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import { HiSparkles, HiLightBulb, HiEye, HiHeart, HiShieldCheck, HiGift, HiUsers, HiStar } from "react-icons/hi";
 import { HiGift as HiGiftLogo } from "react-icons/hi2";
 import { GiveawayMetricSvg, TrustMetricSvg, UsersMetricSvg, WinnerMetricSvg } from "../components/MetricSvgs";
+import { usePlatformStats } from "../hooks/usePlatformStats";
 
 function useCountUp(target, duration = 2000, startWhen = false) {
     const [count, setCount] = useState(0);
@@ -26,38 +27,9 @@ function useCountUp(target, duration = 2000, startWhen = false) {
 export default function AboutUs() {
     const statsRef = useRef(null);
     const [statsVisible, setStatsVisible] = useState(false);
-    const [platformStats, setPlatformStats] = useState({
-        users: 1530, // fallback numbers while loading
-        giveaways: 120,
-        winners: 450,
-        satisfaction: 98
-    });
+    const { stats: platformStats } = usePlatformStats({ refreshMs: 10000 });
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                // Fetch live platform metrics
-                // This assumes an endpoint like /api/admin/stats exists or similar.
-                // We previously noticed /admin/stats returns activeGiveaways, totalWinners, totalPrizeValue.
-                // We'll map them appropriately.
-                const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/admin/stats');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (!data.error) {
-                        setPlatformStats({
-                            users: data.totalWinners * 15 || 1530,   // Approximation if totalUsers not provided in this specific endpoint
-                            giveaways: data.activeGiveaways * 5 || 120, // Approximation or use real if updated
-                            winners: data.totalWinners || 450,
-                            satisfaction: data.verifiedLegit || 98
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to load platform stats:", err);
-            }
-        };
-        fetchStats();
-
         const observer = new IntersectionObserver(
             ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
             { threshold: 0.3 }
@@ -101,10 +73,10 @@ export default function AboutUs() {
                         <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing giveaway community.</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.users} suffix="+" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
-                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.giveaways} suffix="+" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
-                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.winners} suffix="+" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
-                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.satisfaction} suffix="%" label="Trusted Platform" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
+                        <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.registeredUsers} suffix="" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
+                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.activeGiveaways} suffix="" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
+                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.totalWinners} suffix="" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
+                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.verifiedDrawRate} suffix="%" label="Verified Draw Rate" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
                     </div>
                 </div>
             </section>

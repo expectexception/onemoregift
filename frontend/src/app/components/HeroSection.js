@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import api from "../utils/apiClient";
 import { CheckIcon, TrophyIcon, VerificationIcon, ShieldIcon } from "./SVGIcons";
 import RevealOnScroll from "./RevealOnScroll";
+import { formatCompactNumber, formatIndianCurrency, usePlatformStats } from "../hooks/usePlatformStats";
 
 const heroImages = [
     "/images/giftsa.webp",
@@ -24,12 +24,7 @@ export default function HeroSection() {
     const sectionRef = useRef(null);
     const cursorRef = useRef(null);
     const [currentImage, setCurrentImage] = useState(0);
-    const [stats, setStats] = useState({
-        activeGiveaways: "50+",
-        totalWinners: "10K+",
-        totalPrizeValue: "₹5L+",
-        verifiedLegit: "100%"
-    });
+    const { stats, loading: statsLoading } = usePlatformStats({ refreshMs: 10000 });
 
     // Auto-change background images
     useEffect(() => {
@@ -37,26 +32,6 @@ export default function HeroSection() {
             setCurrentImage((prev) => (prev + 1) % heroImages.length);
         }, 5000);
         return () => clearInterval(interval);
-    }, []);
-
-    // Fetch live stats
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const { data } = await api.get('admin/stats');
-                if (!data.error) {
-                    setStats({
-                        activeGiveaways: `${data.activeGiveaways}+`,
-                        totalWinners: data.totalWinners > 1000 ? `${(data.totalWinners / 1000).toFixed(1)}K+` : `${data.totalWinners}+`,
-                        totalPrizeValue: `₹${data.totalPrizeValue > 100000 ? (data.totalPrizeValue / 100000).toFixed(1) + 'L' : data.totalPrizeValue}+`,
-                        verifiedLegit: "100%"
-                    });
-                }
-            } catch (error) {
-                console.error("Hero stats error:", error);
-            }
-        };
-        fetchStats();
     }, []);
 
     // Cursor glow effect
@@ -197,10 +172,10 @@ export default function HeroSection() {
                 {/* Stats */}
                 <RevealOnScroll delayMs={290}>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
-                        <StatCard Icon={CheckIcon} value={stats.activeGiveaways} label="Active" />
-                        <StatCard Icon={TrophyIcon} value={stats.totalWinners} label="Winners" />
-                        <StatCard Icon={VerificationIcon} value={stats.totalPrizeValue} label="Prizes" />
-                        <StatCard Icon={ShieldIcon} value={stats.verifiedLegit} label="Legit" />
+                        <StatCard Icon={CheckIcon} value={statsLoading ? "..." : formatCompactNumber(stats.activeGiveaways)} label="Active" />
+                        <StatCard Icon={TrophyIcon} value={statsLoading ? "..." : formatCompactNumber(stats.totalWinners)} label="Winners" />
+                        <StatCard Icon={VerificationIcon} value={statsLoading ? "..." : formatIndianCurrency(stats.totalPrizeValue)} label="Prizes" />
+                        <StatCard Icon={ShieldIcon} value={statsLoading ? "..." : `${stats.verifiedDrawRate}%`} label="Verified" />
                     </div>
                 </RevealOnScroll>
             </div>

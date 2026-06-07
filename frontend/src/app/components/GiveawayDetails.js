@@ -49,7 +49,7 @@ export default function GiveawayDetails({ data }) {
         try {
             const { data } = await api.get(`giveaway/${_id}`);
             if (data?.giveaway?.participants) {
-                const joined = data.giveaway.participants.some(p => (p._id || p) === user._id);
+                const joined = data.giveaway.participants.some(p => String(p._id || p) === String(user._id));
                 setHasJoined(joined);
             }
         } catch (error) {
@@ -60,7 +60,7 @@ export default function GiveawayDetails({ data }) {
     useEffect(() => {
         if (user && participants) {
             // Handle both populated objects (p._id) and unpopulated string IDs (p)
-            const isJoined = participants.some(p => (p._id || p) === user._id);
+            const isJoined = participants.some(p => String(p._id || p) === String(user._id));
             setHasJoined(isJoined);
         } else {
             setHasJoined(false);
@@ -221,18 +221,35 @@ export default function GiveawayDetails({ data }) {
         <div className="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8 animate-fade-up">
             <div className="premium-card rounded-2xl sm:rounded-3xl overflow-hidden">
                 {/* Image Section */}
-                <div className="relative h-48 sm:h-56 md:h-72 bg-neutral-900 flex items-center justify-center">
-                    <Image
-                        src={imageSrc}
-                        alt={title ? `${title} giveaway image` : "Giveaway image"}
-                        width={280}
-                        height={280}
-                        className="object-contain transform transition-transform duration-500 hover:scale-105 w-32 sm:w-40 md:w-56 h-32 sm:h-40 md:h-56"
-                    />
+                <div className="relative h-64 sm:h-80 md:h-[400px] w-full overflow-hidden bg-neutral-950 flex items-center justify-center border-b border-white/5 group">
+                    {/* Blurred Background Reflection */}
+                    <div className="absolute inset-0 opacity-30 blur-2xl scale-110 pointer-events-none transition-transform duration-700 group-hover:scale-125">
+                        <Image
+                            src={imageSrc}
+                            alt="Background Blur"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                        />
+                    </div>
+                    {/* Subtle Dark Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/45 to-black/85 pointer-events-none" />
+
+                    {/* Main Image */}
+                    <div className="relative w-11/12 h-5/6 max-w-xl flex items-center justify-center transition-all duration-500 transform group-hover:scale-[1.03] group-hover:-translate-y-1">
+                        <Image
+                            src={imageSrc}
+                            alt={title ? `${title} giveaway image` : "Giveaway image"}
+                            fill
+                            className="object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.6)]"
+                            unoptimized
+                        />
+                    </div>
+
                     {/* Status Badge */}
-                    <div className={`absolute top-3 sm:top-4 right-3 sm:right-4 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm ${hasEnded ? 'bg-red-500/20 border-red-500/40' : !hasStarted ? 'bg-blue-500/20 border-blue-500/40' : 'bg-emerald-500/20 border-emerald-500/40'} border`}>
-                        <span className={`font-semibold flex items-center gap-1 sm:gap-2 ${hasEnded ? 'text-red-400' : !hasStarted ? 'text-blue-300' : 'text-emerald-400'}`}>
-                            {hasStarted && !hasEnded && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+                    <div className={`absolute top-4 right-4 px-4 py-2 rounded-full text-xs sm:text-sm backdrop-blur-md ${hasEnded ? 'bg-red-500/20 border-red-500/40' : !hasStarted ? 'bg-blue-500/20 border-blue-500/40' : 'bg-emerald-500/20 border-emerald-500/40'} border shadow-lg`}>
+                        <span className={`font-semibold flex items-center gap-1.5 sm:gap-2 ${hasEnded ? 'text-red-400' : !hasStarted ? 'text-blue-300' : 'text-emerald-400'}`}>
+                            {hasStarted && !hasEnded && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
                             {hasEnded ? 'Ended' : !hasStarted ? 'Scheduled' : 'Live'}
                         </span>
                     </div>

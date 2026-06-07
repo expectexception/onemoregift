@@ -71,29 +71,32 @@ const register = async (req, res) => {
             }
         }
 
-        let tokenExists = req.headers.authorization ? true : false
+        const authHeader = req.headers.authorization;
+        const tokenExists = Boolean(authHeader);
 
         if (!tokenExists) {
             const isRootEmail = ROOT_ADMIN_EMAILS.includes(normalizedEmail);
-            const isAdminExists = await Admin.collection.countDocuments({})
-            if (isAdminExists == 0 || isRootEmail) {
-                return await createAdmin()
+            const isAdminExists = await Admin.collection.countDocuments({});
+            if (isAdminExists === 0 || isRootEmail) {
+                return await createAdmin();
             }
-            else return res.status(400).json({ error: true, msg: "Admin already exists" })
-        }
-        else {
-            let token = req.headers.authorization.split(" ")[1]
+            return res.status(400).json({ error: true, msg: 'Admin already exists' });
+        } else {
+            const parts = authHeader.split(' ');
+            if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer' || !parts[1]) {
+                return res.status(401).json({ error: true, msg: 'Malformed authorization header' });
+            }
+            const token = parts[1];
             const verify = jwt.verify(token, JWT_SECRET);
-            let userId = verify.user.id
-            const isAdmin = verify.user.isAdmin
+            const isAdmin = verify.user.isAdmin;
             if (!isAdmin) {
-                return res.status(400).json({ error: true, msg: "You are not an Admin" })
+                return res.status(403).json({ error: true, msg: 'You are not an Admin' });
             }
-            let findAdmin = await Admin.findOne({ email: normalizedEmail })
+            const findAdmin = await Admin.findOne({ email: normalizedEmail });
             if (findAdmin) {
-                return res.status(400).json({ error: true, msg: "Email Exists" })
+                return res.status(400).json({ error: true, msg: 'Email already exists' });
             }
-            return await createAdmin()
+            return await createAdmin();
         }
 
     } catch (error) {
@@ -186,62 +189,38 @@ const allUsers = async (req, res) => {
 
 const banUser = async (req, res) => {
     try {
-        let { userId } = req.body
-        if (!userId || userId == "") {
-            return res.status(400).json({ error: true, msg: "Something went wrong.." })
-        }
-        let findUser = await Users.findById(userId);
-        if (findUser) {
-            let updateUser = await Users.findByIdAndUpdate(userId, { blocked: true }, { new: true });
-            return res.status(200).json({ error: false, msg: "User blocked" })
-        }
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
-
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ error: true, msg: 'userId required' });
+        const findUser = await Users.findById(userId);
+        if (!findUser) return res.status(404).json({ error: true, msg: 'User not found' });
+        await Users.findByIdAndUpdate(userId, { blocked: true });
+        return res.status(200).json({ error: false, msg: 'User blocked' });
     } catch (error) {
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
+        return res.status(500).json({ error: true, msg: 'Something went wrong' });
     }
 }
 
 const unBanUser = async (req, res) => {
     try {
-        let { userId } = req.body
-        if (!userId || userId == "") {
-            return res.status(400).json({ error: true, msg: "Something went wrong.." })
-        }
-        let findUser = await Users.findById(userId);
-        if (findUser) {
-            let updateUser = await Users.findByIdAndUpdate(userId, { blocked: false }, { new: true });
-            return res.status(200).json({ error: false, msg: "User UnBlocked" })
-        }
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
-
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ error: true, msg: 'userId required' });
+        const findUser = await Users.findById(userId);
+        if (!findUser) return res.status(404).json({ error: true, msg: 'User not found' });
+        await Users.findByIdAndUpdate(userId, { blocked: false });
+        return res.status(200).json({ error: false, msg: 'User unblocked' });
     } catch (error) {
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
+        return res.status(500).json({ error: true, msg: 'Something went wrong' });
     }
 }
 const delUser = async (req, res) => {
     try {
-        let { userId } = req.body
-        if (!userId || userId == "") {
-            return res.status(400).json({ error: true, msg: "Something went wrong.." })
-        }
-        let findUser = await Users.findById(userId);
-        if (findUser) {
-            let updateUser = await Users.findByIdAndDelete(userId);
-            if (updateUser) {
-                return res.status(200).json({ error: false, msg: "User Deleted.." })
-            }
-        }
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
-
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ error: true, msg: 'userId required' });
+        const deleted = await Users.findByIdAndDelete(userId);
+        if (!deleted) return res.status(404).json({ error: true, msg: 'User not found' });
+        return res.status(200).json({ error: false, msg: 'User deleted' });
     } catch (error) {
-        return res.status(400).json({ error: true, msg: "Something went wrong.." })
-
+        return res.status(500).json({ error: true, msg: 'Something went wrong' });
     }
 }
 const adminHome = async (req, res) => {
@@ -564,12 +543,10 @@ const clearParticipants = async (req, res) => {
 
 const clearAllJoined = async (req, res) => {
     try {
-        // Warning: This clears ALL participations across ALL giveaways
+        // Delete all participation records, then reset giveaway arrays
         await JoinedGiveaway.deleteMany({});
         await Giveaway.updateMany({}, { $set: { participants: [], winners: [] } });
-        await JoinedGiveaway.updateMany({}, { $set: { won: false } });
-
-        return res.status(200).json({ error: false, msg: "All entries cleared system-wide" });
+        return res.status(200).json({ error: false, msg: 'All entries cleared system-wide' });
     } catch (error) {
         return res.status(500).json({ error: true, msg: error.message });
     }

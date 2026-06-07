@@ -1,3 +1,5 @@
+'use strict';
+
 const mongoose = require('mongoose');
 
 const pendingRegistrationSchema = new mongoose.Schema({
@@ -11,7 +13,7 @@ const pendingRegistrationSchema = new mongoose.Schema({
     },
     fullName: {
         type: String,
-        default: "",
+        default: '',
     },
     email: {
         type: String,
@@ -21,6 +23,10 @@ const pendingRegistrationSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true,
+    },
+    localPasswordSet: {
+        type: Boolean,
+        default: true,
     },
     loginOtp: {
         token: {
@@ -34,7 +40,7 @@ const pendingRegistrationSchema = new mongoose.Schema({
         attempts: {
             type: Number,
             default: 0,
-        }
+        },
     },
     legalConsent: {
         termsAcceptedAt: Date,
@@ -42,9 +48,10 @@ const pendingRegistrationSchema = new mongoose.Schema({
         policyVersion: String,
         ipAddress: String,
         userAgent: String,
-    }
+    },
 }, { timestamps: true, versionKey: false });
 
+// Auto-expire pending registrations after 1 hour
 pendingRegistrationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 });
 pendingRegistrationSchema.index({ phone: 1 });
 

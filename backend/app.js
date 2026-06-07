@@ -34,7 +34,11 @@ function createApp() {
     },
     credentials: true,
   }));
-  app.use(helmet());
+  app.use(helmet({
+    // Allow cross-origin resource loading (images served from backend port)
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+  }));
   app.set('trust proxy', 1);
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(cookieParser());
@@ -46,7 +50,25 @@ function createApp() {
   }));
   app.use(mongoSanitize());
 
-  app.use(express.static('public'));
+  // Serve uploads from public/ with CORP header
+  app.use('/uploads', (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  }, require('express').static(require('path').join(__dirname, 'public', 'uploads')));
+
+  // Serve custom media directory when IMAGE_STORAGE=disk and MEDIA_DIR is outside public/
+  const mediaDir = process.env.MEDIA_DIR;
+  if (mediaDir && process.env.IMAGE_STORAGE === 'disk') {
+    const resolvedMedia = require('path').resolve(mediaDir);
+    const isInsidePublic = resolvedMedia.includes(require('path').join('public', 'uploads'));
+    if (!isInsidePublic) {
+      app.use('/media', (req, res, next) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        next();
+      }, require('express').static(resolvedMedia));
+      console.log(`[Media] Serving ${resolvedMedia} at /media`);
+    }
+  }
   app.use('/api/v1/auth', auth);
   app.use('/api/v1/admin', admin);
   app.use('/api/v1/giveaway', giveaway);

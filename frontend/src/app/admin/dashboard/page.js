@@ -44,8 +44,10 @@ function DashboardPage() {
         }
 
         getData();
+        const interval = setInterval(getData, 10000);
         return () => {
             mounted = false;
+            clearInterval(interval);
         };
     }, []);
 

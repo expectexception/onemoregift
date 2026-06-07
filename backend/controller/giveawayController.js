@@ -181,56 +181,57 @@ const getAllGiveaways = async (req, res) => {
         return res.status(500).json({ error: true, msg: "Some Error occurred" });
     }
 };
-//get giveaways for Users
+//get giveaways for Users — includes upcoming + active, with computed status
 const getGiveaways = async (req, res) => {
     try {
-        // Get the `page` and `limit` query parameters, with defaults if not provided
         const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const limit = Number(req.query.limit) || 50;
         const skip = (page - 1) * limit;
 
-        // Optional filtering by `name`, if desired (similar to `getTasks`)
         let queryObj = {};
         if (req.query.title) {
-            queryObj.title = { $regex: new RegExp(req.query.title, "i") };
+            queryObj.title = { $regex: new RegExp(req.query.title, 'i') };
         }
 
-        // Get total count of giveaways for pagination metadata
-        const total = await Giveaway.countDocuments(queryObj);
+        const nowIst = dayjs().tz('Asia/Kolkata').toDate();
 
-        // Fetch the giveaways with pagination
-        dayjs.extend(utc);
-        dayjs.extend(timezone);
-
-        // current time in IST (includes hours/minutes/seconds) so giveaways that haven't started yet
-        // or have already ended are excluded
-        const nowIst = dayjs().tz("Asia/Kolkata").toDate();
-
+        // Fetch active + upcoming (exclude ended giveaways)
         const giveawaysRaw = await Giveaway.find({
             ...queryObj,
-            startDate: { $lte: nowIst }, // only include giveaways that have started
-            endDate: { $gte: nowIst }    // and haven't ended yet
+            endDate: { $gte: nowIst },  // not ended yet
         })
-            .sort({ createdAt: -1 })
+            .sort({ startDate: 1 })     // upcoming first, then active by start time
             .skip(skip)
             .limit(limit)
             .lean();
 
+        const now = dayjs().tz('Asia/Kolkata');
+
         const giveaways = giveawaysRaw.map(g => {
+            const start = dayjs(g.startDate).tz('Asia/Kolkata');
+            const end = dayjs(g.endDate).tz('Asia/Kolkata');
+
+            let status;
+            if (now.isBefore(start)) {
+                status = 'upcoming';
+            } else if (now.isAfter(end) || now.isSame(end)) {
+                status = 'ended';
+            } else {
+                status = 'active';
+            }
+
             g.participantCount = g.participants ? g.participants.length : 0;
+            g.status = status;
             delete g.participants;
             return g;
         });
 
-        // Return the paginated data along with metadata
-        return res.status(200).json({
-            error: false,
-            data: giveaways,
-            total
-        });
+        const total = await Giveaway.countDocuments({ ...queryObj, endDate: { $gte: nowIst } });
+
+        return res.status(200).json({ error: false, data: giveaways, total });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ error: true, msg: "Some Error occurred" });
+        return res.status(500).json({ error: true, msg: 'Some Error occurred' });
     }
 };
 

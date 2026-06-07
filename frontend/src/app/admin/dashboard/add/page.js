@@ -52,10 +52,12 @@ function AddGiveawayPage() {
     let [uploadProgress, setUploadProgress] = useState(null);
     let [localPreviewUrl, setLocalPreviewUrl] = useState("");
     useEffect(() => {
+        // Only revoke on unmount, not on every change — avoids StrictMode double-invoke bug
         return () => {
             if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
         };
-    }, [localPreviewUrl]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     let [winnerCount, setwinnerCount] = useState("");
     let [maxParticipants, setMaxParticipants] = useState("");
     let [prize, setPrize] = useState("");
@@ -193,7 +195,7 @@ function AddGiveawayPage() {
 
     return (
         <div className="flex min-h-screen flex-col bg-[#070707]">
-            <div className="flex-col space-y-8 p-4 md:p-8">
+            <div className="flex-col space-y-5 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
@@ -234,24 +236,32 @@ function AddGiveawayPage() {
                 </div>
 
                 {/* Main Form Area */}
-                <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-12">
+                <form onSubmit={handleSubmit} className="grid gap-5 lg:grid-cols-12">
 
                     {/* Media & Essential Config */}
                     <div className="lg:col-span-5 space-y-6">
-                        <Card className="border border-white/[0.06] bg-white/[0.02] rounded-lg overflow-hidden shadow-2xl">
-                            <CardHeader className="border-b border-white/[0.04] bg-white/[0.01] py-6">
+                        <Card className="border border-white/[0.06] bg-neutral-950/50 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl">
+                            <CardHeader className="border-b border-white/[0.04] bg-white/[0.01] py-4 sm:py-5">
                                 <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
                                     <LucideImage className="w-4 h-4 text-red-500" />
                                     Giveaway Image
                                 </CardTitle>
                                 <CardDescription className="text-neutral-500 text-xs font-medium">Event promotional display</CardDescription>
                             </CardHeader>
-                            <CardContent className="p-8">
-                                <div className="space-y-6">
+                            <CardContent className="p-5 sm:p-6">
+                                <div className="space-y-5">
                                     <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] hover:border-red-600/40 transition-all aspect-video flex items-center justify-center bg-black/40">
-                                        {(image || localPreviewUrl) ? (
+                                        {localPreviewUrl ? (
+                                            // blob: URLs must use plain <img> — Next.js <Image> cannot load them
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={localPreviewUrl}
+                                                className="absolute inset-0 w-full h-full object-contain p-3"
+                                                alt="Giveaway Preview"
+                                            />
+                                        ) : image ? (
                                             <Image
-                                                src={image || localPreviewUrl}
+                                                src={image}
                                                 fill
                                                 className="object-contain p-3"
                                                 alt="Giveaway Preview"
@@ -311,8 +321,8 @@ function AddGiveawayPage() {
                         </Card>
 
                         {/* Event Metadata (Secondary) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-5 md:p-6 space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+                            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
                                         <Trophy className="w-4 h-4 text-amber-500" />
@@ -326,11 +336,11 @@ function AddGiveawayPage() {
                                     value={winnerCount}
                                     onChange={(e) => setwinnerCount(e.target.value)}
                                     placeholder="01"
-                                    className="h-12 px-4 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-semibold text-lg placeholder:text-neutral-800 focus:bg-white/[0.03] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-10 px-4 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-semibold text-sm placeholder:text-neutral-800 focus:bg-white/[0.03] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     required
                                 />
                             </div>
-                            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-5 md:p-6 space-y-4">
+                            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
                                         <Target className="w-4 h-4 text-blue-500" />
@@ -344,7 +354,7 @@ function AddGiveawayPage() {
                                     value={maxParticipants}
                                     onChange={(e) => setMaxParticipants(e.target.value)}
                                     placeholder="1000"
-                                    className="h-12 px-4 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-semibold text-lg placeholder:text-neutral-800 focus:bg-white/[0.03] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-10 px-4 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-semibold text-sm placeholder:text-neutral-800 focus:bg-white/[0.03] transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     required
                                 />
                             </div>
@@ -352,18 +362,18 @@ function AddGiveawayPage() {
                     </div>
 
                     {/* Timeline & Details */}
-                    <div className="lg:col-span-7 space-y-6">
-                        <Card className="border border-white/[0.06] bg-white/[0.02] rounded-lg shadow-2xl h-full">
-                            <CardHeader className="border-b border-white/[0.04] bg-white/[0.01] py-7">
+                    <div className="lg:col-span-7 space-y-5">
+                        <Card className="border border-white/[0.06] bg-neutral-950/50 backdrop-blur-md rounded-2xl shadow-2xl h-full">
+                            <CardHeader className="border-b border-white/[0.04] bg-white/[0.01] py-4 sm:py-5">
                                 <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
                                     <Sparkles className="w-4 h-4 text-blue-500" />
                                     Giveaway Details
                                 </CardTitle>
                                 <CardDescription className="text-neutral-500 text-xs font-medium">Enter giveaway rules and timing</CardDescription>
                             </CardHeader>
-                            <CardContent className="p-8 space-y-8">
+                            <CardContent className="p-5 sm:p-6 space-y-5">
                                 {/* Title & Description Section */}
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="title" className="text-xs font-semibold text-neutral-500 ml-1">Title</Label>
                                         <Input
@@ -371,7 +381,7 @@ function AddGiveawayPage() {
                                             value={title}
                                             onChange={(e) => setTitle(e.target.value)}
                                             placeholder="Free subscription giveaway"
-                                            className="h-12 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-medium placeholder:text-neutral-700 focus:bg-white/[0.03] transition-all"
+                                            className="h-10 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-medium text-sm placeholder:text-neutral-700 focus:bg-white/[0.03] transition-all"
                                             required
                                         />
                                     </div>
@@ -383,14 +393,14 @@ function AddGiveawayPage() {
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             placeholder="Describe the contest rules and prize"
-                                            className="h-12 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-medium placeholder:text-neutral-700 focus:bg-white/[0.03] transition-all"
+                                            className="h-10 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-medium text-sm placeholder:text-neutral-700 focus:bg-white/[0.03] transition-all"
                                             required
                                         />
                                     </div>
                                 </div>
 
                                 {/* Timeline Split */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label className="text-xs font-semibold text-neutral-500 ml-1 flex items-center gap-2">
@@ -403,7 +413,7 @@ function AddGiveawayPage() {
                                                     value={startDate}
                                                     onChange={(e) => setStartDate(e.target.value)}
                                                     min={istToday}
-                                                    className="h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-lg font-mono text-xs"
+                                                    className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs"
                                                     required
                                                 />
                                             </div>
@@ -427,7 +437,7 @@ function AddGiveawayPage() {
                                                     value={endDate}
                                                     onChange={(e) => setendDate(e.target.value)}
                                                     min={startDate || istToday}
-                                                    className="h-12 bg-white/[0.03] border-white/[0.08] text-white rounded-lg font-mono text-xs"
+                                                    className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs"
                                                     required
                                                 />
                                             </div>
@@ -441,7 +451,7 @@ function AddGiveawayPage() {
                                 </div>
 
                                 {/* Prize Configuration */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
                                     <div className="space-y-2">
                                         <Label htmlFor="prize" className="text-xs font-semibold text-neutral-500 ml-1">Prize name</Label>
                                         <Input
@@ -449,7 +459,7 @@ function AddGiveawayPage() {
                                             value={prize}
                                             onChange={(e) => setPrize(e.target.value)}
                                             placeholder="iPhone 16 Pro Max"
-                                            className="h-12 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-medium placeholder:text-neutral-700"
+                                            className="h-10 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-medium text-sm placeholder:text-neutral-700"
                                             required
                                         />
                                     </div>
@@ -464,7 +474,7 @@ function AddGiveawayPage() {
                                                 value={prizeValue}
                                                 onChange={(e) => setPrizeValue(e.target.value)}
                                                 placeholder="150000"
-                                                className="h-12 bg-white/[0.01] border-white/[0.08] text-white rounded-lg font-medium pl-8 placeholder:text-neutral-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                className="h-10 bg-white/[0.01] border-white/[0.08] text-white rounded-xl font-medium text-sm pl-8 placeholder:text-neutral-700 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                 required
                                             />
                                         </div>
@@ -475,7 +485,7 @@ function AddGiveawayPage() {
                                     <div className="pt-6 flex flex-col gap-4">
                                     <Button
                                         type="submit"
-                                        className="w-full h-12 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-500 active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
+                                        className="w-full h-10 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-500 active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
                                         disabled={!canSubmit}
                                     >
                                         Create Giveaway
