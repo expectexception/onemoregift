@@ -433,9 +433,9 @@ h1, h2, h3, h4, h5, h6 {
 /* ===== ALTCHA WIDGET CUSTOM PREMIUM DARK THEME ===== */
 altcha-widget {
   --altcha-max-width: 100%;
-  --altcha-color-base: #ffffff;
+  --altcha-color-base: #0a0a0c;
   --altcha-color-text: #e5e5e5;
-  --altcha-color-bg: rgba(14, 14, 14, 0.7);
+  --altcha-color-bg: #0a0a0c;
   --altcha-color-border: rgba(255, 255, 255, 0.08);
   --altcha-color-border-focus: rgba(220, 38, 38, 0.5);
   --altcha-color-accent: #dc2626;

@@ -559,7 +559,7 @@ export default function Giveaways() {
                                         <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" /> Human Verification
                                     </div>
                                     <div className="w-full flex justify-center">
-                                        <altcha-widget ref={altchaRef} challengeurl={ALTCHA_CHALLENGE_URL} auto="onfocus" theme="dark" style={{ maxWidth: "100%", width: "100%", "--altcha-color-bg": "rgba(255, 255, 255, 0.03)", "--altcha-color-border": "rgba(255, 255, 255, 0.1)", "--altcha-border-radius": "12px" }} />
+                                        <altcha-widget ref={altchaRef} challengeurl={ALTCHA_CHALLENGE_URL} auto="onfocus" theme="dark" style={{ maxWidth: "100%", width: "100%" }} />
                                     </div>
                                 </div>
                             )}
