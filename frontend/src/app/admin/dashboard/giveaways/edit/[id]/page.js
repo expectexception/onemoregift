@@ -26,13 +26,8 @@ import withAdminAuth from "../../../../../components/withAdminAuth";
 import api from "@/app/utils/apiClient";
 import { compressImage } from "@/app/utils/imageCompressor";
 import { TimePicker } from "@/app/components/TimePicker";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
+import dayjs from "@/app/utils/dayjs";
 import { useRouter } from "next/navigation";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 function Page({ params }) {
     const slug = use(params).id;

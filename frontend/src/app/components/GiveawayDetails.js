@@ -1,8 +1,6 @@
 import Image from "next/image";
 import AnimatedImage from "./AnimatedImage";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
+import dayjs from "../utils/dayjs";
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -16,8 +14,6 @@ import TrophyIcon from "./SVGIcons/TrophyIcon";
 import UserIcon from "./SVGIcons/UserIcon";
 import { PauseIcon, PlayIcon, DrawIcon, ResetIcon, TrashIcon } from "./SVGIcons";
 
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 // Custom inline SVGs for premium aesthetics
 function ClockIcon({ className = "w-5 h-5 text-red-500" }) {

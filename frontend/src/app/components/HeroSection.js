@@ -95,15 +95,6 @@ export default function HeroSection() {
             <div className="absolute top-20 left-[10%] w-72 h-72 bg-red-600/10 rounded-full blur-[120px]" />
             <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-red-700/8 rounded-full blur-[140px]" />
 
-            {/* Grid pattern */}
-            <div
-                className="absolute inset-0 opacity-[0.04]"
-                style={{
-                    backgroundImage: `linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                    backgroundSize: '80px 80px'
-                }}
-            />
-
             {/* Cursor glow */}
             <div
                 ref={cursorRef}

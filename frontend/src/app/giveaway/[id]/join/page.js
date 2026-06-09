@@ -9,14 +9,8 @@ import { CheckCircle, XCircle, AlertCircle, Gift, MapPin, User, Sparkles } from 
 import { usePathname, useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import withUserAuth from "@/app/components/withUserAuth";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
-
+import dayjs from "@/app/utils/dayjs";
 import SearchableSelect from "@/app/components/SearchableSelect";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 const ALTCHA_CHALLENGE_URL = process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL;
 const getApiErrorMessage = (error, fallback) =>

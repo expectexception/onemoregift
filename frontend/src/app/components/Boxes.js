@@ -1,9 +1,7 @@
 "use client";
 import Image from "next/image";
 import gift1 from "../../../public/images/gift-1.png";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
+import dayjs from "../utils/dayjs";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { HiClock, HiArrowRight } from "react-icons/hi";
 import { CheckCircle, Flame, Clock, CalendarClock, Trophy, Users, ShieldAlert, Sparkles, MapPin, User, AlertCircle, Gift } from "lucide-react";
@@ -19,9 +17,6 @@ import { VerificationIcon, UserIcon, ShieldIcon } from "./SVGIcons";
 import RevealOnScroll from "./RevealOnScroll";
 import SearchableSelect from "./SearchableSelect";
 import AnimatedImage from "./AnimatedImage";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 const ALTCHA_CHALLENGE_URL = process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL;
 

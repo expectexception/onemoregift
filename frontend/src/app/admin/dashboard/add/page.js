@@ -34,12 +34,7 @@ import { useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import { useAuth } from "@/app/context/AuthContext";
 import { compressImage } from "@/app/utils/imageCompressor";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
+import dayjs from "@/app/utils/dayjs";
 
 function AddGiveawayPage() {
     let [title, setTitle] = useState("");
