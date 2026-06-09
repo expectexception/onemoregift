@@ -179,8 +179,8 @@ function GiveawaysDashboardPage() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 rounded-lg bg-red-600 flex items-center justify-center border border-red-500/20">
-                            <Gift className="text-white w-8 h-8" />
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 flex items-center justify-center shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)] shrink-0">
+                            <Gift className="text-red-400 w-7 h-7" />
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">

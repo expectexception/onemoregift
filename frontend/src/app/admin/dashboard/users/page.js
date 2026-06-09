@@ -195,11 +195,16 @@ const UsersPage = () => {
         <div className="min-h-screen bg-black p-4 md:p-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white ">User Management</h1>
-                    <p className="text-[10px] text-neutral-500 font-bold  tracking-widest mt-1">
-                        {total} total user{total !== 1 ? "s" : ""}
-                    </p>
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 flex items-center justify-center shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)] shrink-0">
+                        <Users className="text-red-400 w-7 h-7" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-white ">User Management</h1>
+                        <p className="text-[10px] text-neutral-500 font-bold  tracking-widest mt-1">
+                            {total} total user{total !== 1 ? "s" : ""}
+                        </p>
+                    </div>
                 </div>
                 <button
                     onClick={() => fetchUsers()}

@@ -38,8 +38,8 @@ function AdminSettings() {
         <div className="min-h-screen bg-[#070707]">
             <div className="p-4 md:p-8 max-w-7xl mx-auto">
                 <div className="flex items-center gap-4 mb-10">
-                    <div className="w-14 h-14 rounded-lg bg-red-600 flex items-center justify-center">
-                        <Database className="text-white w-7 h-7" />
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 flex items-center justify-center shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)] shrink-0">
+                        <Database className="text-red-400 w-7 h-7" />
                     </div>
                     <div>
                         <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight">System Settings</h1>

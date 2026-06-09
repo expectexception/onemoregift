@@ -84,8 +84,8 @@ function DashboardPage() {
             <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
                 <header className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10">
-                            <Activity className="h-6 w-6 text-red-300" />
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)]">
+                            <Activity className="h-7 w-7 text-red-400" />
                         </div>
                         <div>
                             <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
