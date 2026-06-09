@@ -1,20 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Search, X } from "lucide-react";
 
 export default function SearchableSelect({ value, onChange, options, placeholder, disabled, className }) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
+    const [mounted, setMounted] = useState(false);
 
     const containerRef = useRef(null);
 
     useEffect(() => {
-        function handleClickOutside(event) {
-            if (containerRef.current && !containerRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        setMounted(true);
     }, []);
 
     useEffect(() => {
@@ -41,48 +37,56 @@ export default function SearchableSelect({ value, onChange, options, placeholder
                 <ChevronDown className={`w-4 h-4 text-neutral-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {isOpen && (
-                <div
-                    className="absolute left-0 right-0 mt-1.5 bg-[#0a0a0a]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100 z-50"
-                >
-                    <div className="flex items-center border-b border-white/[0.08] px-2.5 py-1.5">
-                        <Search className="w-3.5 h-3.5 text-neutral-500 mr-2 shrink-0" />
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search..."
-                            className="w-full bg-transparent border-0 text-xs sm:text-sm text-white focus:outline-none placeholder:text-neutral-600 h-7"
-                        />
+            {isOpen && mounted && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="absolute inset-0" onClick={() => setIsOpen(false)} />
+                    <div className="relative w-full max-w-sm bg-neutral-950 border border-white/10 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col max-h-[70vh] sm:max-h-[500px] animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+                            <span className="text-sm font-bold text-white tracking-wide">{placeholder || "Select Option"}</span>
+                            <button type="button" onClick={() => setIsOpen(false)} className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-neutral-400 hover:text-white transition-all">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="flex items-center border-b border-white/[0.08] px-3.5 py-2">
+                            <Search className="w-4 h-4 text-neutral-500 mr-2 shrink-0" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search..."
+                                className="w-full bg-transparent border-0 text-sm text-white focus:outline-none placeholder:text-neutral-600 h-8"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                            {filteredOptions.length > 0 ? (
+                                filteredOptions.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => {
+                                            onChange(opt.value);
+                                            setIsOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3.5 py-2.5 text-sm rounded-xl transition-all ${
+                                            opt.value === value
+                                                ? "bg-red-600 text-white font-bold"
+                                                : "text-neutral-300 hover:bg-white/[0.05] hover:text-white"
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="py-8 px-4 text-sm text-neutral-500 text-center font-medium">
+                                    No results found
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="max-h-60 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
-                        {filteredOptions.length > 0 ? (
-                            filteredOptions.map((opt) => (
-                                <button
-                                    key={opt.value}
-                                    type="button"
-                                    onClick={() => {
-                                        onChange(opt.value);
-                                        setIsOpen(false);
-                                    }}
-                                    className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors ${
-                                        opt.value === value
-                                            ? "bg-red-600 text-white font-semibold"
-                                            : "text-neutral-300 hover:bg-white/[0.05] hover:text-white"
-                                    }`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))
-                        ) : (
-                            <div className="py-3 px-3 text-xs text-neutral-500 text-center">
-                                No results found
-                             </div>
-                        )}
-                    </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
 }
-
