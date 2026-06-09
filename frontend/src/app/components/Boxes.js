@@ -614,7 +614,7 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
         return () => clearInterval(t);
     }, [targetDateStr]);
 
-    const hasJoined = loggedIn && user && item.participants?.some(p => (p._id || p) === user._id);
+    const hasJoined = item.joined || Boolean(loggedIn && user && item.participants?.some(p => String(p._id || p) === String(user._id)));
     const isWinner = loggedIn && user && item.winners?.some(w => (w._id || w) === user._id);
 
     const handleEnter = () => {

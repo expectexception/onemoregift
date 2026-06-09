@@ -48,9 +48,9 @@ export default function GiveawayDetails({ data }) {
         if (!user?._id || !_id) return;
         try {
             const { data } = await api.get(`giveaway/${_id}`);
-            if (data?.giveaway?.participants) {
-                const joined = data.giveaway.participants.some(p => String(p._id || p) === String(user._id));
-                setHasJoined(joined);
+            if (data?.giveaway) {
+                const joined = data.giveaway.joined || data.giveaway.participants?.some(p => String(p._id || p) === String(user._id));
+                setHasJoined(Boolean(joined));
             }
         } catch (error) {
             console.error("Failed to check participation status", error);

@@ -8,6 +8,7 @@ const timezone = require("dayjs/plugin/timezone");
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+const jwt = require("jsonwebtoken");
 
 const toPositiveInt = (value) => {
     const number = Number(value);
@@ -223,6 +224,23 @@ const getGiveaways = async (req, res) => {
             .lean();
 
 
+        const authHeader = req.header("Authorization");
+        const cookieToken = req.cookies?.user_token;
+        const cleanToken = authHeader?.startsWith("Bearer ")
+            ? authHeader.split(" ")[1]
+            : cookieToken;
+        let userId = null;
+        if (cleanToken) {
+            try {
+                const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET);
+                if (decoded?.data?._id) {
+                    userId = decoded.data._id;
+                }
+            } catch (err) {
+                // Ignore token decode error
+            }
+        }
+
         const now = dayjs().tz('Asia/Kolkata');
 
         const giveaways = giveawaysRaw.map(g => {
@@ -240,6 +258,11 @@ const getGiveaways = async (req, res) => {
 
             g.participantCount = g.participants ? g.participants.length : 0;
             g.status = status;
+            if (userId && g.participants) {
+                g.joined = g.participants.some(p => String(p) === String(userId));
+            } else {
+                g.joined = false;
+            }
             delete g.participants;
             return g;
         });
@@ -275,6 +298,23 @@ const getSingleGiveaway = async (req, res) => {
         }
 
         giveaway.participantCount = giveaway.participants?.length || 0;
+
+        const authHeader = req.header("Authorization");
+        const cookieToken = req.cookies?.user_token;
+        const cleanToken = authHeader?.startsWith("Bearer ")
+            ? authHeader.split(" ")[1]
+            : cookieToken;
+        if (cleanToken) {
+            try {
+                const decoded = jwt.verify(cleanToken, process.env.JWT_SECRET);
+                if (decoded?.data?._id) {
+                    const userId = decoded.data._id;
+                    giveaway.joined = giveaway.participants?.some(p => String(p._id || p) === String(userId));
+                }
+            } catch (err) {
+                // Ignore token decode error
+            }
+        }
 
         return res.status(200).json({ error: false, giveaway });
     } catch (error) {
