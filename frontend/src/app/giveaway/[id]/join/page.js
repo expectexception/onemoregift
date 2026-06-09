@@ -108,9 +108,18 @@ function Home() {
     }
   }, [addressData.countryCode]);
 
+  // Load Altcha library once on client mount
   useEffect(() => {
-    import("altcha").then(() => {
-      setAltchaLoaded(true);
+    if (!altchaLoaded) {
+      import("altcha").then(() => {
+        setAltchaLoaded(true);
+      }).catch(console.error);
+    }
+  }, [altchaLoaded]);
+
+  // Handle Altcha event listeners when widget is mounted
+  useEffect(() => {
+    if (!isCheckingStatus && altchaLoaded && ALTCHA_CHALLENGE_URL) {
       const el = altchaRef.current;
       if (!el) return;
       const onVerified = async (e) => {
@@ -124,9 +133,12 @@ function Home() {
       const onStateChange = (e) => { if (e?.detail?.state !== "verified") setIsCaptchaValid(false); };
       el.addEventListener("verified", onVerified);
       el.addEventListener("statechange", onStateChange);
-      return () => { el.removeEventListener("verified", onVerified); el.removeEventListener("statechange", onStateChange); };
-    }).catch(console.error);
-  }, [altchaLoaded]);
+      return () => {
+        el.removeEventListener("verified", onVerified);
+        el.removeEventListener("statechange", onStateChange);
+      };
+    }
+  }, [isCheckingStatus, altchaLoaded]);
 
   const getSelectedAddress = () => {
     if (addressSelection === "saved") {

@@ -156,28 +156,37 @@ export default function Giveaways() {
         }
     }, [newAddressData.countryCode]);
 
-    // Handle Altcha load and solution
+    // Load Altcha library once on client mount
     useEffect(() => {
-        if (entryDialogOpen && ALTCHA_CHALLENGE_URL) {
+        if (entryDialogOpen && ALTCHA_CHALLENGE_URL && !altchaLoaded) {
             import("altcha").then(() => {
                 setAltchaLoaded(true);
-                const el = altchaRef.current;
-                if (!el) return;
-                const onVerified = async (e) => {
-                    const payload = e?.detail?.payload;
-                    if (!payload) { setIsCaptchaValid(false); return; }
-                    try {
-                        const r = await axios.post("/api/verify-captcha", { payload });
-                        setIsCaptchaValid(r.data.success);
-                    } catch { setIsCaptchaValid(false); }
-                };
-                const onStateChange = (e) => { if (e?.detail?.state !== "verified") setIsCaptchaValid(false); };
-                el.addEventListener("verified", onVerified);
-                el.addEventListener("statechange", onStateChange);
-                return () => { el.removeEventListener("verified", onVerified); el.removeEventListener("statechange", onStateChange); };
             }).catch(console.error);
         }
     }, [entryDialogOpen, altchaLoaded]);
+
+    // Handle Altcha event listeners when widget is mounted
+    useEffect(() => {
+        if (entryDialogOpen && !loadingProfile && altchaLoaded && ALTCHA_CHALLENGE_URL) {
+            const el = altchaRef.current;
+            if (!el) return;
+            const onVerified = async (e) => {
+                const payload = e?.detail?.payload;
+                if (!payload) { setIsCaptchaValid(false); return; }
+                try {
+                    const r = await axios.post("/api/verify-captcha", { payload });
+                    setIsCaptchaValid(r.data.success);
+                } catch { setIsCaptchaValid(false); }
+            };
+            const onStateChange = (e) => { if (e?.detail?.state !== "verified") setIsCaptchaValid(false); };
+            el.addEventListener("verified", onVerified);
+            el.addEventListener("statechange", onStateChange);
+            return () => {
+                el.removeEventListener("verified", onVerified);
+                el.removeEventListener("statechange", onStateChange);
+            };
+        }
+    }, [entryDialogOpen, loadingProfile, altchaLoaded]);
 
     const getSelectedAddress = () => {
         if (addressSelection === "saved") {
