@@ -482,26 +482,20 @@ export default function Giveaways() {
                             {/* Shipping Address */}
                             <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-3 sm:p-4 relative overflow-hidden group">
                                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/[0.02] rounded-full blur-2xl group-hover:bg-white/[0.04] transition-colors pointer-events-none" />
-                                <div className="flex items-center gap-2 text-neutral-200 text-xs sm:text-sm font-semibold mb-3 relative z-10">
-                                    <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                        <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                                <div className="flex items-center justify-between gap-2 mb-3 relative z-10">
+                                    <div className="flex items-center gap-2 text-neutral-200 text-xs sm:text-sm font-semibold">
+                                        <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                            <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                                        </div>
+                                        Shipping Address
                                     </div>
-                                    Shipping Address
+                                    <button onClick={() => router.push("/my-profile/edit")} className="text-[10px] sm:text-xs text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1 rounded-full transition-all font-medium border border-white/5">
+                                        Update Address
+                                    </button>
                                 </div>
                                 
-                                <div className="p-1 rounded-xl bg-black/40 border border-white/5 flex gap-1 mb-3 relative z-10">
-                                    <button type="button" onClick={() => setAddressSelection("saved")} disabled={!profile?.address && !(profile?.addresses?.length > 0)}
-                                        className={`flex-1 h-8 rounded-lg text-xs font-semibold transition-all ${addressSelection === "saved" ? "bg-white/10 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"} ${(!profile?.address && !(profile?.addresses?.length > 0)) ? "opacity-30 cursor-not-allowed" : ""}`}>
-                                        Saved Address
-                                    </button>
-                                    <button type="button" onClick={() => setAddressSelection("new")}
-                                        className={`flex-1 h-8 rounded-lg text-xs font-semibold transition-all ${addressSelection === "new" ? "bg-white/10 text-white shadow-sm" : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"}`}>
-                                        New Address
-                                    </button>
-                                </div>
-
                                 <div className="relative z-10">
-                                    {addressSelection === "saved" && profile?.addresses?.length > 0 && (
+                                    {profile?.addresses?.length > 0 ? (
                                         <div className="space-y-2">
                                             <SearchableSelect
                                                 value={savedAddressIndex.toString()}
@@ -516,46 +510,15 @@ export default function Giveaways() {
                                                 {[profile.addresses[savedAddressIndex]?.line1, profile.addresses[savedAddressIndex]?.line2, profile.addresses[savedAddressIndex]?.city, profile.addresses[savedAddressIndex]?.state, profile.addresses[savedAddressIndex]?.country, profile.addresses[savedAddressIndex]?.postalCode].filter(Boolean).join(", ")}
                                             </div>
                                         </div>
-                                    )}
-                                    {addressSelection === "saved" && !(profile?.addresses?.length > 0) && profile?.address && (
+                                    ) : profile?.address ? (
                                         <div className="bg-black/40 border border-white/5 px-3 py-2.5 rounded-xl text-neutral-300 text-xs leading-relaxed">{profile.address}</div>
-                                    )}
-                                    {addressSelection === "saved" && !profile?.address && !(profile?.addresses?.length > 0) && (
-                                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-200 text-xs">
-                                            No saved address found. Please select &quot;New Address&quot; above to add one.
-                                        </div>
-                                    )}
-
-                                    {addressSelection === "new" && (
-                                        <div className="space-y-2">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input type="text" value={newAddressData.name} onChange={e => setNewAddressData({ ...newAddressData, name: e.target.value })} placeholder="Receiver Name *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                                <input type="tel" value={newAddressData.phone} onChange={e => setNewAddressData({ ...newAddressData, phone: e.target.value })} placeholder="Receiver Phone *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                            </div>
-                                            <input type="text" value={newAddressData.line1} onChange={e => setNewAddressData({ ...newAddressData, line1: e.target.value })} placeholder="Address Line 1 *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                            <input type="text" value={newAddressData.line2} onChange={e => setNewAddressData({ ...newAddressData, line2: e.target.value })} placeholder="Address Line 2 (Optional)" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <SearchableSelect
-                                                    value={newAddressData.countryCode || ""}
-                                                    onChange={(val) => {
-                                                        const c = countries.find(x => x.isoCode === val);
-                                                        setNewAddressData({ ...newAddressData, countryCode: val, country: c?.name || "", state: "" });
-                                                    }}
-                                                    options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
-                                                    placeholder="Country *"
-                                                />
-                                                <SearchableSelect
-                                                    value={newAddressData.state || ""}
-                                                    onChange={(val) => setNewAddressData({ ...newAddressData, state: val })}
-                                                    options={states.map(s => ({ value: s.name, label: s.name }))}
-                                                    placeholder="State *"
-                                                    disabled={!newAddressData.countryCode}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <input type="text" value={newAddressData.city} onChange={e => setNewAddressData({ ...newAddressData, city: e.target.value })} placeholder="City *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                                <input type="text" value={newAddressData.pincode} onChange={e => setNewAddressData({ ...newAddressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
-                                            </div>
+                                    ) : (
+                                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 text-xs flex flex-col gap-2">
+                                            <p className="font-semibold flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-400" /> No saved address found</p>
+                                            <p className="text-[11px] text-neutral-350">You must add at least one shipping address in your profile settings to enter this giveaway.</p>
+                                            <button type="button" onClick={() => router.push("/my-profile/edit")} className="mt-1 w-full h-8 rounded-lg bg-amber-500 text-black hover:bg-amber-400 font-bold transition-all text-xs">
+                                                Go to Profile Settings
+                                            </button>
                                         </div>
                                     )}
                                 </div>

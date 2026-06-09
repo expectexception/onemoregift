@@ -327,24 +327,18 @@ function Home() {
 
             <div className="divider-gradient" />
 
-            {/* Address */}
             <section className="space-y-3">
-              <div className="flex items-center gap-2 text-neutral-300 text-sm font-semibold">
-                <MapPin className="w-4 h-4 text-red-400" /> Shipping Address
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 ml-1">Required</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setAddressSelection("saved")} disabled={!hasSavedAddress}
-                  className={`h-9 px-3 rounded-lg text-xs border transition-all ${addressSelection === "saved" ? "bg-red-600 text-white border-red-500" : "bg-white/[0.03] text-neutral-300 border-white/[0.08]"} ${!hasSavedAddress ? "opacity-40 cursor-not-allowed" : ""}`}>
-                  Use Saved Address
-                </button>
-                <button type="button" onClick={() => setAddressSelection("new")}
-                  className={`h-9 px-3 rounded-lg text-xs border transition-all ${addressSelection === "new" ? "bg-red-600 text-white border-red-500" : "bg-white/[0.03] text-neutral-300 border-white/[0.08]"}`}>
-                  New Address
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-neutral-300 text-sm font-semibold">
+                  <MapPin className="w-4 h-4 text-red-400" /> Shipping Address
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 ml-1">Required</span>
+                </div>
+                <button onClick={() => router.push("/my-profile/edit")} className="text-xs text-red-400 hover:text-red-300 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/10 transition-all">
+                  Update Address
                 </button>
               </div>
 
-              {addressSelection === "saved" && Array.isArray(user.addresses) && user.addresses.length > 0 && (
+              {Array.isArray(user.addresses) && user.addresses.length > 0 ? (
                 <div className="space-y-2">
                   <select value={savedAddressIndex} onChange={e => setSavedAddressIndex(Number(e.target.value))}
                     className="premium-input w-full h-10 px-3 rounded-xl text-white bg-black text-sm">
@@ -356,41 +350,15 @@ function Home() {
                     {[user.addresses[savedAddressIndex]?.line1, user.addresses[savedAddressIndex]?.line2, user.addresses[savedAddressIndex]?.city, user.addresses[savedAddressIndex]?.state, user.addresses[savedAddressIndex]?.country, user.addresses[savedAddressIndex]?.postalCode].filter(Boolean).join(", ")}
                   </div>
                 </div>
-              )}
-              {addressSelection === "saved" && !(Array.isArray(user.addresses) && user.addresses.length > 0) && user.address && (
+              ) : user.address ? (
                 <div className="premium-input px-4 py-3 rounded-xl text-neutral-300 text-sm">{user.address}</div>
-              )}
-
-              {addressSelection === "new" && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="text" value={addressData.name} onChange={e => setAddressData({ ...addressData, name: e.target.value })} placeholder="Receiver Name *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                    <input type="tel" value={addressData.phone} onChange={e => setAddressData({ ...addressData, phone: e.target.value })} placeholder="Receiver Phone *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                  </div>
-                  <input type="text" value={addressData.line1} onChange={e => setAddressData({ ...addressData, line1: e.target.value })} placeholder="Address Line 1 *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                  <input type="text" value={addressData.line2} onChange={e => setAddressData({ ...addressData, line2: e.target.value })} placeholder="Address Line 2 (Optional)" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                  <div className="grid grid-cols-2 gap-2 relative">
-                    <SearchableSelect
-                      value={addressData.countryCode || ""}
-                      onChange={(val) => {
-                        const c = countries.find(x => x.isoCode === val);
-                        setAddressData({ ...addressData, countryCode: val, country: c?.name || "", state: "" });
-                      }}
-                      options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
-                      placeholder="Country *"
-                    />
-                    <SearchableSelect
-                      value={addressData.state || ""}
-                      onChange={(val) => setAddressData({ ...addressData, state: val })}
-                      options={states.map(s => ({ value: s.name, label: s.name }))}
-                      placeholder="State *"
-                      disabled={!addressData.countryCode}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="text" value={addressData.city} onChange={e => setAddressData({ ...addressData, city: e.target.value })} placeholder="City *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                    <input type="text" value={addressData.pincode} onChange={e => setAddressData({ ...addressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                  </div>
+              ) : (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 text-xs flex flex-col gap-2">
+                  <p className="font-semibold flex items-center gap-1.5"><AlertCircle className="w-4 h-4 text-amber-400" /> No saved address found</p>
+                  <p className="text-[11px] text-neutral-350">You must add at least one shipping address in your profile settings to enter this giveaway.</p>
+                  <button type="button" onClick={() => router.push("/my-profile/edit")} className="mt-1 w-full h-9 rounded-lg bg-amber-500 text-black hover:bg-amber-400 font-bold transition-all text-xs">
+                    Go to Profile Settings
+                  </button>
                 </div>
               )}
             </section>
