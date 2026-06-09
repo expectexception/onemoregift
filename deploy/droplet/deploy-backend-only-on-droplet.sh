@@ -26,7 +26,7 @@ fi
 echo "[4/6] Start PM2 apps (backend + frontend dist)"
 cd "$APP_DIR"
 pm2 delete all || true
-pm2 start ecosystem.backend-only.cjs
+pm2 start ecosystem.backend-only.config.cjs
 pm2 save
 
 echo "[5/6] Configure nginx"
