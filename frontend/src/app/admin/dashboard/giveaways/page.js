@@ -10,6 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Trash2, Plus, Gift, Target, Trophy, Clock, ShieldCheck } from "lucide-react";
 import api from "@/app/utils/apiClient";
 import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 function ViewSvg() {
     return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="3" /></svg>;
@@ -91,12 +97,6 @@ function GiveawaysDashboardPage() {
                 { meta: { auth: "admin" } }
             );
 
-            const dayjsModule = await import("dayjs");
-            const dayjs = dayjsModule.default;
-            const utc = (await import("dayjs/plugin/utc")).default;
-            const timezone = (await import("dayjs/plugin/timezone")).default;
-            dayjs.extend(utc);
-            dayjs.extend(timezone);
             const formatStr = "DD MMM YYYY | HH:mm";
 
             setData(
