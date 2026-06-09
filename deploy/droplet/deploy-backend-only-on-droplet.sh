@@ -26,12 +26,7 @@ fi
 echo "[4/6] Start PM2 apps (backend + frontend dist)"
 cd "$APP_DIR"
 pm2 delete all || true
-pm2 start "$APP_DIR/backend/index.js" \
-  --name onemoregift-backend \
-  --cwd "$APP_DIR/backend"
-pm2 start "$FRONTEND_DIST_DIR/standalone/server.js" \
-  --name onemoregift-frontend-dist \
-  --cwd "$FRONTEND_DIST_DIR/standalone"
+pm2 start ecosystem.backend-only.cjs
 pm2 save
 
 echo "[5/6] Configure nginx"
