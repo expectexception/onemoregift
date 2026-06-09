@@ -49,7 +49,7 @@ function AdminSettings() {
 
                 <div className="h-px bg-white/[0.06] mb-10" />
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-4">
                     {/* Dynamic visibility settings */}
                     <VisibilitySettingsCard />
 
@@ -57,9 +57,9 @@ function AdminSettings() {
                     <DbStatusCard />
 
                     {/* Data Maintenance Card */}
-                    <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
+                    <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
                         <div className="absolute top-0 left-0 w-1 h-full bg-red-600 opacity-60 transition-opacity" />
-                        <CardHeader className="p-8 pb-4">
+                        <CardHeader className="p-6 sm:p-8 pb-4">
                             <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-red-600/10 flex items-center justify-center">
                                     <RotateCcw className="w-5 h-5 text-red-500" />
@@ -70,7 +70,7 @@ function AdminSettings() {
                                 Irreversibly clear all participation records across the platform. Use this carefully for system resets or new season preparation.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="p-8 pt-4 space-y-8">
+                        <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
                             <div className="p-5 rounded-2xl bg-red-600/5 border border-red-600/10 flex gap-4">
                                 <AlertTriangle className="text-red-500 w-6 h-6 shrink-0 mt-0.5" />
                                 <div className="space-y-1">
@@ -83,13 +83,13 @@ function AdminSettings() {
                             </div>
                             <Button
                                 variant="destructive"
-                                className="w-full h-12 rounded-lg font-semibold text-base active:scale-[0.98] transition-all group/btn"
+                                className="w-full h-12 rounded-lg font-semibold text-base active:scale-[0.98] transition-all group/btn mt-6"
                                 onClick={handleClearAll}
                                 disabled={loading}
                             >
                                 {loading ? (
                                     <RefreshCw className="animate-spin mr-3" />
-                               ) : (
+                                ) : (
                                     <Trash2 className="mr-3 w-5 h-5 group-hover/btn:scale-110 transition-transform" />
                                 )}
                                 Purge All Participation Data
@@ -166,9 +166,9 @@ function VisibilitySettingsCard() {
     };
 
     return (
-        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
             <div className="absolute top-0 left-0 w-1 h-full bg-blue-600 opacity-60 transition-opacity" />
-            <CardHeader className="p-8 pb-4">
+            <CardHeader className="p-6 sm:p-8 pb-4">
                 <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center">
                         <Database className="w-5 h-5 text-blue-500" />
@@ -179,11 +179,11 @@ function VisibilitySettingsCard() {
                     Set whether users can view upcoming or ended giveaways. Toggling these also dynamically updates homepage statistics.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="p-8 pt-4 space-y-6">
+            <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
                 {fetching ? (
-                    <div className="text-neutral-500 text-sm animate-pulse">Loading configurations...</div>
+                    <div className="text-neutral-500 text-sm animate-pulse flex-1 flex items-center justify-center">Loading configurations...</div>
                 ) : (
-                    <>
+                    <div className="space-y-6 flex-1 flex flex-col justify-between">
                         <div className="space-y-4">
                             <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
                                 <div>
@@ -227,11 +227,11 @@ function VisibilitySettingsCard() {
                         <Button
                             onClick={handleSave}
                             disabled={loading}
-                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98]"
+                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98] mt-6"
                         >
                             {loading ? <RefreshCw className="animate-spin" /> : "Save Changes"}
                         </Button>
-                    </>
+                    </div>
                 )}
             </CardContent>
         </Card>
@@ -263,9 +263,9 @@ function DbStatusCard() {
     }, [fetchDbStatus]);
 
     return (
-        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg relative">
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600 opacity-60 transition-opacity" />
-            <CardHeader className="p-8 pb-4">
+            <CardHeader className="p-6 sm:p-8 pb-4">
                 <CardTitle className="text-xl font-bold text-white flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-indigo-600/10 flex items-center justify-center">
@@ -287,26 +287,26 @@ function DbStatusCard() {
                     Real-time counts of models and documents stored in the database.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="p-8 pt-4 space-y-4">
+            <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
                 {loading && !stats ? (
-                    <div className="text-neutral-500 text-sm animate-pulse">Loading database metrics...</div>
+                    <div className="text-neutral-500 text-sm animate-pulse flex-1 flex items-center justify-center">Loading database metrics...</div>
                 ) : stats ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 flex-1">
                         {[
                             { label: "Total Users", value: stats.users },
                             { label: "Total Giveaways", value: stats.giveaways },
                             { label: "Total Entries", value: stats.entries },
                             { label: "Banned Users", value: stats.bannedUsers },
                             { label: "Administrators", value: stats.admins },
-                        ].map(({ label, value }) => (
-                            <div key={label} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                        ].map(({ label, value }, idx, arr) => (
+                            <div key={label} className={`p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] ${idx === arr.length - 1 ? 'col-span-2' : ''}`}>
                                 <div className="text-xs text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
                                 <div className="text-2xl font-extrabold text-white mt-1">{value}</div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-red-400 text-sm">Failed to load statistics.</div>
+                    <div className="text-red-400 text-sm flex-1 flex items-center justify-center">Failed to load statistics.</div>
                 )}
             </CardContent>
         </Card>
@@ -361,9 +361,9 @@ function SecurityCard() {
     }
 
     return (
-        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
             <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600 opacity-60 transition-opacity" />
-            <CardHeader className="p-8 pb-4">
+            <CardHeader className="p-6 sm:p-8 pb-4">
                 <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-emerald-600/10 flex items-center justify-center">
                         <Shield className="w-5 h-5 text-emerald-500" />
@@ -374,20 +374,20 @@ function SecurityCard() {
                     Update your administrative credentials. Ensure you use a strong password to maintain platform security.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="p-8 pt-4">
-                <form onSubmit={handleUpdate} className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-neutral-500 pl-1">Current password</label>
-                        <Input
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
-                        />
-                    </div>
+            <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
+                <form onSubmit={handleUpdate} className="space-y-6 flex-1 flex flex-col justify-between">
                     <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-neutral-500 pl-1">Current password</label>
+                            <Input
+                                type="password"
+                                required
+                                placeholder="••••••••"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                            />
+                        </div>
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-neutral-500 pl-1">New secure password</label>
                             <Input
@@ -399,14 +399,14 @@ function SecurityCard() {
                                 className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                             />
                         </div>
-                        <Button
-                            type="submit"
-                            disabled={loading || !currentPassword || !newPassword}
-                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98]"
-                        >
-                            {loading ? <RefreshCw className="animate-spin" /> : "Update Credentials"}
-                        </Button>
                     </div>
+                    <Button
+                        type="submit"
+                        disabled={loading || !currentPassword || !newPassword}
+                        className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98] mt-6"
+                    >
+                        {loading ? <RefreshCw className="animate-spin" /> : "Update Credentials"}
+                    </Button>
                 </form>
             </CardContent>
         </Card>
