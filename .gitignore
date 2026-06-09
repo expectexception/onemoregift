@@ -17,6 +17,7 @@ logs/
 
 # Backend specific
 backend/public/uploads/images/*
+backend/media/
 
 # Frontend specific
 frontend/.next/
