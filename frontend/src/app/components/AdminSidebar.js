@@ -4,16 +4,12 @@
 import { useState, useEffect } from "react";
 import { Nav } from "@/components/ui/nav";
 import {
-    LayoutDashboard,
     ChevronRight,
-    UsersRound,
-    Gift,
-    BadgePlus,
-    LogOut,
-    Trophy,
-    ChevronLeft,
-    Settings
+    ChevronLeft
 } from "lucide-react";
+import { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon } from "./SVGIcons";
+import TrophyIcon from "./SVGIcons/TrophyIcon";
+import SettingsIcon from "./SVGIcons/SettingsIcon";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
 
@@ -48,43 +44,43 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
         {
             title: "Dashboard",
             href: "/admin/dashboard",
-            icon: LayoutDashboard,
+            icon: DashboardIcon,
             variant: "default"
         },
         {
             title: "Users",
             href: "/admin/dashboard/users",
-            icon: UsersRound,
+            icon: UsersIcon,
             variant: "ghost"
         },
         {
             title: "Giveaways",
             href: "/admin/dashboard/giveaways",
-            icon: Gift,
+            icon: GiveawayIcon,
             variant: "ghost"
         },
         {
             title: "Add Giveaway",
             href: "/admin/dashboard/add",
-            icon: BadgePlus,
+            icon: AddIcon,
             variant: "ghost"
         },
         {
             title: "Winners",
             href: "/admin/dashboard/winners",
-            icon: Trophy,
+            icon: TrophyIcon,
             variant: "ghost"
         },
         {
             title: "Settings",
             href: "/admin/dashboard/settings",
-            icon: Settings,
+            icon: SettingsIcon,
             variant: "ghost"
         },
         {
             title: "Logout",
             href: "/admin/logout",
-            icon: LogOut,
+            icon: LogoutIcon,
             variant: "ghost"
         }
     ];

@@ -329,6 +329,10 @@ const participate = async (req, res) => {
             return res.status(404).json({ error: true, msg: "Giveaway not found" });
         }
 
+        if (giveaway.isPaused) {
+            return res.status(409).json({ error: true, msg: "This giveaway is currently paused" });
+        }
+
         // current time in IST (includes hours/minutes/seconds)
         const nowIst = dayjs().tz("Asia/Kolkata");
         const giveawayStartIst = dayjs(giveaway.startDate).tz("Asia/Kolkata");
@@ -358,10 +362,8 @@ const participate = async (req, res) => {
             participants: { $ne: userId },
         };
 
-        if (giveaway.maxParticipants) {
-            updateQuery.$expr = {
-                $lt: [{ $size: "$participants" }, "$maxParticipants"],
-            };
+        if (giveaway.maxParticipants && giveaway.maxParticipants > 0) {
+            updateQuery[`participants.${giveaway.maxParticipants - 1}`] = { $exists: false };
         }
 
         const updatedGiveaway = await Giveaway.findOneAndUpdate(
@@ -512,8 +514,16 @@ const setWinners = async (req, res) => {
             winners = uniqueWinners;
         }
 
-        findGiveaway.winners = winners;
-        await findGiveaway.save();
+        const updated = await Giveaway.findOneAndUpdate(
+            { _id: id, winners: { $size: 0 } },
+            { $set: { winners } },
+            { new: true }
+        );
+
+        if (!updated) {
+            return res.status(409).json({ error: true, msg: "Winners have already been drawn for this giveaway" });
+        }
+
         // Update JoinedGiveaway collection to mark winners
         await JoinedGiveaway.updateMany(
             { giveaway: id },
@@ -528,11 +538,103 @@ const setWinners = async (req, res) => {
             winners.includes(participant._id.toString())
         );
 
-        return res.status(200).json({ error: false, msg: "Winners set successfully", winners: selectedWinners })
+        return res.status(200).json({ error: false, msg: "Winners set successfully", winners: selectedWinners });
 
     } catch (error) {
         return res.status(500).json({ error: true, msg: error.message });
 
     }
 }
-module.exports = { createGiveaway, editGiveaway, deleteGiveaway, getAllGiveaways, getSingleGiveaway, participate, getWinners, setWinners, getGiveaways, getWinnersForAdmin };
+
+const togglePauseGiveaway = async (req, res) => {
+    try {
+        const updated = await Giveaway.findByIdAndUpdate(
+            req.params.id,
+            [ { $set: { isPaused: { $not: "$isPaused" } } } ],
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
+        }
+        return res.status(200).json({ error: false, msg: `Giveaway ${updated.isPaused ? "paused" : "resumed"} successfully`, isPaused: updated.isPaused });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: error.message });
+    }
+};
+
+const drawEarlyGiveaway = async (req, res) => {
+    try {
+        const nowIst = dayjs().tz("Asia/Kolkata");
+        const endDate = nowIst.subtract(1, 'second').toDate();
+        const updated = await Giveaway.findByIdAndUpdate(
+            req.params.id,
+            { $set: { endDate } },
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
+        }
+        return res.status(200).json({ error: false, msg: "Giveaway closed early successfully", endDate: updated.endDate });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: error.message });
+    }
+};
+
+const resetWinners = async (req, res) => {
+    try {
+        const updated = await Giveaway.findByIdAndUpdate(
+            req.params.id,
+            { $set: { winners: [] } },
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
+        }
+
+        await JoinedGiveaway.updateMany(
+            { giveaway: req.params.id },
+            { $set: { won: false } }
+        );
+
+        return res.status(200).json({ error: false, msg: "Winners reset successfully" });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: error.message });
+    }
+};
+
+const removeParticipant = async (req, res) => {
+    try {
+        const { id, userId } = req.params;
+        const updated = await Giveaway.findByIdAndUpdate(
+            id,
+            { $pull: { participants: userId, winners: userId } },
+            { new: true }
+        );
+        if (!updated) {
+            return res.status(404).json({ error: true, msg: "Giveaway not found" });
+        }
+
+        await JoinedGiveaway.deleteOne({ giveaway: id, user: userId });
+
+        return res.status(200).json({ error: false, msg: "Participant removed successfully" });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: error.message });
+    }
+};
+
+module.exports = {
+    createGiveaway,
+    editGiveaway,
+    deleteGiveaway,
+    getAllGiveaways,
+    getSingleGiveaway,
+    participate,
+    getWinners,
+    setWinners,
+    getGiveaways,
+    getWinnersForAdmin,
+    togglePauseGiveaway,
+    drawEarlyGiveaway,
+    resetWinners,
+    removeParticipant
+};

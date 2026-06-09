@@ -11,3 +11,4 @@ export { default as CheckIcon } from './CheckIcon';
 export { default as HeartIcon } from './HeartIcon';
 export { default as RegisterBadgeIcon } from './RegisterBadgeIcon';
 export { default as ResetPasswordIcon } from './ResetPasswordIcon';
+export { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon, PauseIcon, PlayIcon, DrawIcon, ResetIcon, TrashIcon } from './CustomIcons';
