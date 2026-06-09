@@ -8,6 +8,7 @@ const TAG_LENGTH = 16;
 const ENCODING = 'hex';
 
 let _key = null;
+let _hmacKey = null;
 
 function getKey() {
     if (_key) return _key;
@@ -15,7 +16,7 @@ function getKey() {
     if (!raw || raw.length !== 64) {
         throw new Error(
             'FIELD_ENCRYPTION_KEY must be a 64-character hex string (32 bytes). ' +
-            'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+            'Generate with: node scripts/gen-keys.js'
         );
     }
     _key = Buffer.from(raw, 'hex');
@@ -23,12 +24,28 @@ function getKey() {
 }
 
 /**
+ * Deterministic HMAC-SHA256 hash for searchable encrypted fields (e.g. email lookup).
+ * Uses a derived sub-key (first 32 bytes of HMAC of "search-index" with the main key).
+ * Returns a 64-char hex string, always the same for the same input.
+ */
+function hmacHash(value) {
+    if (!value) return value;
+    if (!_hmacKey) {
+        const mainKey = getKey();
+        _hmacKey = crypto.createHmac('sha256', mainKey).update('search-index-v1').digest();
+    }
+    return crypto.createHmac('sha256', _hmacKey).update(String(value).trim().toLowerCase()).digest('hex');
+}
+
+/**
  * Encrypt a string value using AES-256-GCM.
  * Returns format: iv:tag:ciphertext (all hex)
- * Returns null/undefined as-is.
+ * Returns null/undefined/'' as-is.
  */
 function encrypt(plaintext) {
     if (plaintext === null || plaintext === undefined || plaintext === '') return plaintext;
+    // Already encrypted — don't double-encrypt
+    if (isEncrypted(String(plaintext))) return plaintext;
 
     const key = getKey();
     const iv = crypto.randomBytes(IV_LENGTH);
@@ -41,9 +58,22 @@ function encrypt(plaintext) {
 }
 
 /**
+ * Returns true if the value looks like an encrypted blob from this system.
+ */
+function isEncrypted(value) {
+    if (!value || typeof value !== 'string') return false;
+    const parts = value.split(':');
+    return (
+        parts.length === 3 &&
+        parts[0].length === IV_LENGTH * 2 &&
+        parts[1].length === TAG_LENGTH * 2
+    );
+}
+
+/**
  * Decrypt a value encrypted by encrypt().
- * Passes through values that don't look like encrypted blobs.
- * Returns null/undefined as-is.
+ * Passes through values that don't look like encrypted blobs (legacy plain values).
+ * Returns null/undefined/'' as-is.
  */
 function decrypt(ciphertext) {
     if (ciphertext === null || ciphertext === undefined || ciphertext === '') return ciphertext;
@@ -70,4 +100,4 @@ function decrypt(ciphertext) {
     }
 }
 
-module.exports = { encrypt, decrypt };
+module.exports = { encrypt, decrypt, hmacHash, isEncrypted };

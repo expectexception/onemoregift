@@ -18,6 +18,11 @@ const AdminSchema = new Schema({
     isAdmin: { type: Boolean, default: false },
     // role field was used in controller but missing from schema
     role: { type: String, default: 'admin' },
+    loginOtp: {
+        token: { type: String },
+        expires: { type: Date },
+        attempts: { type: Number, default: 0 },
+    },
 }, { timestamps: true, versionKey: false });
 
 const Admin = mongoose.model('admins', AdminSchema);

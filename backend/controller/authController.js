@@ -7,7 +7,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
-require('dotenv').config();
+const { hmacHash } = require('../utils/crypto');
+// Note: env is loaded by utils/loadEnv before this module is imported
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -28,6 +29,8 @@ const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED 
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
 const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test';
 const OTP_DEBUG_LOGGING = process.env.NODE_ENV !== 'production' && process.env.LOG_OTP_DEBUG === 'true';
+// Feature flag: set OTP_VERIFICATION_ENABLED=false to skip email OTP for user registration
+const OTP_VERIFICATION_ENABLED = process.env.OTP_VERIFICATION_ENABLED !== 'false';
 
 const googleClient = GOOGLE_CLIENT_IDS.length ? new OAuth2Client() : null;
 
@@ -236,8 +239,11 @@ const register = async (req, res) => {
         logOtpForLocalDebug('registration', normalizedEmail, otpCode);
 
         let isTest = process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com');
+        // If OTP verification is disabled globally, auto-verify all registrations
+        const skipOtp = !OTP_VERIFICATION_ENABLED || isTest;
 
-        const existingUser = await Users.findOne({ $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] });
+        const emailHashVal = hmacHash(normalizedEmail);
+        const existingUser = await Users.findOne({ $or: [{ emailHash: emailHashVal }, { phone: normalizedPhone }] });
         if (existingUser && existingUser.isVerified !== false) {
             const errorMessage = existingUser.email === normalizedEmail
                 ? 'A user with that email already exists'
@@ -245,7 +251,7 @@ const register = async (req, res) => {
             return res.status(409).json({ error: true, msg: errorMessage });
         }
 
-        if (isTest) {
+        if (skipOtp) {
             if (existingUser && existingUser.isVerified === false) {
                 await Users.deleteOne({ _id: existingUser._id });
             }
@@ -261,7 +267,7 @@ const register = async (req, res) => {
             });
             const token = signUserToken(user);
             setUserCookie(res, token);
-            return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
+            return res.status(200).json({ error: false, token, msg: 'Account created successfully' });
         }
 
         if (existingUser && existingUser.isVerified === false) {
@@ -269,6 +275,7 @@ const register = async (req, res) => {
         }
 
         const pendingPhoneOwner = await PendingRegistration.findOne({ phone: normalizedPhone, email: { $ne: normalizedEmail } });
+        const pendingEmailHash = hmacHash(normalizedEmail);
         if (pendingPhoneOwner) {
             return res.status(409).json({ error: true, msg: 'A pending registration already uses that phone number' });
         }
@@ -332,16 +339,17 @@ const register = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password, loginId } = req.body;
-        const identifier = (loginId || email || "").trim();
+        const identifier = (loginId || email || "").trim().toLowerCase();
         if (!identifier || !password) {
             return res.status(400).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
-        const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Look up by email hash (encrypted field) or by name (less sensitive, plain text)
+        const emailHashVal = hmacHash(identifier);
         const user = await Users.findOne({
             $or: [
-                { email: { $regex: `^${escaped}$`, $options: 'i' } },
-                { name: { $regex: `^${escaped}$`, $options: 'i' } }
+                { emailHash: emailHashVal },
+                { name: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
             ]
         });
         if (!user) {
@@ -381,7 +389,7 @@ const requestOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email is required' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user) {
             return res.status(404).json({ error: true, msg: 'User not found. Please register first.' });
         }
@@ -447,7 +455,7 @@ const verifyOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'OTP is invalid or expired' });
         }
@@ -527,7 +535,7 @@ const googleSignin = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Invalid Google account' });
         }
 
-        let user = await Users.findOne({ email: payload.email });
+        let user = await Users.findOne({ emailHash: hmacHash(payload.email) });
 
         if (mode === 'register' && user && user.isVerified === false) {
             await Users.deleteOne({ _id: user._id });
@@ -649,7 +657,7 @@ const resetPass = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email is required.' });
         }
 
-        const findUser = await Users.findOne({ email: normalizedEmail });
+        const findUser = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!findUser) {
             return res.status(200).json({
                 error: false,
@@ -717,7 +725,7 @@ const setPass = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Token, email, and password fields are required.' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || !user.resetToken || !user.resetToken.token) {
             return res.status(400).json({ error: true, msg: 'Token is invalid or has expired. Please request a new password reset.' });
         }
@@ -730,7 +738,7 @@ const setPass = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         await Users.updateOne(
-            { email: normalizedEmail },
+            { emailHash: hmacHash(normalizedEmail) },
             {
                 $set: { password: hashedPassword, localPasswordSet: true },
                 $unset: { resetToken: '' },
@@ -810,7 +818,7 @@ const verifyRegistrationOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const pending = await PendingRegistration.findOne({ email: normalizedEmail });
+        const pending = await PendingRegistration.findOne({ email: normalizedEmail }); // PendingRegistration stores plain email
         if (pending) {
             if (Date.now() > new Date(pending.loginOtp.expires).getTime()) {
                 await PendingRegistration.deleteOne({ _id: pending._id });
@@ -829,7 +837,7 @@ const verifyRegistrationOtp = async (req, res) => {
                 return res.status(400).json({ error: true, msg: 'Invalid OTP' });
             }
 
-            const existingUser = await Users.findOne({ $or: [{ email: pending.email }, { phone: pending.phone }] });
+            const existingUser = await Users.findOne({ $or: [{ emailHash: hmacHash(pending.email) }, { phone: pending.phone }] });
             if (existingUser && existingUser.isVerified !== false) {
                 await PendingRegistration.deleteOne({ _id: pending._id });
                 return res.status(409).json({ error: true, msg: 'A user with these details already exists' });
@@ -874,7 +882,7 @@ const verifyRegistrationOtp = async (req, res) => {
             return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || user.isVerified || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'Invalid request or already verified' });
         }

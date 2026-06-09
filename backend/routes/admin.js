@@ -3,7 +3,7 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const isAdmin = require('../middleware/isAdmin');
 const isRootAdmin = require('../middleware/isRootAdmin');
-const { register, login, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword, getDbStatus } = require('../controller/adminController');
+const { register, login, verifyAdminOtp, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword, getDbStatus } = require('../controller/adminController');
 const { getWinnersForAdmin } = require('../controller/giveawayController');
 const { getAdminConfig, updateConfig } = require('../controller/configController');
 
@@ -20,6 +20,7 @@ router.get('/stats', getPublicStats);
 
 router.post('/register', adminAuthLimiter, register);
 router.post('/login', adminAuthLimiter, login);
+router.post('/verify-otp', adminAuthLimiter, verifyAdminOtp);
 router.get('/me', isAdmin, me);
 router.post('/logout', logout);
 router.patch('/change-password', isAdmin, changeAdminPassword);

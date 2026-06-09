@@ -1,10 +1,13 @@
 'use strict';
 
 const mongoose = require('mongoose');
-const { encrypt, decrypt } = require('../utils/crypto');
+const { encrypt, decrypt, hmacHash } = require('../utils/crypto');
 
-// Fields encrypted at rest with AES-256-GCM
-const ENCRYPTED_SCALAR_FIELDS = ['phone', 'address'];
+// Scalar top-level fields encrypted at rest with AES-256-GCM
+const ENCRYPTED_SCALAR_FIELDS = ['phone', 'address', 'name', 'fullName'];
+
+// Address sub-document fields encrypted at rest
+const ENCRYPTED_ADDRESS_FIELDS = ['fullName', 'phone', 'line1', 'line2', 'city', 'state', 'country', 'postalCode', 'label'];
 
 const addressSubSchema = new mongoose.Schema({
     label: { type: String, default: 'Home' },
@@ -14,6 +17,7 @@ const addressSubSchema = new mongoose.Schema({
     city: { type: String, default: '' },
     state: { type: String, default: '' },
     country: { type: String, default: '' },
+    countryCode: { type: String, default: '' },
     postalCode: { type: String, default: '' },
     phone: { type: String, default: '' },
     isDefault: { type: Boolean, default: false },
@@ -39,6 +43,12 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
+    // Deterministic HMAC hash of email for lookups (since email field is encrypted)
+    emailHash: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
     password: {
         type: String,
         required: true,
@@ -63,7 +73,6 @@ const userSchema = new mongoose.Schema({
     avatar: { type: String },
     address: { type: String },
     addresses: [addressSubSchema],
-    // BUG FIX: was default true — new users must verify email first
     isVerified: {
         type: Boolean,
         default: false,
@@ -86,18 +95,73 @@ userSchema.pre('save', function (next) {
                 this[field] = encrypt(this[field]);
             }
         }
+
+        // Email hash for lookups (derived from the plain value before encrypting)
+        if (this.isModified('email') && this.email) {
+            // email may already be encrypted by the line above if 'email' was in ENCRYPTED_SCALAR_FIELDS
+            // We handle hash separately: email is NOT in ENCRYPTED_SCALAR_FIELDS to control order
+            // Note: email is encrypted below explicitly
+        }
+
+        // Encrypt email explicitly and set hash before encryption
+        if (this.isModified('email') && this.email) {
+            const plain = decrypt(this.email); // safe — returns plain if not yet encrypted
+            this.emailHash = hmacHash(plain);
+            this.email = encrypt(plain);
+        }
+
         // legalConsent.ipAddress
         if (this.isModified('legalConsent.ipAddress') && this.legalConsent && this.legalConsent.ipAddress) {
             this.legalConsent.ipAddress = encrypt(this.legalConsent.ipAddress);
         }
-        // addresses array — encrypt phone inside each sub-doc
+
+        // addresses array — encrypt all sensitive fields
         if (this.isModified('addresses') && Array.isArray(this.addresses)) {
             this.addresses.forEach((addr) => {
-                if (addr.phone) addr.phone = encrypt(addr.phone);
-                if (addr.line1) addr.line1 = encrypt(addr.line1);
-                if (addr.line2) addr.line2 = encrypt(addr.line2);
+                for (const f of ENCRYPTED_ADDRESS_FIELDS) {
+                    if (addr[f]) addr[f] = encrypt(addr[f]);
+                }
             });
         }
+
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Handle findOneAndUpdate — encrypt fields in $set
+userSchema.pre('findOneAndUpdate', function (next) {
+    try {
+        const update = this.getUpdate();
+        const setObj = update?.$set || update;
+        if (!setObj) return next();
+
+        // Scalar fields in update
+        for (const field of ['phone', 'address', 'name', 'fullName']) {
+            if (setObj[field]) {
+                setObj[field] = encrypt(setObj[field]);
+            }
+        }
+
+        // Email in update
+        if (setObj.email) {
+            const plain = decrypt(setObj.email);
+            setObj.emailHash = hmacHash(plain);
+            setObj.email = encrypt(plain);
+        }
+
+        // Addresses array in update
+        if (Array.isArray(setObj.addresses)) {
+            setObj.addresses = setObj.addresses.map((addr) => {
+                const copy = { ...addr };
+                for (const f of ENCRYPTED_ADDRESS_FIELDS) {
+                    if (copy[f]) copy[f] = encrypt(copy[f]);
+                }
+                return copy;
+            });
+        }
+
         next();
     } catch (err) {
         next(err);
@@ -107,33 +171,30 @@ userSchema.pre('save', function (next) {
 // ── Decryption: post-find hooks ───────────────────────────────────────────────
 function decryptDoc(doc) {
     if (!doc) return;
+
     for (const field of ENCRYPTED_SCALAR_FIELDS) {
         if (doc[field]) doc[field] = decrypt(doc[field]);
     }
+
+    if (doc.email) doc.email = decrypt(doc.email);
+
     if (doc.legalConsent && doc.legalConsent.ipAddress) {
         doc.legalConsent.ipAddress = decrypt(doc.legalConsent.ipAddress);
     }
+
     if (Array.isArray(doc.addresses)) {
         doc.addresses.forEach((addr) => {
-            if (addr.phone) addr.phone = decrypt(addr.phone);
-            if (addr.line1) addr.line1 = decrypt(addr.line1);
-            if (addr.line2) addr.line2 = decrypt(addr.line2);
+            for (const f of ENCRYPTED_ADDRESS_FIELDS) {
+                if (addr[f]) addr[f] = decrypt(addr[f]);
+            }
         });
     }
 }
 
-userSchema.post('find', function (docs) {
-    docs.forEach(decryptDoc);
-});
-userSchema.post('findOne', function (doc) {
-    decryptDoc(doc);
-});
-userSchema.post('findOneAndUpdate', function (doc) {
-    decryptDoc(doc);
-});
-userSchema.post('save', function (doc) {
-    decryptDoc(doc);
-});
+userSchema.post('find', function (docs) { docs.forEach(decryptDoc); });
+userSchema.post('findOne', function (doc) { decryptDoc(doc); });
+userSchema.post('findOneAndUpdate', function (doc) { decryptDoc(doc); });
+userSchema.post('save', function (doc) { decryptDoc(doc); });
 
 const Users = mongoose.model('Users', userSchema);
 

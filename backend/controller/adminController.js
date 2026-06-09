@@ -2,17 +2,25 @@ const Admin = require('../model/Admin')
 const Users = require('../model/Users')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
+const crypto = require('crypto')
+const axios = require('axios')
 const Giveaway = require('../model/Giveaway')
 const JoinedGiveaway = require('../model/JoinedGiveaways')
 const { getConfigHelper } = require('./configController')
-require('dotenv').config()
+// env is loaded by utils/loadEnv at startup
 
 const JWT_SECRET = process.env.JWT_SECRET
 const COOKIE_SECURE = process.env.NODE_ENV === 'production';
 const ADMIN_COOKIE_NAME = 'admin_token';
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN;
 const ROOT_ADMIN_EMAILS = (process.env.ROOT_ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
-
+// Feature flag: ADMIN_OTP_ENABLED=true enables 2FA OTP on every admin login
+const ADMIN_OTP_ENABLED = process.env.ADMIN_OTP_ENABLED === 'true';
+const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_URL;
+const EMAIL_SERVICE_API_KEY = process.env.EMAIL_SERVICE_API_KEY;
+const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
+const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
+const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 15000);
 const adminCookieOptions = {
     httpOnly: true,
     secure: COOKIE_SECURE,
@@ -32,6 +40,35 @@ const clearAdminCookie = (res) => {
         maxAge: undefined,
     });
 };
+
+// ── Admin email sending (mirrors authController sendEmail) ────────────────────
+function signAdminEmailRequest({ method, path, body }) {
+    if (!EMAIL_SERVICE_SIGNING_ENABLED) return {};
+    if (!EMAIL_SERVICE_SIGNING_SECRET) return {};
+    const timestamp = `${Math.floor(Date.now() / 1000)}`;
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const bodyHash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
+    const payload = [timestamp, nonce, method.toUpperCase(), path, bodyHash].join('.');
+    const signature = crypto.createHmac('sha256', EMAIL_SERVICE_SIGNING_SECRET).update(payload).digest('hex');
+    return { 'x-email-timestamp': timestamp, 'x-email-nonce': nonce, 'x-email-signature': signature };
+}
+
+async function sendAdminEmail({ to, subject, html }) {
+    if (!EMAIL_SERVICE_URL || !EMAIL_SERVICE_API_KEY) return false;
+    try {
+        const path = '/v1/email/send';
+        const body = { to, subject, html };
+        const { data } = await axios.post(
+            `${EMAIL_SERVICE_URL.replace(/\/$/, '')}${path}`,
+            body,
+            { timeout: EMAIL_SERVICE_TIMEOUT_MS, headers: { 'x-api-key': EMAIL_SERVICE_API_KEY, ...signAdminEmailRequest({ method: 'POST', path, body }) } }
+        );
+        return !data?.error;
+    } catch (err) {
+        console.error('[AdminEmail] Failed:', err?.response?.data || err.message);
+        return false;
+    }
+}
 
 const register = async (req, res) => {
     try {
@@ -119,9 +156,23 @@ const login = async (req, res) => {
 
         const passwordCompare = await bcrypt.compare(password, user.password);
         if (!passwordCompare) {
-            return res
-                .status(401)
-                .json({ error: true, msg: "Please try to login with correct credentials" });
+            return res.status(401).json({ error: true, msg: "Please try to login with correct credentials" });
+        }
+
+        // Admin 2FA OTP
+        if (ADMIN_OTP_ENABLED) {
+            const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+            const otpHash = await bcrypt.hash(otpCode, 10);
+            const otpExpiry = Date.now() + 5 * 60 * 1000;
+            await Admin.findByIdAndUpdate(user._id, {
+                $set: { 'loginOtp.token': otpHash, 'loginOtp.expires': otpExpiry, 'loginOtp.attempts': 0 }
+            });
+            await sendAdminEmail({
+                to: trimmedEmail,
+                subject: 'Admin Login Verification Code',
+                html: `<p>Your OneMoreGift admin login code is: <b style="font-size:24px;letter-spacing:4px">${otpCode}</b></p><p>Expires in 5 minutes. Do not share this code.</p>`
+            });
+            return res.status(200).json({ error: false, requiresOtp: true, msg: 'OTP sent to admin email.' });
         }
 
         const data = {
@@ -137,6 +188,47 @@ const login = async (req, res) => {
     } catch (error) {
         console.error("Admin login error:", error.message);
         res.status(400).json({ error: true, msg: "Something went wrong..!" })
+    }
+}
+
+const verifyAdminOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const trimmedEmail = (email || '').trim().toLowerCase();
+        if (!trimmedEmail || !otp) {
+            return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
+        }
+
+        const user = await Admin.findOne({ email: trimmedEmail });
+        if (!user || !user.loginOtp || !user.loginOtp.token) {
+            return res.status(400).json({ error: true, msg: 'OTP is invalid or expired' });
+        }
+
+        if (Date.now() > new Date(user.loginOtp.expires).getTime()) {
+            await Admin.findByIdAndUpdate(user._id, { $unset: { loginOtp: '' } });
+            return res.status(400).json({ error: true, msg: 'OTP has expired. Please login again.' });
+        }
+
+        const attempts = (user.loginOtp.attempts || 0);
+        const isMatch = await bcrypt.compare(otp, user.loginOtp.token);
+        if (!isMatch) {
+            if (attempts + 1 >= 5) {
+                await Admin.findByIdAndUpdate(user._id, { $unset: { loginOtp: '' } });
+                return res.status(429).json({ error: true, msg: 'Too many attempts. Please login again.' });
+            }
+            await Admin.findByIdAndUpdate(user._id, { $set: { 'loginOtp.attempts': attempts + 1 } });
+            return res.status(400).json({ error: true, msg: 'Invalid OTP' });
+        }
+
+        await Admin.findByIdAndUpdate(user._id, { $unset: { loginOtp: '' } });
+
+        const data = { user: { id: user.id, isAdmin: user.isAdmin, email: user.email } };
+        const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: '1d' });
+        setAdminCookie(res, authtoken);
+        return res.json({ error: false, authtoken });
+    } catch (error) {
+        console.error('verifyAdminOtp error:', error.message);
+        return res.status(500).json({ error: true, msg: 'OTP verification failed' });
     }
 }
 
@@ -609,6 +701,7 @@ const getDbStatus = async (req, res) => {
 module.exports = {
     register,
     login,
+    verifyAdminOtp,
     allUsers,
     banUser,
     unBanUser,

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./utils/loadEnv'); // Must be first — decrypts .env.enc or falls back to plain .env
 const mongoose = require('mongoose');
 const { createApp } = require('./app');
 
