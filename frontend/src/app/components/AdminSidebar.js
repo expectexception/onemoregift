@@ -11,7 +11,8 @@ import {
     BadgePlus,
     LogOut,
     Trophy,
-    ChevronLeft
+    ChevronLeft,
+    Settings
 } from "lucide-react";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,12 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
             title: "Winners",
             href: "/admin/dashboard/winners",
             icon: Trophy,
+            variant: "ghost"
+        },
+        {
+            title: "Settings",
+            href: "/admin/dashboard/settings",
+            icon: Settings,
             variant: "ghost"
         },
         {
