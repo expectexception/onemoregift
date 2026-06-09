@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { VerificationIcon, UserIcon, ShieldIcon } from "./SVGIcons";
 import RevealOnScroll from "./RevealOnScroll";
 import SearchableSelect from "./SearchableSelect";
+import AnimatedImage from "./AnimatedImage";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -426,8 +427,8 @@ export default function Giveaways() {
                     <DialogHeader className="text-center relative z-10">
                         <div className="flex justify-center mb-3 relative">
                             <div className="absolute inset-[-6px] rounded-full border border-red-500/20 animate-[ping_3s_infinite] pointer-events-none" />
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-neutral-900 border border-white/10 flex items-center justify-center p-1 shadow-2xl relative">
-                                <Image src={selectedGiveaway?.image || gift1} height={64} width={64} className="object-cover rounded-full w-full h-full" alt="Giveaway Image" unoptimized />
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-neutral-900 border border-white/10 flex items-center justify-center p-1 shadow-2xl relative overflow-hidden">
+                                <AnimatedImage src={selectedGiveaway?.image || gift1} height={64} width={64} className="object-cover rounded-full w-full h-full" alt="Giveaway Image" unoptimized />
                             </div>
                         </div>
                         <DialogTitle className="text-xl sm:text-2xl font-extrabold text-white tracking-tight mb-0.5">Enter {selectedGiveaway?.title}</DialogTitle>
@@ -648,7 +649,7 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
             <div className="giveaway-card p-4 sm:p-6 h-full flex flex-col border border-white/5 transition-all duration-300 hover:border-white/10">
                 {/* Image */}
                 <div className="relative h-48 w-full mb-4 sm:mb-5 rounded-xl overflow-hidden bg-neutral-900/80 border border-white/5 flex items-center justify-center">
-                    <Image
+                    <AnimatedImage
                         src={item.image || gift1}
                         fill
                         alt={item.title}

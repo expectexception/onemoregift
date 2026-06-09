@@ -1,4 +1,5 @@
 import Image from "next/image";
+import AnimatedImage from "./AnimatedImage";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -417,13 +418,13 @@ export default function GiveawayDetails({ data }) {
             <div className="premium-card rounded-2xl sm:rounded-3xl overflow-hidden bg-[#0d0d0d] border border-white/5 shadow-2xl">
                 {/* Image Section */}
                 <div className="relative h-64 sm:h-80 md:h-[360px] w-full overflow-hidden bg-black flex items-center justify-center border-b border-white/5 group">
-                    <div className="absolute inset-0 opacity-20 blur-2xl scale-110 pointer-events-none transition-transform duration-700 group-hover:scale-125">
-                        <Image src={imageSrc} alt="Background Blur" fill className="object-cover" unoptimized />
+                    <div className="absolute inset-0 opacity-20 blur-2xl scale-110 pointer-events-none transition-transform duration-700 group-hover:scale-125 overflow-hidden">
+                        <AnimatedImage src={imageSrc} alt="Background Blur" fill className="object-cover" unoptimized />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/90 pointer-events-none" />
 
-                    <div className="relative w-11/12 h-5/6 max-w-lg flex items-center justify-center transition-all duration-500 transform group-hover:scale-[1.02]">
-                        <Image src={imageSrc} alt={title ? `${title} giveaway` : "Giveaway image"} fill className="object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.7)]" unoptimized />
+                    <div className="relative w-11/12 h-5/6 max-w-lg flex items-center justify-center transition-all duration-500 transform group-hover:scale-[1.02] overflow-hidden">
+                        <AnimatedImage src={imageSrc} alt={title ? `${title} giveaway` : "Giveaway image"} fill className="object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.7)]" unoptimized />
                     </div>
 
                     {/* Status Badge */}
