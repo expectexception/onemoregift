@@ -12,15 +12,7 @@ import TrophyIcon from "./SVGIcons/TrophyIcon";
 import SettingsIcon from "./SVGIcons/SettingsIcon";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
-
-function AdminMonogram() {
-    return (
-        <svg viewBox="0 0 44 44" className="w-6 h-6" fill="none" aria-hidden="true">
-            <rect x="2" y="2" width="40" height="40" rx="12" fill="rgba(255,255,255,0.12)" />
-            <path d="M14 30L20.5 14H23.5L30 30H26.8L25.4 26.3H18.6L17.2 30H14ZM19.6 23.8H24.4L22 17.3L19.6 23.8Z" fill="white" />
-        </svg>
-    );
-}
+import AnimatedGiftSVG from "./AnimatedGiftSVG";
 
 export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed, setIsCollapsed }) {
     const [mounted, setMounted] = useState(false);
@@ -96,8 +88,8 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
         >
             {/* Branding Area */}
             <div className="h-20 flex items-center px-5 border-b border-white/10 relative overflow-hidden">
-                <div className="w-10 h-10 rounded-md bg-red-600 flex items-center justify-center shrink-0">
-                    <AdminMonogram />
+                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <AnimatedGiftSVG className="w-9 h-9" />
                 </div>
                 {(mounted && !isCollapsed && !mobileWidth) || (mobileWidth && isMobileOpen) ? (
                     <div className="ml-3 animate-in fade-in slide-in-from-left-2 duration-300">

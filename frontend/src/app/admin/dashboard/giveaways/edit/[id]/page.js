@@ -83,15 +83,6 @@ function Page({ params }) {
 
             if (fetchedData.startDate) {
                 try {
-                    const dayjsModule = await import("dayjs");
-                    const utcModule = await import("dayjs/plugin/utc");
-                    const timezoneModule = await import("dayjs/plugin/timezone");
-                    const dayjs = dayjsModule.default || dayjsModule;
-                    const utc = utcModule.default || utcModule;
-                    const timezone = timezoneModule.default || timezoneModule;
-                    dayjs.extend(utc);
-                    dayjs.extend(timezone);
-
                     const start = dayjs.utc(fetchedData.startDate).tz("Asia/Kolkata");
                     setStartDate(start.format("YYYY-MM-DD"));
                     setStartTime(start.format("HH:mm"));
