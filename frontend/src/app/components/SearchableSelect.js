@@ -4,6 +4,7 @@ import { ChevronDown, Search } from "lucide-react";
 export default function SearchableSelect({ value, onChange, options, placeholder, disabled, className }) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
+
     const containerRef = useRef(null);
 
     useEffect(() => {
@@ -41,7 +42,9 @@ export default function SearchableSelect({ value, onChange, options, placeholder
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1.5 bg-[#0a0a0a]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100">
+                <div
+                    className="absolute left-0 right-0 mt-1.5 bg-[#0a0a0a]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100 z-50"
+                >
                     <div className="flex items-center border-b border-white/[0.08] px-2.5 py-1.5">
                         <Search className="w-3.5 h-3.5 text-neutral-500 mr-2 shrink-0" />
                         <input
@@ -74,7 +77,7 @@ export default function SearchableSelect({ value, onChange, options, placeholder
                         ) : (
                             <div className="py-3 px-3 text-xs text-neutral-500 text-center">
                                 No results found
-                            </div>
+                             </div>
                         )}
                     </div>
                 </div>
@@ -82,3 +85,4 @@ export default function SearchableSelect({ value, onChange, options, placeholder
         </div>
     );
 }
+

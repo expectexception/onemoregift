@@ -3,8 +3,9 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const isAdmin = require('../middleware/isAdmin');
 const isRootAdmin = require('../middleware/isRootAdmin');
-const { register, login, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword } = require('../controller/adminController');
+const { register, login, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword, getDbStatus } = require('../controller/adminController');
 const { getWinnersForAdmin } = require('../controller/giveawayController');
+const { getAdminConfig, updateConfig } = require('../controller/configController');
 
 const adminAuthLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -33,8 +34,14 @@ router.get('/giveaways', isAdmin, getAllGiveaways)
 router.get('/winners', isAdmin, getWinnersForAdmin)
 router.get('/giveaway/:id', isAdmin, singleGiveaway)
 
+// Config management
+router.get('/config', isAdmin, getAdminConfig);
+router.post('/config', isAdmin, updateConfig);
+
 // Database Maintenance
 router.post('/maintenance/reset/:id', isAdmin, isRootAdmin, clearParticipants);
 router.post('/maintenance/clear-all', isAdmin, isRootAdmin, clearAllJoined);
+router.get('/maintenance/db-status', isAdmin, getDbStatus);
 
 module.exports = router;
+

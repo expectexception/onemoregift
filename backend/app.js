@@ -12,6 +12,7 @@ const admin = require('./routes/admin');
 const giveaway = require('./routes/giveaway');
 const upload = require('./routes/upload');
 const profile = require('./routes/user-profile');
+const configRoute = require('./routes/config');
 
 function createApp() {
   const app = express();
@@ -74,6 +75,8 @@ function createApp() {
   app.use('/api/v1/giveaway', giveaway);
   app.use('/api/v1/upload', upload);
   app.use('/api/v1/profile', profile);
+  app.use('/api/v1/config', configRoute);
+
 
   app.get('/api/v1/health', (req, res) => {
     const dbReady = mongoose.connection.readyState === 1;

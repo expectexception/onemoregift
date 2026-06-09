@@ -22,17 +22,13 @@ import SearchableSelect from "./SearchableSelect";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const TABS = [
-    { key: "active",   label: "Live Now",  icon: Flame },
-    { key: "upcoming", label: "Upcoming",  icon: CalendarClock },
-];
-
 const ALTCHA_CHALLENGE_URL = process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL;
 
 export default function Giveaways() {
     const router = useRouter();
     const pathname = usePathname();
     const [items, setItems] = useState([]);
+    const [config, setConfig] = useState({ showUpcoming: true, showEnded: false });
     const [activeTab, setActiveTab] = useState("active");
     const { userAuthenticated } = useAuth();
 
@@ -44,7 +40,9 @@ export default function Giveaways() {
     const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
     const [addressSelection, setAddressSelection] = useState("saved");
     const [savedAddressIndex, setSavedAddressIndex] = useState(0);
-    const [newAddressData, setNewAddressData] = useState({ name: "", phone: "", line1: "", line2: "", country: "", countryCode: "", state: "", pincode: "" });
+    const [newAddressData, setNewAddressData] = useState({ name: "", phone: "", line1: "", line2: "", city: "", country: "", countryCode: "", state: "", pincode: "" });
+    const [enteredPersonalPhone, setEnteredPersonalPhone] = useState("");
+    const [errorMsg, setErrorMsg] = useState("");
     
     // Captcha states
     const [isCaptchaValid, setIsCaptchaValid] = useState(false);
@@ -61,10 +59,16 @@ export default function Giveaways() {
 
     const fetchItems = useCallback(async () => {
         try {
-            const response = await api.get("giveaway");
-            setItems(response.data.data || []);
+            const [gwRes, configRes] = await Promise.all([
+                api.get("giveaway"),
+                api.get("config")
+            ]);
+            setItems(gwRes.data.data || []);
+            if (configRes.data && configRes.data.config) {
+                setConfig(configRes.data.config);
+            }
         } catch (error) {
-            console.error("Error fetching giveaways:", error);
+            console.error("Error fetching giveaways or config:", error);
         }
     }, []);
 
@@ -76,13 +80,36 @@ export default function Giveaways() {
 
     const activeGiveaways   = items.filter(g => g.status === "active");
     const upcomingGiveaways = items.filter(g => g.status === "upcoming");
+    const endedGiveaways    = items.filter(g => g.status === "ended");
+
+    // Dynamic tabs
+    const dynamicTabs = [
+        { key: "active", label: "Live Now", icon: Flame, count: activeGiveaways.length, color: "emerald" }
+    ];
+    if (config.showUpcoming) {
+        dynamicTabs.push({ key: "upcoming", label: "Upcoming", icon: CalendarClock, count: upcomingGiveaways.length, color: "blue" });
+    }
+    if (config.showEnded) {
+        dynamicTabs.push({ key: "ended", label: "Ended", icon: Trophy, count: endedGiveaways.length, color: "red" });
+    }
+
+    // Auto-switch to allowed tab if current activeTab is not allowed
+    useEffect(() => {
+        const isTabAllowed = (activeTab === "active") || 
+                             (activeTab === "upcoming" && config.showUpcoming) ||
+                             (activeTab === "ended" && config.showEnded);
+        if (!isTabAllowed) {
+            setActiveTab("active");
+        }
+    }, [activeTab, config.showUpcoming, config.showEnded]);
 
     // Auto-switch to upcoming if no active
     useEffect(() => {
-        if (activeGiveaways.length === 0 && upcomingGiveaways.length > 0) {
+        if (activeGiveaways.length === 0 && upcomingGiveaways.length > 0 && config.showUpcoming && activeTab === "active") {
             setActiveTab("upcoming");
         }
-    }, [activeGiveaways.length, upcomingGiveaways.length]);
+    }, [activeGiveaways.length, upcomingGiveaways.length, config.showUpcoming, activeTab]);
+
 
     // Fetch profile and other details when entry dialog opens
     const handleOpenEntry = async (item) => {
@@ -90,10 +117,13 @@ export default function Giveaways() {
         setEntryDialogOpen(true);
         setLoadingProfile(true);
         setIsCaptchaValid(false);
+        setErrorMsg("");
+        setNewAddressData({ name: "", phone: "", line1: "", line2: "", city: "", country: "", countryCode: "", state: "", pincode: "" });
         try {
             const { data } = await api.get("profile/", { meta: { auth: "user" } });
             const p = data.myProfile;
             setProfile(p);
+            setEnteredPersonalPhone(p.phone || "");
             
             const hasSaved = Boolean(
                 (Array.isArray(p.addresses) && p.addresses.length > 0) ||
@@ -153,38 +183,82 @@ export default function Giveaways() {
         if (addressSelection === "saved") {
             const savedAddresses = Array.isArray(profile?.addresses) ? profile.addresses : [];
             const sel = savedAddresses[savedAddressIndex];
-            if (sel) return [sel.name, sel.phone, sel.line1, sel.line2, sel.city, sel.state, sel.country, sel.postalCode].filter(Boolean).join(", ");
+            if (sel) return [sel.fullName || sel.name, sel.phone, sel.line1, sel.line2, sel.city, sel.state, sel.country, sel.postalCode].filter(Boolean).join(", ");
             return profile?.address || "";
         }
-        return [newAddressData.name, newAddressData.phone, newAddressData.line1, newAddressData.line2, newAddressData.state, newAddressData.country, newAddressData.pincode].filter(Boolean).join(", ");
+        return [newAddressData.name, newAddressData.phone, newAddressData.line1, newAddressData.line2, newAddressData.city, newAddressData.state, newAddressData.country, newAddressData.pincode].filter(Boolean).join(", ");
     };
 
     const submitEntry = async () => {
-        if (!profile?.phone || !String(profile.phone).trim()) {
+        const activePhone = (profile?.phone || enteredPersonalPhone || "").replace(/\D/g, "").slice(0, 10);
+        if (!activePhone) {
+            setErrorMsg("Phone number is required.");
+            return;
+        }
+        if (!/^[6-9]\d{9}$/.test(activePhone)) {
+            setErrorMsg("Phone number must be a valid 10-digit Indian number starting with 6-9.");
             return;
         }
         const address = getSelectedAddress();
         if (!address?.trim()) {
+            setErrorMsg("Address is required.");
             return;
         }
         if (addressSelection === "new") {
-            if (!newAddressData.name || !newAddressData.phone || !newAddressData.line1 || !newAddressData.country || !newAddressData.state || !newAddressData.pincode) {
+            if (!newAddressData.name.trim() || !newAddressData.phone.trim() || !newAddressData.line1.trim() || !newAddressData.city.trim() || !newAddressData.country.trim() || !newAddressData.state.trim() || !newAddressData.pincode.trim()) {
+                setErrorMsg("All address fields marked * are required.");
+                return;
+            }
+            if (!/^[6-9]\d{9}$/.test(newAddressData.phone.replace(/\D/g, "").slice(0, 10))) {
+                setErrorMsg("Receiver phone must be a valid 10-digit Indian number starting with 6-9.");
                 return;
             }
         }
         if (ALTCHA_CHALLENGE_URL && !isCaptchaValid && process.env.NODE_ENV !== "development") {
+            setErrorMsg("Please complete captcha check.");
             return;
         }
 
         setIsSubmittingEntry(true);
+        setErrorMsg("");
         try {
-            if (addressSelection === "new" && address && address !== (profile.address || "")) {
-                await api.patch("profile/update", { address }, { meta: { auth: "user" } });
+            const updates = {};
+            if (!profile?.phone && enteredPersonalPhone) {
+                updates.phone = activePhone;
             }
+            if (addressSelection === "new") {
+                const existingAddresses = Array.isArray(profile?.addresses) ? profile.addresses : [];
+                const updatedAddresses = existingAddresses.map(a => ({ ...a, isDefault: false }));
+                const newAddr = {
+                    label: "Shipping Address",
+                    fullName: newAddressData.name.trim(),
+                    phone: newAddressData.phone.replace(/\D/g, "").slice(0, 10),
+                    line1: newAddressData.line1.trim(),
+                    line2: (newAddressData.line2 || "").trim(),
+                    city: newAddressData.city.trim(),
+                    state: newAddressData.state.trim(),
+                    country: newAddressData.country.trim(),
+                    countryCode: newAddressData.countryCode,
+                    postalCode: newAddressData.pincode.trim(),
+                    isDefault: true
+                };
+                updatedAddresses.push(newAddr);
+                updates.addresses = updatedAddresses;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                const { data: updateRes } = await api.patch("profile/update", updates, { meta: { auth: "user" } });
+                if (updateRes.error) {
+                    setErrorMsg(updateRes.msg || "Failed to update profile.");
+                    setIsSubmittingEntry(false);
+                    return;
+                }
+            }
+
             const { data } = await api.post("giveaway/participate/" + selectedGiveaway._id, {}, { meta: { auth: "user" } });
             if (!data.error) {
                 setEntryDialogOpen(false);
-                setCelebratingName(profile.name || "");
+                setCelebratingName(profile?.name || "");
                 setShowCelebration(true);
                 
                 // Confetti trigger
@@ -203,15 +277,18 @@ export default function Giveaways() {
                     setShowCelebration(false);
                     fetchItems();
                 }, 3500);
+            } else {
+                setErrorMsg(data.msg || "Participation failed.");
             }
         } catch (error) {
             console.error("Entry failed", error);
+            setErrorMsg(error?.response?.data?.msg || "Entry failed. Please try again.");
         } finally {
             setIsSubmittingEntry(false);
         }
     };
 
-    const displayed = activeTab === "active" ? activeGiveaways : upcomingGiveaways;
+    const displayed = activeTab === "active" ? activeGiveaways : activeTab === "upcoming" ? upcomingGiveaways : endedGiveaways;
     const hasAny = items.length > 0;
 
     return (
@@ -235,8 +312,7 @@ export default function Giveaways() {
             {/* Tabs */}
             {hasAny && (
                 <div className="max-w-7xl mx-auto mb-8 flex items-center gap-3 flex-wrap">
-                    {TABS.map(({ key, label, icon: Icon }) => {
-                        const count = key === "active" ? activeGiveaways.length : upcomingGiveaways.length;
+                    {dynamicTabs.map(({ key, label, icon: Icon, count, color }) => {
                         const isActive = activeTab === key;
                         return (
                             <button
@@ -244,9 +320,11 @@ export default function Giveaways() {
                                 onClick={() => setActiveTab(key)}
                                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
                                     isActive
-                                        ? key === "active"
+                                        ? color === "emerald"
                                             ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
-                                            : "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                                            : color === "blue"
+                                            ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                                            : "bg-red-500/15 border-red-500/40 text-red-400"
                                         : "border-white/[0.07] bg-white/[0.02] text-neutral-500 hover:text-neutral-300 hover:border-white/20"
                                 }`}
                             >
@@ -254,7 +332,7 @@ export default function Giveaways() {
                                 {label}
                                 <span className={`px-1.5 py-0.5 rounded-md text-xs font-bold ${
                                     isActive
-                                        ? key === "active" ? "bg-emerald-500/20 text-emerald-300" : "bg-blue-500/20 text-blue-300"
+                                        ? color === "emerald" ? "bg-emerald-500/20 text-emerald-300" : color === "blue" ? "bg-blue-500/20 text-blue-300" : "bg-red-500/20 text-red-300"
                                         : "bg-white/[0.06] text-neutral-500"
                                 }`}>
                                     {count}
@@ -273,16 +351,18 @@ export default function Giveaways() {
                             <VerificationIcon className="w-12 h-12" />
                         </div>
                         <h3 className="text-2xl font-semibold text-white mb-2">
-                            {activeTab === "active" ? "No Live Giveaways" : "No Upcoming Giveaways"}
+                            {activeTab === "active" ? "No Live Giveaways" : activeTab === "upcoming" ? "No Upcoming Giveaways" : "No Ended Giveaways"}
                         </h3>
                         <p className="text-neutral-500 mb-6">
                             {activeTab === "active"
                                 ? upcomingGiveaways.length > 0
                                     ? `${upcomingGiveaways.length} upcoming giveaway${upcomingGiveaways.length > 1 ? "s" : ""} — check the Upcoming tab!`
                                     : "Check back soon for new exciting contests!"
-                                : "Stay tuned — new giveaways are being planned!"}
+                                : activeTab === "upcoming"
+                                ? "Stay tuned — new giveaways are being planned!"
+                                : "History of all completed giveaways."}
                         </p>
-                        {activeTab === "active" && upcomingGiveaways.length > 0 && (
+                        {activeTab === "active" && upcomingGiveaways.length > 0 && config.showUpcoming && (
                             <button
                                 className="btn-outline-premium px-6 py-3 rounded-xl"
                                 onClick={() => setActiveTab("upcoming")}
@@ -292,6 +372,7 @@ export default function Giveaways() {
                         )}
                     </div>
                 ) : (
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {displayed.map((item) => (
                             <GiveawayCard
@@ -360,9 +441,18 @@ export default function Giveaways() {
                                 </div>
 
                                 {(!profile?.phone || !String(profile.phone).trim()) ? (
-                                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-200 text-xs flex items-start gap-2 relative z-10">
-                                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                                        <span>Mobile number is required. Please edit your profile to add a phone number before entering.</span>
+                                    <div className="space-y-2 relative z-10">
+                                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-200 text-xs flex items-start gap-2">
+                                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                            <span>Mobile number is required to participate. Enter below:</span>
+                                        </div>
+                                        <input
+                                            type="tel"
+                                            value={enteredPersonalPhone}
+                                            onChange={e => setEnteredPersonalPhone(e.target.value)}
+                                            placeholder="Your Phone Number *"
+                                            className="w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-all text-xs outline-none"
+                                        />
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 relative z-10">
@@ -430,11 +520,11 @@ export default function Giveaways() {
                                     {addressSelection === "new" && (
                                         <div className="space-y-2">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <input type="text" value={newAddressData.name} onChange={e => setNewAddressData({ ...newAddressData, name: e.target.value })} placeholder="Receiver Name *" className="w-full h-9 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-colors text-xs outline-none" />
-                                                <input type="tel" value={newAddressData.phone} onChange={e => setNewAddressData({ ...newAddressData, phone: e.target.value })} placeholder="Phone Number *" className="w-full h-9 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-colors text-xs outline-none" />
+                                                <input type="text" value={newAddressData.name} onChange={e => setNewAddressData({ ...newAddressData, name: e.target.value })} placeholder="Receiver Name *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
+                                                <input type="tel" value={newAddressData.phone} onChange={e => setNewAddressData({ ...newAddressData, phone: e.target.value })} placeholder="Receiver Phone *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
                                             </div>
-                                            <input type="text" value={newAddressData.line1} onChange={e => setNewAddressData({ ...newAddressData, line1: e.target.value })} placeholder="Address Line 1 *" className="w-full h-9 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-colors text-xs outline-none" />
-                                            <input type="text" value={newAddressData.line2} onChange={e => setNewAddressData({ ...newAddressData, line2: e.target.value })} placeholder="Address Line 2 (Optional)" className="w-full h-9 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-colors text-xs outline-none" />
+                                            <input type="text" value={newAddressData.line1} onChange={e => setNewAddressData({ ...newAddressData, line1: e.target.value })} placeholder="Address Line 1 *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
+                                            <input type="text" value={newAddressData.line2} onChange={e => setNewAddressData({ ...newAddressData, line2: e.target.value })} placeholder="Address Line 2 (Optional)" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
                                             <div className="grid grid-cols-2 gap-2">
                                                 <SearchableSelect
                                                     value={newAddressData.countryCode || ""}
@@ -453,7 +543,10 @@ export default function Giveaways() {
                                                     disabled={!newAddressData.countryCode}
                                                 />
                                             </div>
-                                            <input type="text" value={newAddressData.pincode} onChange={e => setNewAddressData({ ...newAddressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="w-full h-9 px-3 rounded-xl text-white placeholder:text-neutral-600 bg-black/40 border border-white/10 hover:border-white/20 focus:border-white/30 transition-colors text-xs outline-none" />
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <input type="text" value={newAddressData.city} onChange={e => setNewAddressData({ ...newAddressData, city: e.target.value })} placeholder="City *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
+                                                <input type="text" value={newAddressData.pincode} onChange={e => setNewAddressData({ ...newAddressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-xs sm:text-sm" />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -471,6 +564,14 @@ export default function Giveaways() {
                                 </div>
                             )}
 
+                            {/* Error Msg Display */}
+                            {errorMsg && (
+                                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-2.5 text-red-400 text-xs flex items-start gap-2 relative z-10 animate-fade-up">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 animate-pulse" />
+                                    <span>{errorMsg}</span>
+                                </div>
+                            )}
+
                             {/* Action Buttons */}
                             <div className="flex gap-3 mt-1">
                                 <button className="flex-[1] h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs sm:text-sm transition-all" onClick={() => setEntryDialogOpen(false)}>
@@ -481,10 +582,9 @@ export default function Giveaways() {
                                     onClick={submitEntry}
                                     disabled={
                                         isSubmittingEntry ||
-                                        !profile?.phone ||
-                                        !String(profile.phone).trim() ||
+                                        !(profile?.phone || enteredPersonalPhone) ||
                                         !getSelectedAddress()?.trim() ||
-                                        (addressSelection === "new" && (!newAddressData.name || !newAddressData.phone || !newAddressData.line1 || !newAddressData.country || !newAddressData.state || !newAddressData.pincode)) ||
+                                        (addressSelection === "new" && (!newAddressData.name || !newAddressData.phone || !newAddressData.line1 || !newAddressData.city || !newAddressData.country || !newAddressData.state || !newAddressData.pincode)) ||
                                         (ALTCHA_CHALLENGE_URL && !isCaptchaValid && process.env.NODE_ENV !== "development")
                                     }
                                 >
@@ -517,6 +617,7 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
     const status = item.status || "active";
     const isUpcoming = status === "upcoming";
     const isActive = status === "active";
+    const isEnded = status === "ended";
 
     const targetDateStr = isUpcoming ? item.startDate : item.endDate;
 
@@ -542,6 +643,7 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
     }, [targetDateStr]);
 
     const hasJoined = loggedIn && user && item.participants?.some(p => (p._id || p) === user._id);
+    const isWinner = loggedIn && user && item.winners?.some(w => (w._id || w) === user._id);
 
     const handleEnter = () => {
         if (!loggedIn) { setShowDialog(true); return; }
@@ -551,11 +653,13 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
     // Badge config
     const badge = isUpcoming
         ? { color: "bg-blue-500/20 border-blue-500/40 text-blue-400", dot: "bg-blue-400", label: "Soon" }
+        : isEnded
+        ? { color: "bg-red-500/20 border-red-500/40 text-red-400", dot: "bg-red-500", label: "Ended" }
         : { color: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400", dot: "bg-emerald-400 animate-pulse", label: "Live" };
 
     // Timer label
-    const timerLabel = isUpcoming ? "Starts in" : "Ends in";
-    const timerColor = isUpcoming ? "text-blue-400" : "text-red-400";
+    const timerLabel = isUpcoming ? "Starts in" : isEnded ? "Ended on" : "Ends in";
+    const timerColor = isUpcoming ? "text-blue-400" : isEnded ? "text-neutral-500" : "text-red-400";
 
     return (
         <>
@@ -599,14 +703,30 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
                         {timerLabel}
                     </p>
 
-                    {/* Countdown */}
-                    {timeLeft && (
-                        <div className="grid grid-cols-4 gap-2 mb-4">
-                            <CountdownUnit value={timeLeft.days}    label="D" active={isActive} />
-                            <CountdownUnit value={timeLeft.hours}   label="H" active={isActive} />
-                            <CountdownUnit value={timeLeft.minutes} label="M" active={isActive} />
-                            <CountdownUnit value={timeLeft.seconds} label="S" active={isActive} />
+                    {/* Countdown / Winner list */}
+                    {isEnded ? (
+                        <div className="bg-white/[0.02] border border-white/[0.05] p-3 rounded-xl mb-4 flex-1 flex flex-col justify-center">
+                            <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                                Winners
+                            </p>
+                            {item.winners && item.winners.length > 0 ? (
+                                <p className="text-xs text-neutral-200 font-semibold line-clamp-2 leading-relaxed">
+                                    {item.winners.map(w => w.name || w.fullName || "User").join(", ")}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-neutral-500 italic">Winners selection pending</p>
+                            )}
                         </div>
+                    ) : (
+                        timeLeft && (
+                            <div className="grid grid-cols-4 gap-2 mb-4">
+                                <CountdownUnit value={timeLeft.days}    label="D" active={isActive} />
+                                <CountdownUnit value={timeLeft.hours}   label="H" active={isActive} />
+                                <CountdownUnit value={timeLeft.minutes} label="M" active={isActive} />
+                                <CountdownUnit value={timeLeft.seconds} label="S" active={isActive} />
+                            </div>
+                        )
                     )}
 
                     {/* Meta row */}
@@ -629,7 +749,12 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
                     )}
 
                     {/* CTA */}
-                    {hasJoined ? (
+                    {isWinner ? (
+                        <div className="w-full py-3 rounded-xl font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center gap-2 cursor-default mt-auto">
+                            <Trophy className="w-5 h-5 flex-shrink-0 animate-bounce" />
+                            <span>You Won! 🎉</span>
+                        </div>
+                    ) : hasJoined ? (
                         <div className="w-full py-3 rounded-xl font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center gap-2 cursor-default mt-auto">
                             <CheckCircle className="w-5 h-5 flex-shrink-0" />
                             <span>Joined</span>
@@ -638,6 +763,10 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
                         <div className="w-full py-3 rounded-xl font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center gap-1.5 cursor-default mt-auto text-sm">
                             <CalendarClock className="w-4 h-4" />
                             Opens Soon
+                        </div>
+                    ) : isEnded ? (
+                        <div className="w-full py-3 rounded-xl font-semibold bg-neutral-900 border border-white/5 text-neutral-500 flex items-center justify-center gap-2 cursor-default mt-auto text-sm">
+                            <span>Ended</span>
                         </div>
                     ) : (
                         <button
@@ -649,6 +778,7 @@ function GiveawayCard({ item, loggedIn, router, onEnter }) {
                     )}
                 </div>
             </div>
+
 
             {/* Login dialog */}
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -692,63 +822,34 @@ function CountdownUnit({ value, label, active }) {
 }
 
 function CelebrationOverlay({ name }) {
-    const sparkles = Array.from({ length: 18 }, (_, i) => ({
-        id: i,
-        left: 4 + i * 5.3,
-        delay: (i % 6) * 0.15,
-        dur: 1.5 + (i % 4) * 0.22,
-        size: i % 3 === 0 ? "w-5 h-5" : "w-3 h-3",
-    }));
-
     return (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.22),transparent_55%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,185,129,0.06)_1px,transparent_1px),linear-gradient(rgba(16,185,129,0.06)_1px,transparent_1px)] bg-[size:40px_40px]" />
+        <div className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+            <div className="absolute inset-0 bg-black/85 backdrop-blur-md animate-[fadeIn_0.3s_ease-out_forwards]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.15),transparent_60%)]" />
 
-            {/* Orbit rings */}
-            <div className="absolute w-[480px] h-[480px] rounded-full border border-emerald-400/25 animate-[spin_22s_linear_infinite]">
-                {["#34d399","#fbbf24","#f59e0b","#ef4444","#a78bfa","#60a5fa"].map((color, i) => (
-                    <span key={i} className="absolute w-2.5 h-2.5 rounded-full shadow-lg" style={{ top: `${[5,22,68,80,20,50][i]}%`, left: `${[50,85,83,18,15,95][i]}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}` }} />
-                ))}
-            </div>
-            <div className="absolute w-[360px] h-[360px] rounded-full border border-rose-400/20 animate-[spin_32s_linear_infinite_reverse]" />
-            <div className="absolute w-[250px] h-[250px] rounded-full border border-amber-300/15" />
-
-            {/* Badge */}
-            <div className="relative flex flex-col items-center gap-4 animate-fade-up">
-                <div className="relative">
-                    <div className="absolute inset-[-20px] rounded-full border border-emerald-300/50 animate-[ping_1.4s_ease-out_infinite]" />
-                    <div className="absolute inset-[-36px] rounded-full border border-rose-300/30 animate-[ping_2s_ease-out_infinite]" />
-                    <div className="animate-[bounce_2.5s_ease-in-out_infinite]">
-                        <div className="w-36 h-36 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/10 border-2 border-emerald-400/60 flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.5)]">
-                            <div className="text-center">
-                                <div className="text-5xl mb-1">🎁</div>
-                                <CheckCircle className="w-7 h-7 text-emerald-400 mx-auto" />
-                            </div>
-                        </div>
-                    </div>
+            <div className="relative flex flex-col items-center max-w-sm w-[90%] p-8 bg-neutral-900/90 border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(220,38,38,0.3)] text-center animate-[scaleIn_0.4s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+                <div className="w-20 h-20 rounded-full bg-red-600/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(220,38,38,0.2)]">
+                    <Gift className="w-10 h-10 text-red-500 animate-[pulse_2s_infinite]" />
                 </div>
 
-                <div className="text-center space-y-1.5 px-6">
-                    <p className="text-white font-bold text-2xl tracking-tight">You&apos;re In!</p>
-                    {name && <p className="text-emerald-300 font-medium text-base">Good luck, {name.split(" ")[0]}! 🤞</p>}
-                    <p className="text-emerald-100/80 text-sm">Entry confirmed · Winner notified by email</p>
+                <h2 className="text-white font-extrabold text-2xl tracking-tight mb-2">You&apos;re In! 🎉</h2>
+                {name && <p className="text-red-400 font-semibold text-base mb-1">Good luck, {name.split(" ")[0]}! 🤞</p>}
+                <p className="text-neutral-400 text-sm leading-relaxed mb-6">Your entry is sealed. We will notify you by email if you win.</p>
+                
+                <div className="flex items-center gap-2 text-xs text-neutral-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                    <span>Processing...</span>
                 </div>
             </div>
-
-            {/* Sparkles */}
-            {sparkles.map(s => (
-                <div key={s.id} className="absolute" style={{ left: `${s.left}%`, bottom: "12%", animation: `sparkle-rise ${s.dur}s ease-out ${s.delay}s infinite` }}>
-                    <Sparkles className={`${s.size} text-emerald-200/80`} />
-                </div>
-            ))}
 
             <style>{`
-                @keyframes sparkle-rise {
-                    0% { transform: translateY(0) scale(0.7) rotate(0deg); opacity: 0; }
-                    15% { opacity: 1; }
-                    100% { transform: translateY(-140px) scale(1.2) rotate(130deg); opacity: 0; }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleIn {
+                    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
                 }
             `}</style>
         </div>

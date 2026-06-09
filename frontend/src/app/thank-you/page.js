@@ -13,7 +13,7 @@ export default function ThankYou() {
             const confetti = module.default;
             const duration = 4200;
             const animationEnd = Date.now() + duration;
-            const colors = ["#dc2626", "#f43f5e", "#fbbf24", "#34d399", "#ffffff"];
+            const colors = ["#dc2626", "#ef4444", "#fbbf24", "#ffffff", "#737373"];
 
             confetti({
                 particleCount: 110,
@@ -63,23 +63,21 @@ export default function ThankYou() {
 
             <main className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-12 sm:px-6 lg:px-8">
                 <div className="pointer-events-none absolute inset-0">
-                    <div className="absolute left-1/2 top-1/2 h-[620px] w-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[130px]" />
+                    <div className="absolute left-1/2 top-1/2 h-[620px] w-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-red-600/10 blur-[130px]" />
                     <div className="absolute -left-32 top-20 h-72 w-72 rounded-full bg-red-600/15 blur-[100px]" />
-                    <div className="absolute -right-24 bottom-12 h-80 w-80 rounded-full bg-amber-400/10 blur-[110px]" />
+                    <div className="absolute -right-24 bottom-12 h-80 w-80 rounded-full bg-neutral-900/10 blur-[110px]" />
                     <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:56px_56px] [mask-image:radial-gradient(circle_at_center,black,transparent_72%)]" />
                 </div>
 
                 <section className="relative z-10 w-full max-w-5xl">
                     <div className="grid items-center gap-6 lg:grid-cols-[0.9fr_1.1fr]">
                         <div className="relative mx-auto flex aspect-square w-full max-w-[360px] items-center justify-center sm:max-w-[420px]">
-                            <div className="success-orbit absolute inset-0 rounded-full border border-emerald-400/20" />
-                            <div className="success-orbit-reverse absolute inset-8 rounded-full border border-red-400/15" />
-                            <div className="absolute h-52 w-52 rounded-full bg-emerald-400/10 blur-3xl" />
+                            <div className="absolute h-52 w-52 rounded-full bg-red-500/10 blur-3xl" />
 
-                            <svg className="relative h-full w-full drop-shadow-[0_30px_80px_rgba(16,185,129,0.22)]" viewBox="0 0 420 420" role="img" aria-label="Entry confirmed ticket animation">
+                            <svg className="relative h-full w-full drop-shadow-[0_30px_80px_rgba(220,38,38,0.22)]" viewBox="0 0 420 420" role="img" aria-label="Entry confirmed ticket animation">
                                 <defs>
                                     <linearGradient id="ticketGlow" x1="92" y1="84" x2="328" y2="336" gradientUnits="userSpaceOnUse">
-                                        <stop stopColor="#34d399" />
+                                        <stop stopColor="#ef4444" />
                                         <stop offset="0.45" stopColor="#f8fafc" />
                                         <stop offset="1" stopColor="#dc2626" />
                                     </linearGradient>
@@ -92,31 +90,24 @@ export default function ThankYou() {
                                     </filter>
                                 </defs>
                                 <circle cx="210" cy="210" r="152" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.1)" />
-                                <circle className="success-dash" cx="210" cy="210" r="126" fill="none" stroke="url(#ticketGlow)" strokeWidth="3" strokeDasharray="12 14" filter="url(#softGlow)" />
                                 <path className="ticket-pop" d="M116 160c0-19 15-34 34-34h120c19 0 34 15 34 34v28c-18 4-31 20-31 39s13 35 31 39v28c0 19-15 34-34 34H150c-19 0-34-15-34-34v-28c18-4 31-20 31-39s-13-35-31-39v-28Z" fill="rgba(10,10,10,0.92)" stroke="url(#ticketGlow)" strokeWidth="3" />
-                                <path className="check-draw" d="M174 222l28 28 58-70" fill="none" stroke="#34d399" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
-                                <g className="spark-cluster" fill="#fbbf24">
-                                    <circle cx="105" cy="120" r="5" />
-                                    <circle cx="324" cy="132" r="4" />
-                                    <circle cx="330" cy="300" r="6" />
-                                    <circle cx="93" cy="292" r="4" />
-                                </g>
+                                <path className="check-draw" d="M174 222l28 28 58-70" fill="none" stroke="#ef4444" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </div>
 
-                        <div className="premium-card relative overflow-hidden rounded-[2rem] border border-white/[0.09] p-6 text-center shadow-[0_35px_110px_-60px_rgba(16,185,129,0.75)] sm:p-9 lg:text-left">
-                            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-400/10 blur-[80px]" />
+                        <div className="premium-card relative overflow-hidden rounded-[2rem] border border-white/[0.09] p-6 text-center shadow-[0_35px_110px_-60px_rgba(220,38,38,0.45)] sm:p-9 lg:text-left">
+                            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-red-600/10 blur-[80px]" />
                             <div className="pointer-events-none absolute -bottom-20 left-4 h-48 w-48 rounded-full bg-red-600/10 blur-[70px]" />
 
                             <div className="relative">
-                                <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-200 lg:mx-0">
+                                <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-red-400 lg:mx-0">
                                     <TicketCheck className="h-4 w-4" />
                                     Entry secured
                                 </div>
 
                                 <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
                                     You&apos;re officially{" "}
-                                    <span className="bg-gradient-to-r from-emerald-300 via-teal-200 to-white bg-clip-text text-transparent">
+                                    <span className="bg-gradient-to-r from-red-500 via-rose-400 to-white bg-clip-text text-transparent">
                                         in.
                                     </span>
                                 </h1>
@@ -156,33 +147,6 @@ export default function ThankYou() {
             <Footer />
 
             <style jsx>{`
-                .success-orbit {
-                    animation: orbitSpin 14s linear infinite, orbitPulse 2.8s ease-in-out infinite;
-                    box-shadow: 0 0 80px rgba(52, 211, 153, 0.08);
-                }
-                .success-orbit::before,
-                .success-orbit-reverse::before {
-                    content: "";
-                    position: absolute;
-                    top: -5px;
-                    left: 50%;
-                    height: 10px;
-                    width: 10px;
-                    border-radius: 999px;
-                    background: #34d399;
-                    box-shadow: 0 0 24px #34d399;
-                }
-                .success-orbit-reverse {
-                    animation: orbitSpin 10s linear infinite reverse;
-                }
-                .success-orbit-reverse::before {
-                    background: #ef4444;
-                    box-shadow: 0 0 24px #ef4444;
-                }
-                .success-dash {
-                    transform-origin: center;
-                    animation: dashSpin 9s linear infinite;
-                }
                 .ticket-pop {
                     transform-origin: center;
                     animation: ticketPop 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -192,30 +156,12 @@ export default function ThankYou() {
                     stroke-dashoffset: 140;
                     animation: drawCheck 820ms 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
-                .spark-cluster {
-                    transform-origin: center;
-                    animation: sparkleDrift 3.2s ease-in-out infinite;
-                }
-                @keyframes orbitSpin {
-                    to { transform: rotate(360deg); }
-                }
-                @keyframes orbitPulse {
-                    0%, 100% { opacity: 0.7; transform: scale(1); }
-                    50% { opacity: 1; transform: scale(1.025); }
-                }
-                @keyframes dashSpin {
-                    to { transform: rotate(-360deg); }
-                }
                 @keyframes ticketPop {
                     from { opacity: 0; transform: scale(0.84) rotate(-4deg); }
                     to { opacity: 1; transform: scale(1) rotate(0deg); }
                 }
                 @keyframes drawCheck {
                     to { stroke-dashoffset: 0; }
-                }
-                @keyframes sparkleDrift {
-                    0%, 100% { opacity: 0.45; transform: scale(0.96); }
-                    50% { opacity: 1; transform: scale(1.08); }
                 }
             `}</style>
         </div>
@@ -224,7 +170,7 @@ export default function ThankYou() {
 
 const ConfirmationStat = ({ icon: Icon, label, value }) => (
     <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 text-left">
-        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
+        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
             <Icon className="h-4 w-4" />
         </div>
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-500">{label}</p>

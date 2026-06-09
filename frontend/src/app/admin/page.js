@@ -292,7 +292,6 @@ export default function AdminLoginForm() {
                                     id="email"
                                     type="email"
                                     className="field-input"
-                                    placeholder="admin@onemoregift.in"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -308,7 +307,6 @@ export default function AdminLoginForm() {
                                     id="password"
                                     type={showPassword ? "text" : "password"}
                                     className="field-input has-icon"
-                                    placeholder="••••••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required

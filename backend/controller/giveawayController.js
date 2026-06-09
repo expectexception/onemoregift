@@ -1,8 +1,10 @@
 const Giveaway = require("../model/Giveaway");
 const JoinedGiveaway = require("../model/JoinedGiveaways");
+const { getConfigHelper } = require("./configController");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const timezone = require("dayjs/plugin/timezone");
+
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -181,7 +183,6 @@ const getAllGiveaways = async (req, res) => {
         return res.status(500).json({ error: true, msg: "Some Error occurred" });
     }
 };
-//get giveaways for Users — includes upcoming + active, with computed status
 const getGiveaways = async (req, res) => {
     try {
         const page = Number(req.query.page) || 1;
@@ -194,16 +195,33 @@ const getGiveaways = async (req, res) => {
         }
 
         const nowIst = dayjs().tz('Asia/Kolkata').toDate();
+        const config = await getConfigHelper();
+        const { showUpcoming, showEnded } = config;
 
-        // Fetch active + upcoming (exclude ended giveaways)
-        const giveawaysRaw = await Giveaway.find({
-            ...queryObj,
-            endDate: { $gte: nowIst },  // not ended yet
-        })
+        // Build visible filter
+        const orConds = [
+            // Always include live (active)
+            { startDate: { $lte: nowIst }, endDate: { $gte: nowIst } }
+        ];
+        if (showUpcoming) {
+            orConds.push({ startDate: { $gt: nowIst } });
+        }
+        if (showEnded) {
+            orConds.push({ endDate: { $lt: nowIst } });
+        }
+        const visibleFilter = { ...queryObj, $or: orConds };
+
+        // Fetch visible giveaways
+        const giveawaysRaw = await Giveaway.find(visibleFilter)
+            .populate({
+                path: 'winners',
+                select: '_id name'
+            })
             .sort({ startDate: 1 })     // upcoming first, then active by start time
             .skip(skip)
             .limit(limit)
             .lean();
+
 
         const now = dayjs().tz('Asia/Kolkata');
 
@@ -226,7 +244,7 @@ const getGiveaways = async (req, res) => {
             return g;
         });
 
-        const total = await Giveaway.countDocuments({ ...queryObj, endDate: { $gte: nowIst } });
+        const total = await Giveaway.countDocuments(visibleFilter);
 
         return res.status(200).json({ error: false, data: giveaways, total });
     } catch (error) {
@@ -234,6 +252,7 @@ const getGiveaways = async (req, res) => {
         return res.status(500).json({ error: true, msg: 'Some Error occurred' });
     }
 };
+
 
 //get a single giveaway
 // const getSingleGiveaway = async (req, res) => {

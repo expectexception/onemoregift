@@ -4,7 +4,9 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
 const Giveaway = require('../model/Giveaway')
 const JoinedGiveaway = require('../model/JoinedGiveaways')
+const { getConfigHelper } = require('./configController')
 require('dotenv').config()
+
 const JWT_SECRET = process.env.JWT_SECRET
 const COOKIE_SECURE = process.env.NODE_ENV === 'production';
 const ADMIN_COOKIE_NAME = 'admin_token';
@@ -415,6 +417,22 @@ const singleGiveaway = async (req, res) => {
 const getPublicStats = async (req, res) => {
     try {
         const now = new Date();
+        const config = await getConfigHelper();
+        const { showUpcoming, showEnded } = config;
+
+        // Build visible filter
+        const visibleFilter = {
+            $or: [
+                // Always include live (active)
+                { startDate: { $lte: now }, endDate: { $gte: now } }
+            ]
+        };
+        if (showUpcoming) {
+            visibleFilter.$or.push({ startDate: { $gt: now } });
+        }
+        if (showEnded) {
+            visibleFilter.$or.push({ endDate: { $lt: now } });
+        }
 
         if (process.env.NODE_ENV === 'test') {
             const [activeGiveaways, giveawaysWithWinners, allGiveaways] = await Promise.all([
@@ -422,8 +440,8 @@ const getPublicStats = async (req, res) => {
                     startDate: { $lte: now },
                     endDate: { $gte: now }
                 }),
-                Giveaway.find({ winners: { $exists: true, $ne: [] } }),
-                Giveaway.find({})
+                Giveaway.find({ ...visibleFilter, winners: { $exists: true, $ne: [] } }),
+                Giveaway.find(visibleFilter)
             ]);
             const totalWinners = giveawaysWithWinners.reduce((sum, giveaway) => {
                 return sum + (Array.isArray(giveaway.winners) ? giveaway.winners.length : 0);
@@ -436,7 +454,7 @@ const getPublicStats = async (req, res) => {
                 totalUsers: 0,
                 totalGiveaways: allGiveaways.length,
                 activeGiveaways,
-                completedGiveaways: 0,
+                completedGiveaways: showEnded ? allGiveaways.filter(g => g.endDate < now).length : 0,
                 totalWinners,
                 totalPrizeValue,
                 giveawaysWithWinners: giveawaysWithWinners.length,
@@ -457,13 +475,14 @@ const getPublicStats = async (req, res) => {
         ] = await Promise.all([
             Users.countDocuments({ isVerified: { $ne: false } }),
             Users.countDocuments({}),
-            Giveaway.countDocuments({}),
+            Giveaway.countDocuments(visibleFilter),
             Giveaway.countDocuments({
                 startDate: { $lte: now },
                 endDate: { $gte: now }
             }),
-            Giveaway.countDocuments({ endDate: { $lt: now } }),
+            showEnded ? Giveaway.countDocuments({ endDate: { $lt: now } }) : 0,
             Giveaway.aggregate([
+                { $match: visibleFilter },
                 {
                     $project: {
                         winnerCount: {
@@ -486,6 +505,7 @@ const getPublicStats = async (req, res) => {
                 }
             ]),
             Giveaway.aggregate([
+                { $match: visibleFilter },
                 {
                     $group: {
                         _id: null,
@@ -498,8 +518,9 @@ const getPublicStats = async (req, res) => {
         const totalWinners = winnerStats[0]?.totalWinners || 0;
         const giveawaysWithWinners = winnerStats[0]?.giveawaysWithWinners || 0;
         const totalPrizeValue = prizeStats[0]?.totalPrizeValue || 0;
-        const verifiedDrawRate = completedGiveaways > 0
-            ? Math.round((giveawaysWithWinners / completedGiveaways) * 100)
+        const completedDivisor = showEnded ? completedGiveaways : (await Giveaway.countDocuments({ endDate: { $lt: now } }));
+        const verifiedDrawRate = completedDivisor > 0
+            ? Math.round((giveawaysWithWinners / completedDivisor) * 100)
             : 0;
 
         return res.status(200).json({
@@ -521,6 +542,7 @@ const getPublicStats = async (req, res) => {
         return res.status(500).json({ error: true, msg: "Failed to fetch stats" });
     }
 }
+
 
 const clearParticipants = async (req, res) => {
     try {
@@ -552,6 +574,38 @@ const clearAllJoined = async (req, res) => {
     }
 }
 
+const getDbStatus = async (req, res) => {
+    try {
+        const [
+            usersCount,
+            giveawaysCount,
+            joinedCount,
+            adminCount,
+            bannedCount
+        ] = await Promise.all([
+            Users.countDocuments({}),
+            Giveaway.countDocuments({}),
+            JoinedGiveaway.countDocuments({}),
+            Admin.countDocuments({}),
+            Users.countDocuments({ isBanned: true })
+        ]);
+
+        return res.status(200).json({
+            error: false,
+            stats: {
+                users: usersCount,
+                giveaways: giveawaysCount,
+                entries: joinedCount,
+                admins: adminCount,
+                bannedUsers: bannedCount
+            }
+        });
+    } catch (error) {
+        console.error("DB Status Error:", error);
+        return res.status(500).json({ error: true, msg: "Failed to fetch DB status" });
+    }
+};
+
 module.exports = {
     register,
     login,
@@ -569,5 +623,7 @@ module.exports = {
     getPublicStats,
     clearParticipants,
     clearAllJoined,
-    changeAdminPassword
+    changeAdminPassword,
+    getDbStatus
 }
+

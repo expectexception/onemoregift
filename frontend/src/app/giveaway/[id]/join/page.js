@@ -13,6 +13,8 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
+import SearchableSelect from "@/app/components/SearchableSelect";
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -40,10 +42,11 @@ function Home() {
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
-  const [addressData, setAddressData] = useState({ line1: "", line2: "", country: "", countryCode: "", state: "", pincode: "" });
+  const [addressData, setAddressData] = useState({ name: "", phone: "", line1: "", line2: "", city: "", country: "", countryCode: "", state: "", pincode: "" });
+  const [enteredPersonalPhone, setEnteredPersonalPhone] = useState("");
   const [altchaLoaded, setAltchaLoaded] = useState(false);
 
-  const hasPhone = Boolean(user.phone && String(user.phone).trim());
+  const hasPhone = Boolean((user.phone && String(user.phone).trim()) || (enteredPersonalPhone && String(enteredPersonalPhone).trim()));
   const hasSavedAddress = Boolean(
     (Array.isArray(user.addresses) && user.addresses.length > 0) ||
     (user.address && String(user.address).trim())
@@ -72,7 +75,10 @@ function Home() {
 
   useEffect(() => {
     api.get("profile/", { meta: { auth: "user" } })
-      .then(({ data }) => setUser(data.myProfile))
+      .then(({ data }) => {
+        setUser(data.myProfile);
+        setEnteredPersonalPhone(data.myProfile.phone || "");
+      })
       .catch(console.error);
   }, []);
 
@@ -126,15 +132,20 @@ function Home() {
     if (addressSelection === "saved") {
       const savedAddresses = Array.isArray(user.addresses) ? user.addresses : [];
       const sel = savedAddresses[savedAddressIndex];
-      if (sel) return [sel.line1, sel.line2, sel.city, sel.state, sel.country, sel.postalCode].filter(Boolean).join(", ");
+      if (sel) return [sel.fullName || sel.name, sel.phone, sel.line1, sel.line2, sel.city, sel.state, sel.country, sel.postalCode].filter(Boolean).join(", ");
       return user.address || "";
     }
-    return [addressData.line1, addressData.line2, addressData.state, addressData.country, addressData.pincode].filter(Boolean).join(", ");
+    return [addressData.name, addressData.phone, addressData.line1, addressData.line2, addressData.city, addressData.state, addressData.country, addressData.pincode].filter(Boolean).join(", ");
   };
 
   const handleJoin = async () => {
-    if (!hasPhone) {
-      toast({ title: "Phone required", description: "Add mobile number to your profile first.", variant: "destructive" });
+    const activePhone = (user.phone || enteredPersonalPhone || "").replace(/\D/g, "").slice(0, 10);
+    if (!activePhone) {
+      toast({ title: "Phone required", description: "Mobile number is required to participate.", variant: "destructive" });
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(activePhone)) {
+      toast({ title: "Invalid Phone", description: "Phone number must be a valid 10-digit Indian number starting with 6-9.", variant: "destructive" });
       return;
     }
     const address = getSelectedAddress();
@@ -143,8 +154,12 @@ function Home() {
       return;
     }
     if (addressSelection === "new") {
-      if (!addressData.line1 || !addressData.country || !addressData.state || !addressData.pincode) {
-        toast({ title: "Incomplete address", description: "Fill in Address Line 1, Country, State, and Pincode.", variant: "destructive" });
+      if (!addressData.name.trim() || !addressData.phone.trim() || !addressData.line1.trim() || !addressData.city.trim() || !addressData.country.trim() || !addressData.state.trim() || !addressData.pincode.trim()) {
+        toast({ title: "Incomplete Address", description: "Please fill in all address fields marked with *.", variant: "destructive" });
+        return;
+      }
+      if (!/^[6-9]\d{9}$/.test(addressData.phone.replace(/\D/g, "").slice(0, 10))) {
+        toast({ title: "Invalid Phone", description: "Receiver phone must be a valid 10-digit Indian number starting with 6-9.", variant: "destructive" });
         return;
       }
     }
@@ -154,9 +169,40 @@ function Home() {
     }
     try {
       setIsSubmitting(true);
-      if (addressSelection === "new" && address && address !== (user.address || "")) {
-        await api.patch("profile/update", { address }, { meta: { auth: "user" } });
+      
+      const updates = {};
+      if (!user.phone && enteredPersonalPhone) {
+        updates.phone = activePhone;
       }
+      if (addressSelection === "new") {
+        const existingAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+        const updatedAddresses = existingAddresses.map(a => ({ ...a, isDefault: false }));
+        const newAddr = {
+          label: "Shipping Address",
+          fullName: addressData.name.trim(),
+          phone: addressData.phone.replace(/\D/g, "").slice(0, 10),
+          line1: addressData.line1.trim(),
+          line2: (addressData.line2 || "").trim(),
+          city: addressData.city.trim(),
+          state: addressData.state.trim(),
+          country: addressData.country.trim(),
+          countryCode: addressData.countryCode,
+          postalCode: addressData.pincode.trim(),
+          isDefault: true
+        };
+        updatedAddresses.push(newAddr);
+        updates.addresses = updatedAddresses;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        const { data: updateRes } = await api.patch("profile/update", updates, { meta: { auth: "user" } });
+        if (updateRes.error) {
+          toast({ title: "Error", description: updateRes.msg || "Failed to update profile.", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { data } = await api.post("giveaway/participate/" + giveawayId, {}, { meta: { auth: "user" } });
       if (!data.error) {
         setParticipated(true);
@@ -208,7 +254,7 @@ function Home() {
   );
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen bg-black p-4 overflow-hidden">
+    <div className="relative flex flex-col items-center justify-center min-h-screen bg-black p-4 py-12">
       {showCelebration && <CelebrationOverlay name={user.name} />}
 
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(220,38,38,0.08),transparent_60%)] pointer-events-none" />
@@ -237,24 +283,34 @@ function Home() {
                   Edit Profile
                 </button>
               </div>
-              {!hasPhone && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 text-xs flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>Mobile number required. Please update your profile before entering.</span>
+              {!user.phone || !String(user.phone).trim() ? (
+                <div className="space-y-2">
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>Mobile number is required to participate. Enter below:</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={enteredPersonalPhone}
+                    onChange={e => setEnteredPersonalPhone(e.target.value)}
+                    placeholder="Your Phone Number *"
+                    className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { label: "Name", value: user.name },
+                    { label: "Phone", value: user.phone },
+                    { label: "Email", value: user.email },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="premium-input px-3 py-2 rounded-xl">
+                      <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-0.5">{label}</p>
+                      <p className="text-white text-sm truncate">{value || <span className="text-neutral-500">Not set</span>}</p>
+                    </div>
+                  ))}
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {[
-                  { label: "Name", value: user.name },
-                  { label: "Phone", value: user.phone },
-                  { label: "Email", value: user.email },
-                ].map(({ label, value }) => (
-                  <div key={label} className="premium-input px-3 py-2 rounded-xl">
-                    <p className="text-[10px] text-neutral-500 uppercase tracking-wider mb-0.5">{label}</p>
-                    <p className="text-white text-sm truncate">{value || <span className="text-neutral-500">Not set</span>}</p>
-                  </div>
-                ))}
-              </div>
             </section>
 
             <div className="divider-gradient" />
@@ -295,19 +351,34 @@ function Home() {
 
               {addressSelection === "new" && (
                 <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" value={addressData.name} onChange={e => setAddressData({ ...addressData, name: e.target.value })} placeholder="Receiver Name *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
+                    <input type="tel" value={addressData.phone} onChange={e => setAddressData({ ...addressData, phone: e.target.value })} placeholder="Receiver Phone *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
+                  </div>
                   <input type="text" value={addressData.line1} onChange={e => setAddressData({ ...addressData, line1: e.target.value })} placeholder="Address Line 1 *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
                   <input type="text" value={addressData.line2} onChange={e => setAddressData({ ...addressData, line2: e.target.value })} placeholder="Address Line 2 (Optional)" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <select value={addressData.countryCode} onChange={e => { const c = countries.find(x => x.isoCode === e.target.value); setAddressData({ ...addressData, countryCode: e.target.value, country: c?.name || "", state: "" }); }} className="premium-input h-10 px-3 rounded-xl text-white bg-black text-sm">
-                      <option value="" disabled>Country *</option>
-                      {countries.map(c => <option key={c.isoCode} value={c.isoCode}>{c.name}</option>)}
-                    </select>
-                    <select value={addressData.state} onChange={e => setAddressData({ ...addressData, state: e.target.value })} disabled={!addressData.countryCode} className="premium-input h-10 px-3 rounded-xl text-white bg-black text-sm disabled:opacity-40">
-                      <option value="" disabled>State *</option>
-                      {states.map(s => <option key={s.isoCode} value={s.name}>{s.name}</option>)}
-                    </select>
+                  <div className="grid grid-cols-2 gap-2 relative">
+                    <SearchableSelect
+                      value={addressData.countryCode || ""}
+                      onChange={(val) => {
+                        const c = countries.find(x => x.isoCode === val);
+                        setAddressData({ ...addressData, countryCode: val, country: c?.name || "", state: "" });
+                      }}
+                      options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
+                      placeholder="Country *"
+                    />
+                    <SearchableSelect
+                      value={addressData.state || ""}
+                      onChange={(val) => setAddressData({ ...addressData, state: val })}
+                      options={states.map(s => ({ value: s.name, label: s.name }))}
+                      placeholder="State *"
+                      disabled={!addressData.countryCode}
+                    />
                   </div>
-                  <input type="text" value={addressData.pincode} onChange={e => setAddressData({ ...addressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" value={addressData.city} onChange={e => setAddressData({ ...addressData, city: e.target.value })} placeholder="City *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
+                    <input type="text" value={addressData.pincode} onChange={e => setAddressData({ ...addressData, pincode: e.target.value })} placeholder="Pincode / Zipcode *" className="premium-input w-full h-10 px-3 rounded-xl text-white placeholder:text-neutral-600 text-sm" />
+                  </div>
                 </div>
               )}
             </section>
@@ -341,64 +412,34 @@ function Home() {
 }
 
 function CelebrationOverlay({ name }) {
-  const sparkles = Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    left: 4 + i * 5.3,
-    delay: (i % 6) * 0.15,
-    dur: 1.5 + (i % 4) * 0.22,
-    size: i % 3 === 0 ? "w-5 h-5" : "w-3 h-3",
-  }));
-
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.22),transparent_55%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,185,129,0.06)_1px,transparent_1px),linear-gradient(rgba(16,185,129,0.06)_1px,transparent_1px)] bg-[size:40px_40px]" />
+    <div className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-md animate-[fadeIn_0.3s_ease-out_forwards]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.15),transparent_60%)]" />
 
-      {/* Orbit rings */}
-      <div className="absolute w-[480px] h-[480px] rounded-full border border-emerald-400/25 animate-[spin_22s_linear_infinite]">
-        {["#34d399","#fbbf24","#f59e0b","#ef4444","#a78bfa","#60a5fa"].map((color, i) => (
-          <span key={i} className="absolute w-2.5 h-2.5 rounded-full shadow-lg" style={{ top: `${[5,22,68,80,20,50][i]}%`, left: `${[50,85,83,18,15,95][i]}%`, backgroundColor: color, boxShadow: `0 0 12px ${color}` }} />
-        ))}
-      </div>
-      <div className="absolute w-[360px] h-[360px] rounded-full border border-rose-400/20 animate-[spin_32s_linear_infinite_reverse]" />
-      <div className="absolute w-[250px] h-[250px] rounded-full border border-amber-300/15" />
-
-      {/* Badge */}
-      <div className="relative flex flex-col items-center gap-4 animate-fade-up">
-        <div className="relative">
-          <div className="absolute inset-[-20px] rounded-full border border-emerald-300/50 animate-[ping_1.4s_ease-out_infinite]" />
-          <div className="absolute inset-[-36px] rounded-full border border-rose-300/30 animate-[ping_2s_ease-out_infinite]" />
-          <div className="animate-[bounce_2.5s_ease-in-out_infinite]">
-            <div className="w-36 h-36 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/10 border-2 border-emerald-400/60 flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.5)]">
-              <div className="text-center">
-                <div className="text-5xl mb-1">🎁</div>
-                <CheckCircle className="w-7 h-7 text-emerald-400 mx-auto" />
-              </div>
-            </div>
-          </div>
+      <div className="relative flex flex-col items-center max-w-sm w-[90%] p-8 bg-neutral-900/90 border border-white/10 rounded-2xl shadow-[0_25px_60px_-15px_rgba(220,38,38,0.3)] text-center animate-[scaleIn_0.4s_cubic-bezier(0.16,1,0.3,1)_forwards]">
+        <div className="w-20 h-20 rounded-full bg-red-600/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(220,38,38,0.2)]">
+          <Gift className="w-10 h-10 text-red-500 animate-[pulse_2s_infinite]" />
         </div>
 
-        <div className="text-center space-y-1.5 px-6">
-          <p className="text-white font-bold text-2xl tracking-tight">You&apos;re In!</p>
-          {name && <p className="text-emerald-300 font-medium text-base">Good luck, {name.split(" ")[0]}! 🤞</p>}
-          <p className="text-emerald-100/80 text-sm">Entry confirmed · Winner notified by email</p>
-          <p className="text-neutral-400 text-xs mt-2 animate-pulse">Redirecting to thank-you page...</p>
+        <h2 className="text-white font-extrabold text-2xl tracking-tight mb-2">You&apos;re In! 🎉</h2>
+        {name && <p className="text-red-400 font-semibold text-base mb-1">Good luck, {name.split(" ")[0]}! 🤞</p>}
+        <p className="text-neutral-400 text-sm leading-relaxed mb-6">Your entry is sealed. We will notify you by email if you win.</p>
+        
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+          <span>Redirecting...</span>
         </div>
       </div>
-
-      {/* Sparkles */}
-      {sparkles.map(s => (
-        <div key={s.id} className="absolute" style={{ left: `${s.left}%`, bottom: "12%", animation: `sparkle-rise ${s.dur}s ease-out ${s.delay}s infinite` }}>
-          <Sparkles className={`${s.size} text-emerald-200/80`} />
-        </div>
-      ))}
 
       <style>{`
-        @keyframes sparkle-rise {
-          0% { transform: translateY(0) scale(0.7) rotate(0deg); opacity: 0; }
-          15% { opacity: 1; }
-          100% { transform: translateY(-140px) scale(1.2) rotate(130deg); opacity: 0; }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
         }
       `}</style>
     </div>
