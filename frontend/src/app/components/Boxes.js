@@ -253,6 +253,15 @@ export default function Giveaways() {
                 };
                 updatedAddresses.push(newAddr);
                 updates.addresses = updatedAddresses;
+            } else if (addressSelection === "saved") {
+                const existingAddresses = Array.isArray(profile?.addresses) ? profile.addresses : [];
+                if (existingAddresses.length > 0 && savedAddressIndex >= 0 && savedAddressIndex < existingAddresses.length) {
+                    const updatedAddresses = existingAddresses.map((a, i) => ({
+                        ...a,
+                        isDefault: i === savedAddressIndex
+                    }));
+                    updates.addresses = updatedAddresses;
+                }
             }
 
             if (Object.keys(updates).length > 0) {
@@ -480,7 +489,7 @@ export default function Giveaways() {
                             </div>
 
                             {/* Shipping Address */}
-                            <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-3 sm:p-4 relative overflow-hidden group">
+                            <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-3 sm:p-4 relative group">
                                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/[0.02] rounded-full blur-2xl group-hover:bg-white/[0.04] transition-colors pointer-events-none" />
                                 <div className="flex items-center justify-between gap-2 mb-3 relative z-10">
                                     <div className="flex items-center gap-2 text-neutral-200 text-xs sm:text-sm font-semibold">
@@ -505,6 +514,7 @@ export default function Giveaways() {
                                                     label: (a.label || "Address " + (i + 1)) + (a.isDefault ? " (Default)" : "")
                                                 }))}
                                                 placeholder="Select Saved Address"
+                                                usePortal={false}
                                             />
                                             <div className="bg-black/40 border border-white/5 px-3 py-2.5 rounded-xl text-neutral-300 text-xs leading-relaxed">
                                                 {[profile.addresses[savedAddressIndex]?.line1, profile.addresses[savedAddressIndex]?.line2, profile.addresses[savedAddressIndex]?.city, profile.addresses[savedAddressIndex]?.state, profile.addresses[savedAddressIndex]?.country, profile.addresses[savedAddressIndex]?.postalCode].filter(Boolean).join(", ")}

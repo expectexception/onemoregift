@@ -204,6 +204,15 @@ function Home() {
         };
         updatedAddresses.push(newAddr);
         updates.addresses = updatedAddresses;
+      } else if (addressSelection === "saved") {
+        const existingAddresses = Array.isArray(user.addresses) ? user.addresses : [];
+        if (existingAddresses.length > 0 && savedAddressIndex >= 0 && savedAddressIndex < existingAddresses.length) {
+          const updatedAddresses = existingAddresses.map((a, i) => ({
+            ...a,
+            isDefault: i === savedAddressIndex
+          }));
+          updates.addresses = updatedAddresses;
+        }
       }
 
       if (Object.keys(updates).length > 0) {
