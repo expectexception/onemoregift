@@ -29,8 +29,9 @@ import { TimePicker } from "@/app/components/TimePicker";
 import dayjs from "@/app/utils/dayjs";
 import { useRouter } from "next/navigation";
 
-function Page({ params }) {
-    const slug = use(params).id;
+function EditGiveaway({ params }) {
+    const resolvedParams = use(params);
+    const slug = resolvedParams.id;
     const router = useRouter();
     const [giveaway, setGiveaway] = useState({});
     const [title, setTitle] = useState("");
@@ -469,4 +470,4 @@ const StatusPill = ({ icon: Icon, label, value, tone = "good" }) => {
     );
 };
 
-export default withAdminAuth(Page);
+export default withAdminAuth(EditGiveaway);
