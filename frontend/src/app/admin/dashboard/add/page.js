@@ -37,15 +37,15 @@ import { compressImage } from "@/app/utils/imageCompressor";
 import dayjs from "@/app/utils/dayjs";
 
 function AddGiveawayPage() {
-    let [title, setTitle] = useState("");
-    let [description, setDescription] = useState("");
-    let [image, setImage] = useState("");
-    let [startDate, setStartDate] = useState("");
-    let [endDate, setendDate] = useState("");
-    let [startTime, setStartTime] = useState("");
-    let [endTime, setEndTime] = useState("");
-    let [uploadProgress, setUploadProgress] = useState(null);
-    let [localPreviewUrl, setLocalPreviewUrl] = useState("");
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    const [image, setImage] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setendDate] = useState("");
+    const [startTime, setStartTime] = useState("");
+    const [endTime, setEndTime] = useState("");
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const [localPreviewUrl, setLocalPreviewUrl] = useState("");
     useEffect(() => {
         // Only revoke on unmount, not on every change — avoids StrictMode double-invoke bug
         return () => {
@@ -53,10 +53,10 @@ function AddGiveawayPage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    let [winnerCount, setwinnerCount] = useState("");
-    let [maxParticipants, setMaxParticipants] = useState("");
-    let [prize, setPrize] = useState("");
-    let [prizeValue, setPrizeValue] = useState("");
+    const [winnerCount, setwinnerCount] = useState("");
+    const [maxParticipants, setMaxParticipants] = useState("");
+    const [prize, setPrize] = useState("");
+    const [prizeValue, setPrizeValue] = useState("");
     const { toast } = useToast();
     const router = useRouter();
     const { logoutAdmin } = useAuth();
@@ -70,7 +70,7 @@ function AddGiveawayPage() {
     const hasValidStartDate = startAt && !startAt.isBefore(nowIst);
     const hasValidCounts = winnerTotal > 0 && participantCap > 0 && winnerTotal <= participantCap;
     const canSubmit = title && description && startDate && startTime && endDate && endTime && prize && prizeValue && hasValidCounts && hasValidTimeline && hasValidStartDate;
-    let uploadImage = async (imageFile) => {
+    const uploadImage = async (imageFile) => {
         if (!imageFile) return;
         try {
             setUploadProgress(0);
@@ -78,9 +78,9 @@ function AddGiveawayPage() {
             setLocalPreviewUrl(previewUrl);
 
             const compressed = await compressImage(imageFile, 1600, 1600, 0.85, 1.5 * 1024 * 1024);
-            let form = new FormData();
+            const form = new FormData();
             form.append("image", compressed || imageFile)
-            let { data } = await api.post(`upload`, form, {
+            const { data } = await api.post(`upload`, form, {
                 meta: { auth: "admin" },
                 onUploadProgress: (progressEvent) => {
                     if (progressEvent.total) {
@@ -127,7 +127,7 @@ function AddGiveawayPage() {
         }
     }
 
-    let handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!hasValidStartDate) {
             toast({ title: "Invalid start time", variant: "destructive", description: "Start date and time cannot be in the past (IST)." });
@@ -142,7 +142,7 @@ function AddGiveawayPage() {
             return;
         }
         try {
-            let formdata = {
+            const formdata = {
                 title: title,
                 description: description,
                 image: image || "/images/gift.png",

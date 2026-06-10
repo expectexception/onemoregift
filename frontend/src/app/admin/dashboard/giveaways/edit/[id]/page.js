@@ -41,10 +41,10 @@ function Page({ params }) {
     const [endDate, setEndDate] = useState("");
     const [endTime, setEndTime] = useState("");
     const [winnerCount, setWinnerCount] = useState("");
-    let [maxParticipants, setMaxParticipants] = useState("");
+    const [maxParticipants, setMaxParticipants] = useState("");
     const [prize, setPrize] = useState("");
     const [prizeValue, setPrizeValue] = useState("");
-    let [uploadProgress, setUploadProgress] = useState(null);
+    const [uploadProgress, setUploadProgress] = useState(null);
     const { toast } = useToast();
     const winnerTotal = Number(winnerCount || 0);
     const participantCap = Number(maxParticipants || 0);
@@ -103,14 +103,14 @@ function Page({ params }) {
     }, [slug]);
 
     // Handle image upload
-    let uploadImage = async (imageFile) => {
+    const uploadImage = async (imageFile) => {
         if (!imageFile) return;
         try {
             setUploadProgress(0);
             const compressed = await compressImage(imageFile, 1200, 1200, 0.85);
-            let form = new FormData();
+            const form = new FormData();
             form.append("image", compressed || imageFile)
-            let { data } = await api.post(`upload`, form, {
+            const { data } = await api.post(`upload`, form, {
                 meta: { auth: "admin" },
                 onUploadProgress: (progressEvent) => {
                     if (progressEvent.total) {
