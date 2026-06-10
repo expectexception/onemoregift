@@ -60,6 +60,8 @@ export default function GiveawayDetails({ data }) {
     const router = useRouter();
     const path = usePathname();
     const formatStr = "DD MMM YYYY, hh:mm A";
+    const isAdminPath = path.includes("/admin/dashboard/giveaways/");
+    const nowIst = dayjs().tz("Asia/Kolkata");
 
     const { user } = useAuth();
     const [localGiveaway, setLocalGiveaway] = useState(data || {});
@@ -178,8 +180,6 @@ export default function GiveawayDetails({ data }) {
         return () => clearInterval(timer);
     }, [endDate, isPaused]);
 
-    const nowIst = dayjs().tz("Asia/Kolkata");
-    const isAdminPath = path.includes("/admin/dashboard/giveaways/");
     const isTestEvent = title?.startsWith("LIFECYCLE-TEST-") || title?.startsWith("TEST-");
     const hasStarted = startDate ? !nowIst.isBefore(dayjs(startDate).tz("Asia/Kolkata")) : true;
     const hasEnded = (endDate ? !nowIst.isBefore(dayjs(endDate).tz("Asia/Kolkata")) : false) || (isAdminPath && isTestEvent);
