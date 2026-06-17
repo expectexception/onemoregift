@@ -8,6 +8,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const sharp = require('sharp');
 const isAdmin = require('../middleware/isAdmin');
+const isAuth = require('../middleware/isAuth');
 const ImageStore = require('../model/ImageStore');
 require('dotenv').config();
 
@@ -195,6 +196,43 @@ router.post('/multiple', isAdmin, upload.array('images', 10), async (req, res) =
         const results = await Promise.all(req.files.map(save));
         const urls = results.map(r => r.url);
 
+        return res.status(200).json({ error: false, urls, storage: IMAGE_STORAGE });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: 'Upload failed: ' + error.message });
+    }
+});
+
+// Upload single image for authenticated users
+router.post('/user', isAuth, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: true, msg: 'No valid image file provided' });
+        if (!hasAllowedSignature(req.file.buffer, req.file.mimetype)) {
+            return res.status(400).json({ error: true, msg: 'Uploaded file is not a valid image' });
+        }
+        const result = IMAGE_STORAGE === 'mongodb' ? await saveToMongo(req.file) : await saveToDisk(req.file);
+        return res.status(200).json({
+            error: false,
+            url: result.url,
+            filename: result.filename,
+            storage: IMAGE_STORAGE,
+            originalSize: result.originalSize,
+            compressedSize: result.size,
+        });
+    } catch (error) {
+        return res.status(500).json({ error: true, msg: 'File upload failed: ' + error.message });
+    }
+});
+
+// Upload multiple images for authenticated users
+router.post('/user-multiple', isAuth, upload.array('images', 10), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0)
+            return res.status(400).json({ error: true, msg: 'No valid image files provided' });
+        const invalid = req.files.find(f => !hasAllowedSignature(f.buffer, f.mimetype));
+        if (invalid) return res.status(400).json({ error: true, msg: 'One or more files are not valid images' });
+        const save = IMAGE_STORAGE === 'mongodb' ? saveToMongo : saveToDisk;
+        const results = await Promise.all(req.files.map(save));
+        const urls = results.map(r => r.url);
         return res.status(200).json({ error: false, urls, storage: IMAGE_STORAGE });
     } catch (error) {
         return res.status(500).json({ error: true, msg: 'Upload failed: ' + error.message });

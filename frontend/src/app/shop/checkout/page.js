@@ -1,0 +1,489 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/app/utils/apiClient";
+import Navbar from "@/app/components/Navbar";
+import Footer from "@/app/components/Footer";
+import { useAuth } from "@/app/context/AuthContext";
+import { 
+    ShoppingBag, 
+    MapPin, 
+    Calendar, 
+    Clock, 
+    FileText, 
+    CreditCard, 
+    ShieldCheck, 
+    AlertTriangle,
+    X,
+    CheckCircle2,
+    Lock
+} from "lucide-react";
+
+export default function CheckoutPage() {
+    const router = useRouter();
+    const { user, userAuthenticated, loadingUser } = useAuth();
+
+    // Cart State
+    const [cart, setCart] = useState([]);
+    
+    // Store State
+    const [stores, setStores] = useState([]);
+    const [loadingStores, setLoadingStores] = useState(true);
+
+    // Form fields
+    const [selectedStoreId, setSelectedStoreId] = useState("");
+    const [pickupDate, setPickupDate] = useState("");
+    const [pickupTime, setPickupTime] = useState("");
+    const [customerNote, setCustomerNote] = useState("");
+
+    // Checkout Flow States
+    const [submitting, setSubmitting] = useState(false);
+    const [errorMsg, setErrorMsg] = useState("");
+    const [createdOrder, setCreatedOrder] = useState(null);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+    const [paymentSuccessStatus, setPaymentSuccessStatus] = useState(null); // 'success' or 'failed'
+
+    // Load Cart and Stores
+    useEffect(() => {
+        const storedCart = localStorage.getItem("omg_cart");
+        if (storedCart) {
+            try {
+                setCart(JSON.parse(storedCart));
+            } catch (e) {
+                setCart([]);
+            }
+        }
+
+        const fetchStores = async () => {
+            try {
+                const { data } = await api.get("shop/stores");
+                if (!data.error) {
+                    // Filter only active stores
+                    const activeStores = (data.data || []).filter(s => s.isActive);
+                    setStores(activeStores);
+                }
+            } catch (err) {
+                console.error("Failed to load stores:", err);
+            } finally {
+                setLoadingStores(false);
+            }
+        };
+
+        fetchStores();
+    }, []);
+
+    // Redirect or guard
+    if (loadingUser) {
+        return (
+            <div className="min-h-screen bg-black text-white flex flex-col justify-between">
+                <Navbar />
+                <div className="flex-grow flex items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <Footer />
+            </div>
+        );
+    }
+
+    if (!userAuthenticated) {
+        return (
+            <div className="min-h-screen bg-black text-white flex flex-col justify-between">
+                <Navbar />
+                <div className="flex-grow flex items-center justify-center p-6">
+                    <div className="max-w-md w-full bg-neutral-950 border border-neutral-900 rounded-3xl p-8 text-center space-y-6">
+                        <div className="w-16 h-16 bg-red-950/30 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
+                            <Lock className="w-8 h-8" />
+                        </div>
+                        <h2 className="text-2xl font-bold">Secure Checkout</h2>
+                        <p className="text-neutral-500 text-sm">
+                            Please sign in or register to complete your order, track scheduled pickups, and get verification codes.
+                        </p>
+                        <button
+                            onClick={() => router.push("/login?redirect=/shop/checkout")}
+                            className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                        >
+                            Sign In to Account
+                        </button>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
+
+    const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+    const handleSubmitOrder = async (e) => {
+        e.preventDefault();
+        setErrorMsg("");
+
+        if (cart.length === 0) {
+            setErrorMsg("Your cart is empty.");
+            return;
+        }
+
+        if (!selectedStoreId) {
+            setErrorMsg("Please select a physical store location for pickup.");
+            return;
+        }
+
+        if (!pickupDate || !pickupTime) {
+            setErrorMsg("Please schedule a pickup date and time.");
+            return;
+        }
+
+        // Validate date must be today or future
+        const chosenDateTime = new Date(`${pickupDate}T${pickupTime}`);
+        if (chosenDateTime < new Date()) {
+            setErrorMsg("Pickup date and time cannot be in the past.");
+            return;
+        }
+
+        setSubmitting(true);
+
+        try {
+            const payload = {
+                items: cart.map(item => ({
+                    productId: item.productId,
+                    variantId: item.variant ? item.variant._id : undefined,
+                    quantity: item.quantity
+                })),
+                pickupStoreId: selectedStoreId,
+                scheduledPickupTime: chosenDateTime.toISOString(),
+                customerNote
+            };
+
+            const { data } = await api.post("shop/orders", payload, {
+                meta: { auth: "user" }
+            });
+
+            if (!data.error && data.data) {
+                setCreatedOrder(data.data);
+                setPaymentModalOpen(true);
+            } else {
+                setErrorMsg(data.msg || "Failed to submit order. Please check item stock.");
+            }
+        } catch (err) {
+            console.error(err);
+            setErrorMsg(err.response?.data?.msg || "Failed to create order. Please try again.");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // Simulate Payment
+    const handleSimulatePayment = async (success) => {
+        if (!createdOrder) return;
+        setPaymentProcessing(true);
+        setErrorMsg("");
+
+        try {
+            const { data } = await api.post("shop/orders/simulate-payment", {
+                orderId: createdOrder._id,
+                success
+            }, {
+                meta: { auth: "user" }
+            });
+
+            if (!data.error) {
+                setPaymentSuccessStatus(success ? 'success' : 'failed');
+                if (success) {
+                    // Empty Cart on success
+                    localStorage.removeItem("omg_cart");
+                    setCart([]);
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        setPaymentModalOpen(false);
+                        router.push("/shop/orders");
+                    }, 2000);
+                } else {
+                    // On failure, close modal and show error so they can retry payment later
+                    setTimeout(() => {
+                        setPaymentModalOpen(false);
+                        setErrorMsg("Payment simulation failed. Order is in pending status. You can pay from your orders page.");
+                    }, 1500);
+                }
+            } else {
+                setErrorMsg("Simulation API failed.");
+                setPaymentModalOpen(false);
+            }
+        } catch (err) {
+            console.error(err);
+            setErrorMsg("Payment processing error.");
+            setPaymentModalOpen(false);
+        } finally {
+            setPaymentProcessing(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-black text-white flex flex-col relative overflow-hidden">
+            {/* Background Gradients */}
+            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-red-900/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-red-900/5 rounded-full blur-[150px] pointer-events-none" />
+
+            <Navbar />
+
+            <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-28 relative z-10">
+                <div className="mb-10">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Secure Checkout</h1>
+                    <p className="text-neutral-400 text-sm">Review your selections, select your pickup hub, and pay securely.</p>
+                </div>
+
+                {errorMsg && (
+                    <div className="p-4 rounded-xl bg-red-950/30 border border-red-500/20 text-red-400 text-xs flex gap-3 items-center mb-8">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <span>{errorMsg}</span>
+                    </div>
+                )}
+
+                {cart.length === 0 ? (
+                    <div className="text-center py-20 border border-dashed border-neutral-800 rounded-3xl bg-neutral-950/20">
+                        <ShoppingBag className="w-12 h-12 text-neutral-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-neutral-300">Your cart is empty</h3>
+                        <p className="text-neutral-500 text-sm mt-1 mb-6">Choose from our exquisite collection first.</p>
+                        <button
+                            onClick={() => router.push("/shop")}
+                            className="px-6 py-3 bg-neutral-900 border border-neutral-800 hover:bg-neutral-850 rounded-xl text-xs uppercase tracking-widest font-bold text-white transition-colors cursor-pointer"
+                        >
+                            Explore Shop
+                        </button>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        {/* Form Column */}
+                        <div className="lg:col-span-7 space-y-6">
+                            {/* 1. Pickup Store Selector */}
+                            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-950 border border-neutral-900 space-y-6">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <MapPin className="w-5 h-5 text-red-500" />
+                                    1. Choose Store Location
+                                </h3>
+
+                                {loadingStores ? (
+                                    <div className="py-6 flex items-center justify-center">
+                                        <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : stores.length === 0 ? (
+                                    <p className="text-neutral-500 text-xs">No active store locations available. Please contact admin support.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {stores.map((store) => (
+                                            <label 
+                                                key={store._id}
+                                                className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
+                                                    selectedStoreId === store._id 
+                                                        ? "bg-red-950/10 border-red-600" 
+                                                        : "bg-neutral-900/20 border-neutral-850 hover:border-neutral-700"
+                                                }`}
+                                            >
+                                                <div className="flex gap-3 items-start">
+                                                    <input
+                                                        type="radio"
+                                                        name="pickupStore"
+                                                        value={store._id}
+                                                        checked={selectedStoreId === store._id}
+                                                        onChange={() => setSelectedStoreId(store._id)}
+                                                        className="mt-1 accent-red-600 cursor-pointer"
+                                                    />
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-white">{store.name}</h4>
+                                                        <p className="text-xs text-neutral-400 mt-1">{store.address}, {store.city}</p>
+                                                        {store.operatingHours && (
+                                                            <p className="text-[10px] text-neutral-500 mt-0.5">Hours: {store.operatingHours}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Schedule Pickup Time */}
+                            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-950 border border-neutral-900 space-y-6">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-red-500" />
+                                    2. Schedule Collection Time
+                                </h3>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-neutral-400 mb-2 uppercase tracking-wider">Pickup Date</label>
+                                        <input
+                                            type="date"
+                                            value={pickupDate}
+                                            min={new Date().toISOString().split("T")[0]}
+                                            onChange={(e) => setPickupDate(e.target.value)}
+                                            required
+                                            className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-neutral-400 mb-2 uppercase tracking-wider">Estimated Time</label>
+                                        <input
+                                            type="time"
+                                            value={pickupTime}
+                                            onChange={(e) => setPickupTime(e.target.value)}
+                                            required
+                                            className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Customer Note */}
+                            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-950 border border-neutral-900 space-y-6">
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-red-500" />
+                                    3. Special Instructions (Optional)
+                                </h3>
+
+                                <textarea
+                                    placeholder="Add any specific instructions for store manager..."
+                                    value={customerNote}
+                                    onChange={(e) => setCustomerNote(e.target.value)}
+                                    rows={3}
+                                    className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-4 text-sm focus:outline-none focus:border-red-600 transition-colors resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Summary Column */}
+                        <div className="lg:col-span-5 space-y-6">
+                            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-950 border border-neutral-900 space-y-6">
+                                <h3 className="text-base font-bold text-white pb-4 border-b border-neutral-900">Order Summary</h3>
+
+                                <div className="space-y-4 max-h-[280px] overflow-y-auto pr-1">
+                                    {cart.map((item) => (
+                                        <div key={item.cartKey} className="flex justify-between items-start gap-4">
+                                            <div className="flex gap-3 items-start">
+                                                <div className="w-12 h-12 bg-neutral-900 rounded-lg overflow-hidden border border-neutral-850 flex-shrink-0">
+                                                    {item.image ? (
+                                                        <img 
+                                                            src={item.image.startsWith('http') ? item.image : `http://localhost:9000${item.image}`} 
+                                                            alt={item.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-neutral-700 bg-neutral-900">
+                                                            <ShoppingBag className="w-4 h-4" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-white line-clamp-1">{item.name}</h4>
+                                                    <p className="text-[10px] text-neutral-500 mt-0.5">
+                                                        Qty: {item.quantity} {item.variant && `| Option: ${item.variant.name}`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs font-bold text-neutral-300">₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-3 pt-4 border-t border-neutral-905">
+                                    <div className="flex justify-between text-xs text-neutral-400">
+                                        <span>Items count</span>
+                                        <span>{cartCount} units</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-neutral-400">
+                                        <span>Tax & Coordination</span>
+                                        <span className="text-emerald-500">FREE</span>
+                                    </div>
+                                    <div className="flex justify-between items-baseline pt-2 border-t border-neutral-900">
+                                        <span className="text-sm font-bold text-white">Total Amount</span>
+                                        <span className="text-xl font-extrabold text-red-500">₹{subtotal.toLocaleString("en-IN")}</span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    {submitting ? "Placing Order..." : "Place Order & Pay"}
+                                </button>
+
+                                <div className="flex justify-center items-center gap-1.5 text-[10px] text-neutral-500">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                    SSL Secured Checkout Sandbox
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                )}
+            </main>
+
+            <Footer />
+
+            {/* Sandbox Payment Simulator Modal */}
+            {paymentModalOpen && createdOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+
+                    {/* Modal Content */}
+                    <div className="bg-neutral-950 border border-neutral-800 rounded-3xl max-w-md w-full p-8 relative z-10 text-center space-y-6 shadow-2xl animate-scale-in">
+                        <div className="w-12 h-12 bg-red-950/30 border border-red-500/20 text-red-500 rounded-xl flex items-center justify-center mx-auto">
+                            <CreditCard className="w-6 h-6" />
+                        </div>
+
+                        <div>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/30">
+                                Sandbox Gateway
+                            </span>
+                            <h3 className="text-xl font-bold mt-3 text-white">Simulate Payment</h3>
+                            <p className="text-xs text-neutral-400 mt-1">
+                                Order ID: <span className="font-mono text-neutral-200">{createdOrder.orderSerialNumber || createdOrder._id}</span>
+                            </p>
+                        </div>
+
+                        <div className="py-4 border-y border-neutral-900 my-2 space-y-1.5">
+                            <p className="text-xs text-neutral-500">Amount Payable</p>
+                            <p className="text-3xl font-extrabold text-white">₹{createdOrder.total.toLocaleString("en-IN")}</p>
+                        </div>
+
+                        {paymentSuccessStatus === 'success' ? (
+                            <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 text-xs flex gap-3 items-center justify-center animate-pulse">
+                                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                                <span className="font-bold">Payment Approved! Redirecting...</span>
+                            </div>
+                        ) : paymentSuccessStatus === 'failed' ? (
+                            <div className="p-4 rounded-xl bg-red-950/30 border border-red-500/20 text-red-400 text-xs flex gap-3 items-center justify-center">
+                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                                <span className="font-bold">Payment Simulation Refused.</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => handleSimulatePayment(true)}
+                                    disabled={paymentProcessing}
+                                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
+                                >
+                                    {paymentProcessing ? "Authorizing..." : "Simulate Success (Pay)"}
+                                </button>
+                                <button
+                                    onClick={() => handleSimulatePayment(false)}
+                                    disabled={paymentProcessing}
+                                    className="w-full py-3 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
+                                >
+                                    Simulate Failure
+                                </button>
+                            </div>
+                        )}
+                        
+                        <p className="text-[10px] text-neutral-500">
+                            This is a secure local playground simulation. No real money will be charged.
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

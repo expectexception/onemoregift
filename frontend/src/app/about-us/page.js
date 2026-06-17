@@ -76,7 +76,7 @@ export default function AboutUs() {
                         <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.registeredUsers} suffix="" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
                         <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.activeGiveaways} suffix="" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
                         <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.totalWinners} suffix="" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
-                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.verifiedDrawRate} suffix="%" label="Verified Draw Rate" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
+                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.totalPrizeValue} prefix="₹" suffix="+" label="Total Prize Value" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
                     </div>
                 </div>
             </section>
@@ -207,7 +207,7 @@ function ValueCard({ icon, title, description, delay }) {
     );
 }
 
-function StatCounter({ icon, target, suffix, label, color, startWhen }) {
+function StatCounter({ icon, target, prefix = "", suffix = "", label, color, startWhen }) {
     const count = useCountUp(target, 1800, startWhen);
     return (
         <div className="premium-card rounded-2xl p-5 border border-white/[0.08] bg-black/45 backdrop-blur-md hover:border-white/[0.16] transition-all duration-300 group">
@@ -218,7 +218,7 @@ function StatCounter({ icon, target, suffix, label, color, startWhen }) {
                 <span className="text-[10px] uppercase tracking-wider text-neutral-500">Live</span>
             </div>
             <div className={`text-3xl md:text-4xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-br ${color}`}>
-                {startWhen ? count.toLocaleString() : "0"}{suffix}
+                {prefix}{startWhen ? count.toLocaleString() : "0"}{suffix}
             </div>
             <div className="mt-2 text-xs md:text-sm text-neutral-400 font-medium uppercase tracking-wide">{label}</div>
         </div>

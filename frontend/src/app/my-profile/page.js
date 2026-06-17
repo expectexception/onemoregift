@@ -93,6 +93,9 @@ function HomePage() {
                             <Button className="w-full btn-gradient rounded-xl h-11 font-medium mt-6" onClick={() => router.push("/my-profile/edit")}>
                                 <Pencil size={18} className="mr-2" /> Edit Profile
                             </Button>
+                            <Button className="w-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-850 rounded-xl h-11 font-medium mt-3 text-neutral-300" onClick={() => router.push("/shop/orders")}>
+                                <Gift size={18} className="mr-2" /> My Shop Orders
+                            </Button>
                         </div>
 
                         <div className="premium-card rounded-2xl p-6 lg:col-span-2">

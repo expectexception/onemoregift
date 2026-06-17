@@ -21,7 +21,11 @@ function createApp() {
     .map((origin) => origin.trim())
     .filter(Boolean);
   const isProd = process.env.NODE_ENV === "production";
-  const devOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+  const devOrigins = [
+    "http://localhost:3000", "http://127.0.0.1:3000",
+    "http://localhost:3001", "http://127.0.0.1:3001",
+    "http://localhost:3002", "http://127.0.0.1:3002"
+  ];
   const allowedOrigins = isProd
     ? configuredOrigins
     : Array.from(new Set([...configuredOrigins, ...devOrigins]));
@@ -76,6 +80,21 @@ function createApp() {
   app.use('/api/v1/upload', upload);
   app.use('/api/v1/profile', profile);
   app.use('/api/v1/config', configRoute);
+
+  // ── New module routes ───────────────────────────────────────────────────────
+  app.use('/api/v1/admin/surprise', require('./routes/surpriseAdmin'));
+  app.use('/api/v1/admin/moments', require('./routes/momentsAdmin'));
+  app.use('/api/v1/admin/products', require('./routes/productsAdmin'));
+  app.use('/api/v1/admin/orders', require('./routes/ordersAdmin'));
+  app.use('/api/v1/admin/stores', require('./routes/storesAdmin'));
+  app.use('/api/v1/admin/gifts', require('./routes/giftsAdmin'));
+  app.use('/api/v1/admin/audit-logs', require('./routes/auditLogsAdmin'));
+  app.use('/api/v1/admin/roles', require('./routes/rolesAdmin'));
+
+  // User facing surprise and moments
+  app.use('/api/v1/surprise', require('./routes/surprise'));
+  app.use('/api/v1/happy-moment', require('./routes/happyMoment'));
+  app.use('/api/v1/shop', require('./routes/shop'));
 
 
   app.get('/api/v1/health', (req, res) => {

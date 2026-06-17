@@ -3,10 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Nav } from "@/components/ui/nav";
-import {
-    ChevronRight,
-    ChevronLeft
-} from "lucide-react";
+import { ChevronRight, ChevronLeft, Gift, ShoppingBag, Heart, Package, Store, Star, ClipboardList, Shield, BarChart3, FileText } from "lucide-react";
 import { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon } from "./SVGIcons";
 import TrophyIcon from "./SVGIcons/TrophyIcon";
 import SettingsIcon from "./SVGIcons/SettingsIcon";
@@ -33,6 +30,7 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
     }
 
     const navLinks = [
+        // ── Core ─────────────────────────────────────────────────────────────
         {
             title: "Dashboard",
             href: "/admin/dashboard",
@@ -45,6 +43,8 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
             icon: UsersIcon,
             variant: "ghost"
         },
+
+        // ── Giveaways ────────────────────────────────────────────────────────
         {
             title: "Giveaways",
             href: "/admin/dashboard/giveaways",
@@ -63,6 +63,68 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
             icon: TrophyIcon,
             variant: "ghost"
         },
+
+        // ── Surprise Me ──────────────────────────────────────────────────────
+        {
+            title: "Surprise Requests",
+            href: "/admin/dashboard/surprise",
+            icon: Gift,
+            variant: "ghost"
+        },
+        {
+            title: "Happy Moments",
+            href: "/admin/dashboard/moments",
+            icon: Heart,
+            variant: "ghost"
+        },
+        {
+            title: "Gifts",
+            href: "/admin/dashboard/gifts",
+            icon: Star,
+            variant: "ghost"
+        },
+
+        // ── Shop ─────────────────────────────────────────────────────────────
+        {
+            title: "Products",
+            href: "/admin/dashboard/products",
+            icon: ShoppingBag,
+            variant: "ghost"
+        },
+        {
+            title: "Orders",
+            href: "/admin/dashboard/orders",
+            icon: Package,
+            variant: "ghost"
+        },
+        {
+            title: "Stores",
+            href: "/admin/dashboard/stores",
+            icon: Store,
+            variant: "ghost"
+        },
+
+        // ── Admin ────────────────────────────────────────────────────────────
+        {
+            title: "Reports",
+            href: "/admin/dashboard/reports",
+            icon: BarChart3,
+            variant: "ghost"
+        },
+        {
+            title: "Roles & Access",
+            href: "/admin/dashboard/roles",
+            icon: Shield,
+            variant: "ghost"
+        },
+        {
+            title: "Audit Logs",
+            href: "/admin/dashboard/audit-logs",
+            icon: FileText,
+            variant: "ghost"
+        },
+
+        // ── System ───────────────────────────────────────────────────────────
         {
             title: "Settings",
             href: "/admin/dashboard/settings",

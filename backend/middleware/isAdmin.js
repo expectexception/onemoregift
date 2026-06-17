@@ -1,6 +1,7 @@
 'use strict';
 
 const jwt = require("jsonwebtoken");
+const Admin = require("../model/Admin");
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Feature flag: comma-separated list of admin emails allowed to access panel.
@@ -10,7 +11,7 @@ const ADMIN_EMAIL_WHITELIST = (process.env.ADMIN_EMAIL_WHITELIST || "")
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
 
-const isAdmin = (req, res, next) => {
+const isAdmin = async (req, res, next) => {
     const authHeader = req.header("Authorization");
     const cookieToken = req.cookies?.admin_token;
     const cleanToken = authHeader?.startsWith("Bearer ")
@@ -29,7 +30,7 @@ const isAdmin = (req, res, next) => {
             return res.status(401).json({ error: true, msg: "Access denied. Please authenticate using a valid token." });
         }
 
-        // Email whitelist check — instant lockout without changing passwords
+        // Email whitelist check
         if (ADMIN_EMAIL_WHITELIST.length > 0) {
             const adminEmail = (data.user.email || "").toLowerCase();
             if (!ADMIN_EMAIL_WHITELIST.includes(adminEmail)) {
@@ -37,6 +38,19 @@ const isAdmin = (req, res, next) => {
                 return res.status(403).json({ error: true, msg: "Access denied. Your account is not authorized for admin panel access." });
             }
         }
+
+        // Load full admin doc for RBAC (req.adminDoc used by hasRole middleware)
+        try {
+            const adminDoc = await Admin.findById(data.user.id).lean({ virtuals: true });
+            if (adminDoc && !adminDoc.isActive) {
+                return res.status(403).json({ error: true, msg: "Admin account is deactivated." });
+            }
+            req.adminDoc = adminDoc;
+        } catch (_) {
+            // Non-fatal — RBAC will fail if doc not loaded
+            req.adminDoc = null;
+        }
+
     } catch (error) {
         return res.status(401).json({ error: true, msg: "Access denied. Please authenticate using a valid token." });
     }

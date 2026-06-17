@@ -1,3 +1,4 @@
+"use client";
 import { HiOutlineLogout } from "react-icons/hi";
 import { SheetDemo } from "./Sidebar";
 import { useRouter } from 'next/navigation'
@@ -41,6 +42,8 @@ export default function Navbar() {
                 <div className="hidden lg:flex items-center gap-5 xl:gap-8">
                     <NavLink href="/" label="Home" />
                     <NavLink href="/giveaway" label="Giveaways" />
+                    <NavLink href="/surprise-me" label="Surprises & Moments" />
+                    <NavLink href="/shop" label="Shop" />
                     <NavLink href="/winners" label="Winners" />
                     <NavLink href="/about-us" label="About" />
                 </div>
@@ -103,6 +106,8 @@ export default function Navbar() {
                                 <div className="space-y-1">
                                     <MobileNavLink href="/" label="Home" />
                                     <MobileNavLink href="/giveaway" label="Giveaways" />
+                                    <MobileNavLink href="/surprise-me" label="Surprises & Moments" />
+                                    <MobileNavLink href="/shop" label="Shop" />
                                     <MobileNavLink href="/winners" label="Winners" />
                                     <MobileNavLink href="/about-us" label="About" />
                                 </div>

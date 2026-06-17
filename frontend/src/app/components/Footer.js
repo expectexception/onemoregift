@@ -24,7 +24,7 @@ export default function Footer() {
                                 </span>
                             </div>
                             <p className="text-sm sm:text-base text-neutral-500 leading-relaxed max-w-md mb-4 sm:mb-6">
-                                India&apos;s leading premium giveaway platform. Win real rewards by participating in our daily updated contests. 100% verified and legitimate.
+                                Earn exciting gifts for free by joining giveaways and completing simple tasks. Our platform makes it easy, safe, and rewarding to participate. Start today, collect rewards, and discover how fun earning free gifts can be!
                             </p>
                         </div>
 
