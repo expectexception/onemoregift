@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -106,6 +107,13 @@ function createApp() {
       db: dbReady ? 'connected' : 'disconnected',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Serve the favicon so browser/probe requests for /favicon.ico don't 500.
+  app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'favicon.ico'), (err) => {
+      if (err && !res.headersSent) res.status(204).end();
     });
   });
 

@@ -2,8 +2,19 @@
 
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
+const Counter = require('./Counter');
 
 const ORDER_STATUSES = ['pending', 'paid', 'ready_for_pickup', 'collected', 'cancelled', 'refunded'];
+
+// Legal status transitions — prevents e.g. moving a collected order back to pending
+const ORDER_STATUS_TRANSITIONS = {
+    pending: ['paid', 'cancelled'],
+    paid: ['ready_for_pickup', 'refunded', 'cancelled'],
+    ready_for_pickup: ['collected', 'refunded', 'cancelled'],
+    collected: ['refunded'],
+    cancelled: [],
+    refunded: [],
+};
 
 const orderItemSchema = new Schema({
     productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -65,8 +76,8 @@ const orderSchema = new Schema({
 orderSchema.pre('save', async function (next) {
     if (!this.orderNumber) {
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const count = await mongoose.model('Order').countDocuments({});
-        this.orderNumber = `OMG-${date}-${String(count + 1).padStart(4, '0')}`;
+        const seq = await Counter.nextSeq(`order-${date}`);
+        this.orderNumber = `OMG-${date}-${String(seq).padStart(4, '0')}`;
     }
     next();
 });
@@ -74,8 +85,8 @@ orderSchema.pre('save', async function (next) {
 orderSchema.index({ userId: 1, status: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ pickupStoreId: 1, status: 1 });
-orderSchema.index({ orderNumber: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
 module.exports = Order;
 module.exports.ORDER_STATUSES = ORDER_STATUSES;
+module.exports.ORDER_STATUS_TRANSITIONS = ORDER_STATUS_TRANSITIONS;

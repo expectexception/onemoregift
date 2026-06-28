@@ -18,6 +18,13 @@ const reportSchema = new Schema({
     resolved: { type: Boolean, default: false },
 }, { _id: true });
 
+const commentSchema = new Schema({
+    userId: { type: Schema.Types.ObjectId, ref: 'Users', required: true },
+    text: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+    editedAt: { type: Date },
+}, { _id: true });
+
 const happyMomentSchema = new Schema({
     userId: { type: Schema.Types.ObjectId, ref: 'Users', required: true },
 
@@ -34,6 +41,7 @@ const happyMomentSchema = new Schema({
 
     // Community
     reactions: [reactionSchema],
+    comments: [commentSchema],
     reports: [reportSchema],
     viewCount: { type: Number, default: 0 },
 

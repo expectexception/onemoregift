@@ -2,17 +2,23 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/app/components/ConfirmDialog";
+import MultiImageUploader from "@/app/components/MultiImageUploader";
+import { EmptyBoxIllustration } from "@/app/components/SVGIcons";
 import { Star, Plus, Pencil, Trash2 } from "lucide-react";
 
 const OCCASIONS = ["birthday", "anniversary", "wedding", "graduation", "achievement", "festival", "custom"];
 
 function GiftsAdminPage() {
+    const { toast } = useToast();
+    const { confirm, ConfirmDialog } = useConfirm();
     const [gifts, setGifts] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editGift, setEditGift] = useState(null);
-    const [form, setForm] = useState({ name: "", description: "", estimatedValue: "", stock: "", occasions: [], requiresVerification: true, isActive: true });
+    const [form, setForm] = useState({ name: "", description: "", estimatedValue: "", stock: "", occasions: [], requiresVerification: true, isActive: true, images: [] });
     const [saving, setSaving] = useState(false);
 
     const fetchGifts = useCallback(async () => {
@@ -28,7 +34,7 @@ function GiftsAdminPage() {
 
     const openEdit = (g) => {
         setEditGift(g);
-        setForm({ name: g.name, description: g.description || "", estimatedValue: g.estimatedValue, stock: g.stock, occasions: g.occasions || [], requiresVerification: g.requiresVerification, isActive: g.isActive });
+        setForm({ name: g.name, description: g.description || "", estimatedValue: g.estimatedValue, stock: g.stock, occasions: g.occasions || [], requiresVerification: g.requiresVerification, isActive: g.isActive, images: g.images || [] });
         setShowForm(true);
     };
 
@@ -38,19 +44,30 @@ function GiftsAdminPage() {
             const payload = { ...form, estimatedValue: Number(form.estimatedValue), stock: Number(form.stock) };
             if (editGift) {
                 await api.patch(`admin/gifts/${editGift._id}`, payload, { meta: { auth: "admin" } });
+                toast({ title: "Gift updated", description: `${form.name} was saved.` });
             } else {
                 await api.post("admin/gifts", payload, { meta: { auth: "admin" } });
+                toast({ title: "Gift created", description: `${form.name} added to the catalog.` });
             }
             setShowForm(false); setEditGift(null);
-            setForm({ name: "", description: "", estimatedValue: "", stock: "", occasions: [], requiresVerification: true, isActive: true });
+            setForm({ name: "", description: "", estimatedValue: "", stock: "", occasions: [], requiresVerification: true, isActive: true, images: [] });
             fetchGifts();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Save failed", description: err?.response?.data?.msg || "Could not save gift.", variant: "destructive" });
+        }
         setSaving(false);
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Delete this gift?")) return;
-        try { await api.delete(`admin/gifts/${id}`, { meta: { auth: "admin" } }); fetchGifts(); } catch (_) {}
+        const ok = await confirm({ title: "Delete this gift?", description: "This cannot be undone.", confirmText: "Delete", danger: true });
+        if (!ok) return;
+        try {
+            await api.delete(`admin/gifts/${id}`, { meta: { auth: "admin" } });
+            toast({ title: "Gift deleted" });
+            fetchGifts();
+        } catch (err) {
+            toast({ title: "Failed to delete", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     const toggleOccasion = (occ) => {
@@ -73,7 +90,7 @@ function GiftsAdminPage() {
                             <p className="text-sm text-neutral-500">Manage gifts for surprise assignments</p>
                         </div>
                     </div>
-                    <button onClick={() => { setEditGift(null); setShowForm(true); }}
+                    <button onClick={() => { setEditGift(null); setForm({ name: "", description: "", estimatedValue: "", stock: "", occasions: [], requiresVerification: true, isActive: true, images: [] }); setShowForm(true); }}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl">
                         <Plus className="w-4 h-4" /> Add Gift
                     </button>
@@ -83,6 +100,11 @@ function GiftsAdminPage() {
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {gifts.map(g => (
                             <div key={g._id} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5">
+                                {g.images?.[0] && (
+                                    <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-white/5 border border-white/10">
+                                        <img src={g.images[0]} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-start mb-3">
                                     <h3 className="text-white font-semibold">{g.name}</h3>
                                     <span className={`text-xs px-2 py-1 rounded-full ${g.isActive ? "bg-green-500/10 text-green-400" : "bg-neutral-800 text-neutral-500"}`}>
@@ -111,7 +133,12 @@ function GiftsAdminPage() {
                                 </div>
                             </div>
                         ))}
-                        {gifts.length === 0 && <div className="col-span-3 text-center py-12 text-neutral-500">No gifts yet</div>}
+                        {gifts.length === 0 && (
+                            <div className="col-span-3 text-center py-12">
+                                <EmptyBoxIllustration className="w-20 h-20 mx-auto mb-2" />
+                                <p className="text-neutral-500 text-sm">No gifts yet</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -126,6 +153,10 @@ function GiftsAdminPage() {
                                 <button onClick={() => setShowForm(false)} className="text-neutral-500 hover:text-white">✕</button>
                             </div>
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs text-neutral-500 mb-1.5">Gift Images</label>
+                                    <MultiImageUploader images={form.images} onChange={(images) => setForm(p => ({ ...p, images }))} />
+                                </div>
                                 {[
                                     { label: "Gift Name", key: "name" },
                                     { label: "Estimated Value (₹)", key: "estimatedValue", type: "number" },
@@ -172,6 +203,8 @@ function GiftsAdminPage() {
                     </div>
                 </div>
             )}
+
+            {ConfirmDialog}
         </div>
     );
 }

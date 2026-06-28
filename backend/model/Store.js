@@ -12,7 +12,7 @@ const operatingHoursSchema = new Schema({
 
 const storeSchema = new Schema({
     name: { type: String, required: true },
-    code: { type: String, unique: true }, // short code e.g. 'DEL-01'
+    code: { type: String, required: true, unique: true, trim: true, uppercase: true }, // short code e.g. 'DEL-01'
 
     // Location
     address: { type: String, required: true },

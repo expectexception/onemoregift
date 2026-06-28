@@ -40,8 +40,12 @@ const isAdmin = async (req, res, next) => {
         }
 
         // Load full admin doc for RBAC (req.adminDoc used by hasRole middleware)
+        // NOTE: must NOT use .lean() here — the `permissions` field is a schema
+        // virtual (role + extraPermissions), and .lean({ virtuals: true }) is a
+        // no-op without the mongoose-lean-virtuals plugin, which silently strips
+        // permissions and breaks every hasRole() check.
         try {
-            const adminDoc = await Admin.findById(data.user.id).lean({ virtuals: true });
+            const adminDoc = await Admin.findById(data.user.id);
             if (adminDoc && !adminDoc.isActive) {
                 return res.status(403).json({ error: true, msg: "Admin account is deactivated." });
             }

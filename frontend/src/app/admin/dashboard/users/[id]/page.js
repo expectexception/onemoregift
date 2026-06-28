@@ -15,7 +15,9 @@ import {
     RefreshCw,
     Lock,
     CheckCircle,
-    AlertCircle
+    AlertCircle,
+    ShoppingBag,
+    ExternalLink,
 } from "lucide-react";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,8 @@ const UserProfilePage = () => {
     const [joinedGiveaway, setJoinedGiveaway] = useState(0);
     const [won, setWon] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [orders, setOrders] = useState([]);
+    const [ordersLoading, setOrdersLoading] = useState(true);
 
     // Password reset state
     const [newPassword, setNewPassword] = useState("");
@@ -97,9 +101,26 @@ const UserProfilePage = () => {
         }
     };
 
+    const fetchOrders = useCallback(async () => {
+        try {
+            setOrdersLoading(true);
+            const { data } = await api.get(`admin/orders?userId=${userId}&limit=50`, {
+                meta: { auth: "admin" },
+            });
+            if (!data.error) setOrders(data.data || []);
+        } catch (error) {
+            // non-fatal — order history is supplementary to the profile
+        } finally {
+            setOrdersLoading(false);
+        }
+    }, [userId]);
+
     useEffect(() => {
-        if (userId) fetchUser();
-    }, [userId, fetchUser]);
+        if (userId) {
+            fetchUser();
+            fetchOrders();
+        }
+    }, [userId, fetchUser, fetchOrders]);
 
     if (loading) {
         return (
@@ -216,14 +237,57 @@ const UserProfilePage = () => {
                             </CardContent>
                         </Card>
 
-                        {/* Additional Info / Activity Placeholder */}
-                        <Card className="border-white/[0.06] bg-white/[0.02] border-dashed opacity-60 rounded-lg">
-                            <CardContent className="p-12 flex flex-col items-center justify-center text-center">
-                                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4">
-                                    <Shield className="w-8 h-8 text-neutral-700" />
-                                </div>
-                                <h3 className="text-neutral-400 font-bold mb-1">User Activity Logs</h3>
-                                <p className="text-neutral-600 text-sm max-w-xs">Detailed participation history and security logs will be available here in the next update.</p>
+                        {/* Shop Order History */}
+                        <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
+                            <CardHeader>
+                                <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                                    <ShoppingBag className="w-5 h-5 text-red-500" />
+                                    Shop Order History
+                                </CardTitle>
+                                <CardDescription className="text-neutral-500">
+                                    {orders.length} order{orders.length !== 1 ? "s" : ""} placed by this user
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {ordersLoading ? (
+                                    <div className="space-y-2">
+                                        {Array.from({ length: 3 }).map((_, i) => (
+                                            <div key={i} className="h-14 w-full bg-white/[0.04] rounded animate-pulse" />
+                                        ))}
+                                    </div>
+                                ) : orders.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {orders.map((order) => (
+                                            <button
+                                                key={order._id}
+                                                onClick={() => router.push(`/admin/dashboard/orders?search=${order.orderNumber}`)}
+                                                className="w-full flex items-center justify-between gap-3 p-3 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] transition-colors text-left"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-white truncate">{order.orderNumber}</div>
+                                                    <div className="text-xs text-neutral-500 mt-0.5">
+                                                        {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                                        {" · "}₹{order.total}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-white/[0.06] text-neutral-300 border border-white/[0.08] capitalize">
+                                                        {order.status.replace(/_/g, " ")}
+                                                    </span>
+                                                    <ExternalLink className="w-3.5 h-3.5 text-neutral-600" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-center py-10">
+                                        <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4">
+                                            <ShoppingBag className="w-8 h-8 text-neutral-700" />
+                                        </div>
+                                        <h3 className="text-neutral-400 font-bold mb-1">No orders yet</h3>
+                                        <p className="text-neutral-600 text-sm max-w-xs">This user hasn&apos;t placed any shop orders.</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

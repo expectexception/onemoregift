@@ -2,9 +2,15 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/app/components/ConfirmDialog";
+import MultiImageUploader from "@/app/components/MultiImageUploader";
+import { EmptyBoxIllustration } from "@/app/components/SVGIcons";
 import { ShoppingBag, Plus, Pencil, Archive, Trash2, Search, AlertTriangle } from "lucide-react";
 
 function ProductsAdminPage() {
+    const { toast } = useToast();
+    const { confirm, ConfirmDialog } = useConfirm();
     const [products, setProducts] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -15,7 +21,7 @@ function ProductsAdminPage() {
     const [lowStock, setLowStock] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editProduct, setEditProduct] = useState(null);
-    const [form, setForm] = useState({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true });
+    const [form, setForm] = useState({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true, images: [] });
     const [saving, setSaving] = useState(false);
     const [stockModal, setStockModal] = useState(null);
     const [stockAdj, setStockAdj] = useState("");
@@ -47,7 +53,7 @@ function ProductsAdminPage() {
 
     const openEdit = (p) => {
         setEditProduct(p);
-        setForm({ name: p.name, description: p.description || "", category: p.category, basePrice: p.basePrice, stock: p.stock, occasions: (p.occasions || []).join(", "), isActive: p.isActive });
+        setForm({ name: p.name, description: p.description || "", category: p.category, basePrice: p.basePrice, stock: p.stock, occasions: (p.occasions || []).join(", "), isActive: p.isActive, images: p.images || [] });
         setShowForm(true);
     };
 
@@ -57,35 +63,56 @@ function ProductsAdminPage() {
             const payload = { ...form, basePrice: Number(form.basePrice), stock: Number(form.stock), occasions: form.occasions.split(",").map(o => o.trim()).filter(Boolean) };
             if (editProduct) {
                 await api.patch(`admin/products/${editProduct._id}`, payload, { meta: { auth: "admin" } });
+                toast({ title: "Product updated", description: `${form.name} was saved.` });
             } else {
                 await api.post("admin/products", payload, { meta: { auth: "admin" } });
+                toast({ title: "Product created", description: `${form.name} was added to the catalog.` });
             }
             setShowForm(false);
             setEditProduct(null);
-            setForm({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true });
+            setForm({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true, images: [] });
             fetchProducts();
             fetchCategories();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Save failed", description: err?.response?.data?.msg || "Could not save product.", variant: "destructive" });
+        }
         setSaving(false);
     };
 
     const handleArchive = async (id) => {
-        if (!confirm("Archive this product?")) return;
-        try { await api.patch(`admin/products/${id}/archive`, {}, { meta: { auth: "admin" } }); fetchProducts(); } catch (_) {}
+        const ok = await confirm({ title: "Archive this product?", description: "It will be hidden from the shop but kept for records." });
+        if (!ok) return;
+        try {
+            await api.patch(`admin/products/${id}/archive`, {}, { meta: { auth: "admin" } });
+            toast({ title: "Product archived" });
+            fetchProducts();
+        } catch (err) {
+            toast({ title: "Failed to archive", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Permanently delete this product?")) return;
-        try { await api.delete(`admin/products/${id}`, { meta: { auth: "admin" } }); fetchProducts(); } catch (_) {}
+        const ok = await confirm({ title: "Permanently delete this product?", description: "This cannot be undone.", confirmText: "Delete", danger: true });
+        if (!ok) return;
+        try {
+            await api.delete(`admin/products/${id}`, { meta: { auth: "admin" } });
+            toast({ title: "Product deleted" });
+            fetchProducts();
+        } catch (err) {
+            toast({ title: "Failed to delete", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     const handleStockAdjust = async () => {
         if (!stockModal || !stockAdj) return;
         try {
             await api.patch(`admin/products/${stockModal._id}/stock`, { adjustment: Number(stockAdj), reason: stockReason }, { meta: { auth: "admin" } });
+            toast({ title: "Stock updated", description: `${stockModal.name}: adjustment of ${stockAdj} applied.` });
             setStockModal(null); setStockAdj(""); setStockReason("");
             fetchProducts();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Failed to adjust stock", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     return (
@@ -101,7 +128,7 @@ function ProductsAdminPage() {
                             <p className="text-sm text-neutral-500">Manage shop inventory</p>
                         </div>
                     </div>
-                    <button onClick={() => { setEditProduct(null); setForm({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true }); setShowForm(true); }}
+                    <button onClick={() => { setEditProduct(null); setForm({ name: "", description: "", category: "", basePrice: "", stock: "", occasions: "", isActive: true, images: [] }); setShowForm(true); }}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors">
                         <Plus className="w-4 h-4" /> Add Product
                     </button>
@@ -140,12 +167,26 @@ function ProductsAdminPage() {
                                 {loading ? (
                                     <tr><td colSpan={6} className="text-center py-12 text-neutral-500">Loading...</td></tr>
                                 ) : products.length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center py-12 text-neutral-500">No products found</td></tr>
+                                    <tr><td colSpan={6} className="text-center py-12">
+                                        <EmptyBoxIllustration className="w-20 h-20 mx-auto mb-2" />
+                                        <p className="text-neutral-500 text-sm">No products found</p>
+                                    </td></tr>
                                 ) : products.map(p => (
                                     <tr key={p._id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                                         <td className="px-4 py-3">
-                                            <div className="text-sm text-white font-medium">{p.name}</div>
-                                            {p.occasions?.length > 0 && <div className="text-xs text-neutral-500">{p.occasions.join(", ")}</div>}
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 border border-white/10 shrink-0">
+                                                    {p.images?.[0] ? (
+                                                        <img src={p.images[0]} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-neutral-600"><ShoppingBag className="w-4 h-4" /></div>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm text-white font-medium">{p.name}</div>
+                                                    {p.occasions?.length > 0 && <div className="text-xs text-neutral-500">{p.occasions.join(", ")}</div>}
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{p.category}</td>
                                         <td className="px-4 py-3 text-sm text-white">₹{p.basePrice?.toLocaleString("en-IN")}</td>
@@ -191,6 +232,10 @@ function ProductsAdminPage() {
                                 <button onClick={() => setShowForm(false)} className="text-neutral-500 hover:text-white">✕</button>
                             </div>
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs text-neutral-500 mb-1.5">Product Images</label>
+                                    <MultiImageUploader images={form.images} onChange={(images) => setForm(p => ({ ...p, images }))} />
+                                </div>
                                 {[
                                     { label: "Product Name", key: "name", type: "text" },
                                     { label: "Category", key: "category", type: "text" },
@@ -249,6 +294,8 @@ function ProductsAdminPage() {
                     </div>
                 </div>
             )}
+
+            {ConfirmDialog}
         </div>
     );
 }

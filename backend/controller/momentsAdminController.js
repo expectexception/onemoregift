@@ -135,6 +135,34 @@ const resolveReport = async (req, res) => {
     }
 };
 
+// DELETE /api/v1/admin/moments/:id/comment/:commentId
+const removeComment = async (req, res) => {
+    try {
+        const doc = await HappyMoment.findById(req.params.id);
+        if (!doc) return res.status(404).json({ error: true, msg: 'Moment not found' });
+
+        const comment = doc.comments.id(req.params.commentId);
+        if (!comment) return res.status(404).json({ error: true, msg: 'Comment not found' });
+
+        doc.comments.pull(req.params.commentId);
+        await doc.save();
+
+        await logAction({
+            action: 'moment.comment_removed',
+            category: 'moment',
+            admin: req.user,
+            adminDoc: req.adminDoc,
+            entityType: 'HappyMoment',
+            entityId: doc._id,
+            req,
+        });
+
+        return res.json({ error: false, msg: 'Comment removed', data: doc.comments });
+    } catch (err) {
+        return res.status(500).json({ error: true, msg: 'Failed to remove comment' });
+    }
+};
+
 // POST /api/v1/admin/moments/:id/assign-gift
 const assignGift = async (req, res) => {
     try {
@@ -168,4 +196,4 @@ const assignGift = async (req, res) => {
     }
 };
 
-module.exports = { listMoments, getMoment, updateStatus, toggleFeature, removeMoment, resolveReport, assignGift };
+module.exports = { listMoments, getMoment, updateStatus, toggleFeature, removeMoment, removeComment, resolveReport, assignGift };

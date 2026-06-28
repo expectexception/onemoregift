@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
-import { Gift, Clock, CheckCircle, XCircle, AlertTriangle, Eye, Filter, Search } from "lucide-react";
+import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
+import { Gift, Clock, CheckCircle, XCircle, AlertTriangle, Eye, Filter, Search, FileText } from "lucide-react";
 
 const STATUS_COLORS = {
     draft: "bg-neutral-800 text-neutral-400",
@@ -149,7 +150,10 @@ function SurpriseAdminPage() {
                                 {loading ? (
                                     <tr><td colSpan={7} className="text-center py-12 text-neutral-500">Loading...</td></tr>
                                 ) : requests.length === 0 ? (
-                                    <tr><td colSpan={7} className="text-center py-12 text-neutral-500">No requests found</td></tr>
+                                    <tr><td colSpan={7} className="text-center py-12">
+                                        <EmptyTimelineIllustration className="w-20 h-20 mx-auto mb-2" />
+                                        <p className="text-neutral-500 text-sm">No requests found</p>
+                                    </td></tr>
                                 ) : requests.map(r => (
                                     <tr key={r._id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                                         <td className="px-4 py-3 text-sm text-white font-medium">{r.recipientName}</td>
@@ -206,9 +210,37 @@ function SurpriseAdminPage() {
                                 <InfoRow label="Description" value={selected.description} />
                                 <InfoRow label="Contact" value={selected.recipientContact} />
                                 <InfoRow label="Submitted by" value={selected.userId?.email} />
-                                <InfoRow label="Documents" value={selected.documents?.length ? `${selected.documents.length} uploaded` : "None"} />
                                 {selected.assignedGift && <InfoRow label="Assigned Gift" value={selected.assignedGift?.name || "Yes"} />}
                             </div>
+
+                            {selected.documents?.length > 0 ? (
+                                <div className="mb-6">
+                                    <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-2">
+                                        Proof Documents ({selected.documents.length})
+                                    </p>
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                        {selected.documents.map((url, i) => {
+                                            const isPdf = /\.pdf($|\?)/i.test(url);
+                                            return (
+                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                                                    {isPdf ? (
+                                                        <div className="w-24 h-24 rounded-xl border border-white/10 hover:border-red-500/40 transition-colors flex flex-col items-center justify-center gap-1 bg-white/[0.02] text-neutral-400">
+                                                            <FileText className="w-6 h-6" />
+                                                            <span className="text-[9px] font-bold">Doc {i + 1}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <img src={url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/10 hover:border-red-500/40 transition-colors" />
+                                                    )}
+                                                </a>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mb-6">
+                                    <InfoRow label="Documents" value="None uploaded" />
+                                </div>
+                            )}
 
                             {/* Timeline */}
                             {selected.verificationTimeline?.length > 0 && (

@@ -6,7 +6,25 @@ const getConfigHelper = async () => {
     const configs = await SystemConfig.find({});
     const showUpcoming = configs.find(c => c.key === 'showUpcoming')?.value ?? true;
     const showEnded = configs.find(c => c.key === 'showEnded')?.value ?? false;
-    return { showUpcoming, showEnded };
+    const requireSurpriseProof = configs.find(c => c.key === 'requireSurpriseProof')?.value ?? true;
+    const requireMomentProof = configs.find(c => c.key === 'requireMomentProof')?.value ?? true;
+
+    // Homepage section visibility (DB-backed, default visible)
+    const homeShowSteps = configs.find(c => c.key === 'homeShowSteps')?.value ?? true;
+    const homeShowStats = configs.find(c => c.key === 'homeShowStats')?.value ?? true;
+    const homeShowMoments = configs.find(c => c.key === 'homeShowMoments')?.value ?? true;
+    const homeShowShop = configs.find(c => c.key === 'homeShowShop')?.value ?? true;
+
+    // Env-driven flags (require a server restart to change, unlike the DB-backed ones above)
+    const shopEnabled = (process.env.ENABLE_SHOP || 'true').toLowerCase() !== 'false';
+    const realPaymentsEnabled = (process.env.ENABLE_REAL_PAYMENTS || 'false').toLowerCase() === 'true';
+    const paymentsProvider = (process.env.PAYMENTS_PROVIDER || 'sandbox').toLowerCase();
+
+    return {
+        showUpcoming, showEnded, requireSurpriseProof, requireMomentProof,
+        homeShowSteps, homeShowStats, homeShowMoments, homeShowShop,
+        shopEnabled, realPaymentsEnabled, paymentsProvider,
+    };
 };
 
 const getPublicConfig = async (req, res) => {
@@ -31,7 +49,22 @@ const getAdminConfig = async (req, res) => {
 
 const updateConfig = async (req, res) => {
     try {
-        const { showUpcoming, showEnded } = req.body;
+        const {
+            showUpcoming, showEnded, requireSurpriseProof, requireMomentProof,
+            homeShowSteps, homeShowStats, homeShowMoments, homeShowShop,
+        } = req.body;
+
+        // Persist any homepage section toggle that was provided
+        const homeToggles = { homeShowSteps, homeShowStats, homeShowMoments, homeShowShop };
+        for (const [key, value] of Object.entries(homeToggles)) {
+            if (value !== undefined) {
+                await SystemConfig.findOneAndUpdate(
+                    { key },
+                    { value: !!value },
+                    { upsert: true, new: true }
+                );
+            }
+        }
 
         if (showUpcoming !== undefined) {
             await SystemConfig.findOneAndUpdate(
@@ -45,6 +78,22 @@ const updateConfig = async (req, res) => {
             await SystemConfig.findOneAndUpdate(
                 { key: 'showEnded' },
                 { value: !!showEnded },
+                { upsert: true, new: true }
+            );
+        }
+
+        if (requireSurpriseProof !== undefined) {
+            await SystemConfig.findOneAndUpdate(
+                { key: 'requireSurpriseProof' },
+                { value: !!requireSurpriseProof },
+                { upsert: true, new: true }
+            );
+        }
+
+        if (requireMomentProof !== undefined) {
+            await SystemConfig.findOneAndUpdate(
+                { key: 'requireMomentProof' },
+                { value: !!requireMomentProof },
                 { upsert: true, new: true }
             );
         }

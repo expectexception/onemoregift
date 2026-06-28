@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Trash2, RotateCcw, AlertTriangle, RefreshCw, Lock, Shield, CheckCircle } from "lucide-react";
+import { Database, Trash2, RotateCcw, AlertTriangle, RefreshCw, Lock, Shield, CheckCircle, ShoppingBag, Terminal, LayoutTemplate } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "../../../components/withAdminAuth";
@@ -50,11 +50,17 @@ function AdminSettings() {
                 <div className="h-px bg-white/[0.06] mb-10" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mt-4">
+                    {/* Homepage section visibility */}
+                    <HomepageSectionsCard />
+
                     {/* Dynamic visibility settings */}
                     <VisibilitySettingsCard />
 
                     {/* Database status and metrics */}
                     <DbStatusCard />
+
+                    {/* Shop / Payments env flags (read-only) */}
+                    <ShopPaymentsCard />
 
                     {/* Data Maintenance Card */}
                     <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
@@ -111,12 +117,136 @@ function AdminSettings() {
     );
 }
 
+const HOME_SECTIONS = [
+    { key: "homeShowStats", title: "Hero Stats", desc: "Show the animated live stats counters in the hero" },
+    { key: "homeShowSteps", title: "How It Works", desc: "Show the animated 3-step 'how it works' section" },
+    { key: "homeShowMoments", title: "Popular Moments", desc: "Showcase popular happy moments shared by winners" },
+    { key: "homeShowShop", title: "Featured Products", desc: "Showcase popular products from the shop" },
+];
+
+function HomepageSectionsCard() {
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(true);
+    const [sections, setSections] = useState({
+        homeShowStats: true,
+        homeShowSteps: true,
+        homeShowMoments: true,
+        homeShowShop: true,
+    });
+
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const { data } = await api.get("admin/config", { meta: { auth: "admin" } });
+                if (!data.error && data.config) {
+                    setSections({
+                        homeShowStats: data.config.homeShowStats ?? true,
+                        homeShowSteps: data.config.homeShowSteps ?? true,
+                        homeShowMoments: data.config.homeShowMoments ?? true,
+                        homeShowShop: data.config.homeShowShop ?? true,
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch config", error);
+            } finally {
+                setFetching(false);
+            }
+        };
+        fetchConfig();
+    }, []);
+
+    const toggle = (key) => setSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+    const handleSave = async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.post("admin/config", sections, { meta: { auth: "admin" } });
+            if (!data.error) {
+                toast({
+                    title: "Homepage Updated",
+                    description: (
+                        <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span>Homepage sections updated.</span>
+                        </div>
+                    )
+                });
+            } else {
+                toast({ title: "Failed", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            const message = error?.response?.data?.msg || "Request failed.";
+            toast({ title: "Error", description: message, variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
+            <div className="absolute top-0 left-0 w-1 h-full bg-fuchsia-600 opacity-60 transition-opacity" />
+            <CardHeader className="p-6 sm:p-8 pb-4">
+                <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-fuchsia-600/10 flex items-center justify-center">
+                        <LayoutTemplate className="w-5 h-5 text-fuchsia-500" />
+                    </div>
+                    Homepage Sections
+                </CardTitle>
+                <CardDescription className="text-neutral-500 text-sm mt-2 leading-relaxed">
+                    Toggle which showcase sections appear on the public homepage. Changes are live immediately.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
+                {fetching ? (
+                    <div className="text-neutral-500 text-sm animate-pulse flex-1 flex items-center justify-center">Loading configurations...</div>
+                ) : (
+                    <div className="space-y-6 flex-1 flex flex-col justify-between">
+                        <div className="space-y-4">
+                            {HOME_SECTIONS.map(({ key, title, desc }) => (
+                                <div key={key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                    <div>
+                                        <div className="text-sm font-semibold text-white">{title}</div>
+                                        <div className="text-xs text-neutral-500 mt-0.5">{desc}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => toggle(key)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ml-4 ${
+                                            sections[key] ? "bg-red-600" : "bg-neutral-800"
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                sections[key] ? "translate-x-6" : "translate-x-1"
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Button
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98] mt-6"
+                        >
+                            {loading ? <RefreshCw className="animate-spin" /> : "Save Changes"}
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function VisibilitySettingsCard() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
     const [showUpcoming, setShowUpcoming] = useState(true);
     const [showEnded, setShowEnded] = useState(false);
+    const [requireSurpriseProof, setRequireSurpriseProof] = useState(true);
+    const [requireMomentProof, setRequireMomentProof] = useState(true);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -125,6 +255,8 @@ function VisibilitySettingsCard() {
                 if (!data.error && data.config) {
                     setShowUpcoming(!!data.config.showUpcoming);
                     setShowEnded(!!data.config.showEnded);
+                    setRequireSurpriseProof(data.config.requireSurpriseProof ?? true);
+                    setRequireMomentProof(data.config.requireMomentProof ?? true);
                 }
             } catch (error) {
                 console.error("Failed to fetch config", error);
@@ -141,7 +273,9 @@ function VisibilitySettingsCard() {
         try {
             const { data } = await api.post("admin/config", {
                 showUpcoming,
-                showEnded
+                showEnded,
+                requireSurpriseProof,
+                requireMomentProof
             }, { meta: { auth: "admin" } });
 
             if (!data.error) {
@@ -150,7 +284,7 @@ function VisibilitySettingsCard() {
                     description: (
                         <div className="flex items-center gap-2">
                             <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span>Giveaway visibility settings updated.</span>
+                            <span>Platform settings updated.</span>
                         </div>
                     )
                 });
@@ -173,10 +307,10 @@ function VisibilitySettingsCard() {
                     <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center">
                         <Database className="w-5 h-5 text-blue-500" />
                     </div>
-                    Visibility Controls
+                    Platform Controls
                 </CardTitle>
                 <CardDescription className="text-neutral-500 text-sm mt-2 leading-relaxed">
-                    Set whether users can view upcoming or ended giveaways. Toggling these also dynamically updates homepage statistics.
+                    Configure visibility settings for giveaways, and toggle verification proof requirements for Surprises & Moments.
                 </CardDescription>
             </CardHeader>
             <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
@@ -222,6 +356,44 @@ function VisibilitySettingsCard() {
                                     />
                                 </button>
                             </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                <div>
+                                    <div className="text-sm font-semibold text-white">Surprise Request Proof</div>
+                                    <div className="text-xs text-neutral-500 mt-0.5">Show and require document proof when applying for a surprise</div>
+                                </div>
+                                <button
+                                    onClick={() => setRequireSurpriseProof(!requireSurpriseProof)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                        requireSurpriseProof ? "bg-red-600" : "bg-neutral-800"
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            requireSurpriseProof ? "translate-x-6" : "translate-x-1"
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                <div>
+                                    <div className="text-sm font-semibold text-white">Happy Moments Proof</div>
+                                    <div className="text-xs text-neutral-500 mt-0.5">Show and require verification proof when sharing a happy moment</div>
+                                </div>
+                                <button
+                                    onClick={() => setRequireMomentProof(!requireMomentProof)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                        requireMomentProof ? "bg-red-600" : "bg-neutral-800"
+                                    }`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            requireMomentProof ? "translate-x-6" : "translate-x-1"
+                                        }`}
+                                    />
+                                </button>
+                            </div>
                         </div>
 
                         <Button
@@ -231,6 +403,90 @@ function VisibilitySettingsCard() {
                         >
                             {loading ? <RefreshCw className="animate-spin" /> : "Save Changes"}
                         </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function ShopPaymentsCard() {
+    const [fetching, setFetching] = useState(true);
+    const [config, setConfig] = useState({ shopEnabled: true, realPaymentsEnabled: false, paymentsProvider: "sandbox" });
+
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const { data } = await api.get("admin/config", { meta: { auth: "admin" } });
+                if (!data.error && data.config) {
+                    setConfig({
+                        shopEnabled: data.config.shopEnabled ?? true,
+                        realPaymentsEnabled: data.config.realPaymentsEnabled ?? false,
+                        paymentsProvider: data.config.paymentsProvider || "sandbox",
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch config", error);
+            } finally {
+                setFetching(false);
+            }
+        };
+        fetchConfig();
+    }, []);
+
+    const StatusPill = ({ active, onLabel, offLabel }) => (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${active
+            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+            : "bg-neutral-700/20 text-neutral-400 border border-neutral-600/20"
+            }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-neutral-500"}`} />
+            {active ? onLabel : offLabel}
+        </span>
+    );
+
+    return (
+        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-xl relative flex flex-col h-full">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-600 opacity-60 transition-opacity" />
+            <CardHeader className="p-6 sm:p-8 pb-4">
+                <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-600/10 flex items-center justify-center">
+                        <ShoppingBag className="w-5 h-5 text-amber-500" />
+                    </div>
+                    Shop & Payments
+                </CardTitle>
+                <CardDescription className="text-neutral-500 text-sm mt-2 leading-relaxed">
+                    Controlled via environment variables on the server &mdash; changing these requires editing <code className="text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded">.env</code> and restarting the backend.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 sm:p-8 pt-4 flex-1 flex flex-col justify-between">
+                {fetching ? (
+                    <div className="text-neutral-500 text-sm animate-pulse flex-1 flex items-center justify-center">Loading configuration...</div>
+                ) : (
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                            <div>
+                                <div className="text-sm font-semibold text-white">Shop Checkout</div>
+                                <div className="text-xs text-neutral-500 mt-0.5">ENABLE_SHOP</div>
+                            </div>
+                            <StatusPill active={config.shopEnabled} onLabel="Online" offLabel="Offline" />
+                        </div>
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                            <div>
+                                <div className="text-sm font-semibold text-white">Real Payments</div>
+                                <div className="text-xs text-neutral-500 mt-0.5">ENABLE_REAL_PAYMENTS</div>
+                            </div>
+                            <StatusPill active={config.realPaymentsEnabled} onLabel="Enabled" offLabel="Sandbox only" />
+                        </div>
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                            <div>
+                                <div className="text-sm font-semibold text-white">Payment Provider</div>
+                                <div className="text-xs text-neutral-500 mt-0.5">PAYMENTS_PROVIDER</div>
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider bg-white/[0.06] text-neutral-300 border border-white/[0.08] capitalize">
+                                <Terminal className="w-3 h-3" />
+                                {config.paymentsProvider}
+                            </span>
+                        </div>
                     </div>
                 )}
             </CardContent>

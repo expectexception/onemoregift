@@ -2,24 +2,28 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/app/utils/apiClient";
+import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-import { 
-    ShoppingBag, 
-    Search, 
-    SlidersHorizontal, 
-    Star, 
-    ShoppingCart, 
-    X, 
-    Plus, 
-    Minus, 
+import { useToast } from "@/hooks/use-toast";
+import { EmptyBoxIllustration, EmptyCartIllustration } from "@/app/components/SVGIcons";
+import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
+import {
+    ShoppingBag,
+    Search,
+    SlidersHorizontal,
+    Star,
+    ShoppingCart,
+    X,
+    Plus,
+    Minus,
     ArrowRight,
     Sparkles
 } from "lucide-react";
 
 export default function ShopPage() {
     const router = useRouter();
+    const { toast } = useToast();
 
     // Catalog State
     const [products, setProducts] = useState([]);
@@ -39,6 +43,7 @@ export default function ShopPage() {
     // Cart State
     const [cart, setCart] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
+    const [brokenImages, setBrokenImages] = useState(() => new Set());
 
     // Fetch categories
     const fetchCategories = useCallback(async () => {
@@ -94,7 +99,8 @@ export default function ShopPage() {
     // Sync cart to local storage
     const updateCart = (newCart) => {
         setCart(newCart);
-        localStorage.setItem("omg_cart", JSON.stringify(newCart));
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newCart));
+        notifyCartUpdated();
     };
 
     // Trigger fetch on filter change
@@ -119,7 +125,7 @@ export default function ShopPage() {
         if (existingItemIndex > -1) {
             const currentQty = cart[existingItemIndex].quantity;
             if (currentQty >= limitStock) {
-                alert(`Cannot add more. Only ${limitStock} items in stock.`);
+                toast({ title: "Stock limit reached", description: `Only ${limitStock} item(s) in stock.`, variant: "destructive" });
                 return;
             }
             const updated = [...cart];
@@ -127,7 +133,7 @@ export default function ShopPage() {
             updateCart(updated);
         } else {
             if (limitStock <= 0) {
-                alert("This product is out of stock.");
+                toast({ title: "Out of stock", description: "This product is currently unavailable.", variant: "destructive" });
                 return;
             }
             const newItem = {
@@ -155,7 +161,7 @@ export default function ShopPage() {
         if (newQty <= 0) {
             updated.splice(itemIndex, 1);
         } else if (newQty > updated[itemIndex].maxStock) {
-            alert(`Only ${updated[itemIndex].maxStock} units available.`);
+            toast({ title: "Stock limit reached", description: `Only ${updated[itemIndex].maxStock} unit(s) available.`, variant: "destructive" });
             return;
         } else {
             updated[itemIndex].quantity = newQty;
@@ -333,7 +339,7 @@ export default function ShopPage() {
                     </div>
                 ) : products.length === 0 ? (
                     <div className="text-center py-20 border border-dashed border-neutral-800 rounded-3xl bg-neutral-950/20">
-                        <ShoppingBag className="w-12 h-12 text-neutral-600 mx-auto mb-4" />
+                        <EmptyBoxIllustration className="w-28 h-28 mx-auto mb-2" />
                         <h3 className="text-lg font-bold text-neutral-300">No premium products found</h3>
                         <p className="text-neutral-500 text-sm mt-1">Try tweaking your filters or search terms.</p>
                     </div>
@@ -349,11 +355,12 @@ export default function ShopPage() {
                                 return (
                                     <div key={prod._id} className="premium-card rounded-2xl flex flex-col h-full overflow-hidden border border-neutral-900 bg-neutral-950">
                                         {/* Image Frame */}
-                                        <div className="relative group/img aspect-video sm:aspect-square bg-neutral-950 overflow-hidden cursor-pointer" onClick={() => router.push(`/shop/${prod._id}`)}>
-                                            {prod.images?.[0] ? (
-                                                <img 
-                                                    src={prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:9000${prod.images[0]}`} 
+                                        <div className="relative group/img aspect-square bg-neutral-950 overflow-hidden cursor-pointer" onClick={() => router.push(`/shop/${prod._id}`)}>
+                                            {prod.images?.[0] && !brokenImages.has(prod._id) ? (
+                                                <img
+                                                    src={mediaUrl(prod.images[0])}
                                                     alt={prod.name}
+                                                    onError={() => setBrokenImages(prev => new Set(prev).add(prod._id))}
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
                                                 />
                                             ) : (
@@ -495,8 +502,8 @@ export default function ShopPage() {
                             {/* Cart List */}
                             <div className="flex-1 overflow-y-auto p-6 space-y-4">
                                 {cart.length === 0 ? (
-                                    <div className="text-center py-24 text-neutral-500 space-y-4">
-                                        <ShoppingBag className="w-12 h-12 text-neutral-700 mx-auto" />
+                                    <div className="text-center py-16 text-neutral-500 space-y-4">
+                                        <EmptyCartIllustration className="w-24 h-24 mx-auto" />
                                         <p className="text-sm font-medium">Your cart is empty</p>
                                         <button 
                                             onClick={() => setCartOpen(false)}
@@ -512,7 +519,7 @@ export default function ShopPage() {
                                             <div className="w-16 h-16 rounded-lg overflow-hidden bg-neutral-950 border border-neutral-850 flex-shrink-0">
                                                 {item.image ? (
                                                     <img 
-                                                        src={item.image.startsWith('http') ? item.image : `http://localhost:9000${item.image}`} 
+                                                        src={mediaUrl(item.image)} 
                                                         alt={item.name}
                                                         className="w-full h-full object-cover"
                                                     />

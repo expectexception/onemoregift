@@ -27,7 +27,7 @@ const EMAIL_SERVICE_REQUIRED = process.env.EMAIL_SERVICE_REQUIRED === 'true';
 const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 15000);
 const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
-const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test';
+const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production';
 const OTP_DEBUG_LOGGING = process.env.NODE_ENV !== 'production' && process.env.LOG_OTP_DEBUG === 'true';
 // Feature flag: set OTP_VERIFICATION_ENABLED=false to skip email OTP for user registration
 const OTP_VERIFICATION_ENABLED = process.env.OTP_VERIFICATION_ENABLED !== 'false';
@@ -370,7 +370,7 @@ const login = async (req, res) => {
             });
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 
@@ -394,7 +394,7 @@ const requestOtp = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'User not found. Please register first.' });
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 
@@ -635,7 +635,7 @@ const googleSignin = async (req, res) => {
             }
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 

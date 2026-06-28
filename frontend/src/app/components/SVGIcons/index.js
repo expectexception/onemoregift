@@ -12,3 +12,5 @@ export { default as HeartIcon } from './HeartIcon';
 export { default as RegisterBadgeIcon } from './RegisterBadgeIcon';
 export { default as ResetPasswordIcon } from './ResetPasswordIcon';
 export { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon, PauseIcon, PlayIcon, DrawIcon, ResetIcon, TrashIcon } from './CustomIcons';
+export { GiftBoxIcon, StoreIcon, CameraIcon, SurpriseIcon, BadgeCheckIcon, ClockPendingIcon, BellAlertIcon, PickupBagIcon, ConfettiBurstIcon, MapPinIcon } from './ShopIcons';
+export { EmptyBoxIllustration, EmptyGalleryIllustration, EmptyCartIllustration, EmptyTimelineIllustration } from './EmptyStateIllustrations';

@@ -36,6 +36,9 @@ const createStore = async (req, res) => {
         await logAction({ action: 'store.create', category: 'store', admin: req.user, adminDoc: req.adminDoc, entityType: 'Store', entityId: doc._id, newValue: { name: doc.name }, req });
         return res.status(201).json({ error: false, data: doc });
     } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({ error: true, msg: 'A store with that code already exists. Please use a unique store code.' });
+        }
         return res.status(500).json({ error: true, msg: 'Failed to create store' });
     }
 };
@@ -47,6 +50,9 @@ const updateStore = async (req, res) => {
         await logAction({ action: 'store.update', category: 'store', admin: req.user, adminDoc: req.adminDoc, entityType: 'Store', entityId: doc._id, req });
         return res.json({ error: false, data: doc });
     } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({ error: true, msg: 'A store with that code already exists. Please use a unique store code.' });
+        }
         return res.status(500).json({ error: true, msg: 'Failed to update store' });
     }
 };

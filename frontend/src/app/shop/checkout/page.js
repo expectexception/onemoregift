@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/app/utils/apiClient";
+import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { useAuth } from "@/app/context/AuthContext";
@@ -20,6 +20,17 @@ import {
     Lock
 } from "lucide-react";
 
+// Short codes must match the backend enum exactly (model/Store.js operatingHoursSchema.day)
+const WEEKDAY_CODES = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+
+function formatTodayHours(operatingHours) {
+    const todayCode = WEEKDAY_CODES[new Date().getDay()];
+    const today = operatingHours.find((h) => h.day === todayCode);
+    if (!today) return "See store for hours";
+    if (today.isClosed) return "Closed today";
+    return `${today.open}–${today.close} today`;
+}
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { user, userAuthenticated, loadingUser } = useAuth();
@@ -30,6 +41,7 @@ export default function CheckoutPage() {
     // Store State
     const [stores, setStores] = useState([]);
     const [loadingStores, setLoadingStores] = useState(true);
+    const [shopEnabled, setShopEnabled] = useState(true);
 
     // Form fields
     const [selectedStoreId, setSelectedStoreId] = useState("");
@@ -72,6 +84,12 @@ export default function CheckoutPage() {
         };
 
         fetchStores();
+
+        api.get("config")
+            .then(({ data }) => {
+                if (!data.error && data.config?.shopEnabled === false) setShopEnabled(false);
+            })
+            .catch(() => {});
     }, []);
 
     // Redirect or guard
@@ -119,6 +137,11 @@ export default function CheckoutPage() {
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
         setErrorMsg("");
+
+        if (!shopEnabled) {
+            setErrorMsg("Shop checkout is temporarily unavailable. Please check back later.");
+            return;
+        }
 
         if (cart.length === 0) {
             setErrorMsg("Your cart is empty.");
@@ -234,6 +257,13 @@ export default function CheckoutPage() {
                     <p className="text-neutral-400 text-sm">Review your selections, select your pickup hub, and pay securely.</p>
                 </div>
 
+                {!shopEnabled && (
+                    <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/20 text-amber-400 text-xs flex gap-3 items-center mb-8">
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <span>Shop checkout is temporarily unavailable. You can browse products, but orders cannot be placed right now.</span>
+                    </div>
+                )}
+
                 {errorMsg && (
                     <div className="p-4 rounded-xl bg-red-950/30 border border-red-500/20 text-red-400 text-xs flex gap-3 items-center mb-8">
                         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
@@ -293,8 +323,10 @@ export default function CheckoutPage() {
                                                     <div>
                                                         <h4 className="text-sm font-bold text-white">{store.name}</h4>
                                                         <p className="text-xs text-neutral-400 mt-1">{store.address}, {store.city}</p>
-                                                        {store.operatingHours && (
-                                                            <p className="text-[10px] text-neutral-500 mt-0.5">Hours: {store.operatingHours}</p>
+                                                        {Array.isArray(store.operatingHours) && store.operatingHours.length > 0 && (
+                                                            <p className="text-[10px] text-neutral-500 mt-0.5">
+                                                                Hours: {formatTodayHours(store.operatingHours)}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -358,6 +390,7 @@ export default function CheckoutPage() {
                             <div className="p-6 sm:p-8 rounded-2xl bg-neutral-950 border border-neutral-900 space-y-6">
                                 <h3 className="text-base font-bold text-white pb-4 border-b border-neutral-900">Order Summary</h3>
 
+                                <div className="relative">
                                 <div className="space-y-4 max-h-[280px] overflow-y-auto pr-1">
                                     {cart.map((item) => (
                                         <div key={item.cartKey} className="flex justify-between items-start gap-4">
@@ -365,7 +398,7 @@ export default function CheckoutPage() {
                                                 <div className="w-12 h-12 bg-neutral-900 rounded-lg overflow-hidden border border-neutral-850 flex-shrink-0">
                                                     {item.image ? (
                                                         <img 
-                                                            src={item.image.startsWith('http') ? item.image : `http://localhost:9000${item.image}`} 
+                                                            src={mediaUrl(item.image)} 
                                                             alt={item.name}
                                                             className="w-full h-full object-cover"
                                                         />
@@ -386,6 +419,10 @@ export default function CheckoutPage() {
                                         </div>
                                     ))}
                                 </div>
+                                {cart.length > 3 && (
+                                    <div className="pointer-events-none absolute bottom-0 left-0 right-1 h-8 bg-gradient-to-t from-neutral-950 to-transparent" />
+                                )}
+                                </div>
 
                                 <div className="space-y-3 pt-4 border-t border-neutral-905">
                                     <div className="flex justify-between text-xs text-neutral-400">
@@ -404,10 +441,10 @@ export default function CheckoutPage() {
 
                                 <button
                                     type="submit"
-                                    disabled={submitting}
+                                    disabled={submitting || !shopEnabled}
                                     className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                    {submitting ? "Placing Order..." : "Place Order & Pay"}
+                                    {submitting ? "Placing Order..." : !shopEnabled ? "Checkout Unavailable" : "Place Order & Pay"}
                                 </button>
 
                                 <div className="flex justify-center items-center gap-1.5 text-[10px] text-neutral-500">

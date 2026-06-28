@@ -82,46 +82,79 @@ const createOrder = async (req, res) => {
 
         let subtotal = 0;
         const processedItems = [];
+        const decremented = []; // for rollback on partial failure
 
-        // Validate products & variants stock
+        const rollback = async () => {
+            for (const d of decremented) {
+                if (d.variantId) {
+                    await Product.updateOne(
+                        { _id: d.productId, 'variants._id': d.variantId },
+                        { $inc: { 'variants.$.stock': d.quantity } }
+                    ).catch(() => {});
+                } else {
+                    await Product.updateOne(
+                        { _id: d.productId },
+                        { $inc: { stock: d.quantity } }
+                    ).catch(() => {});
+                }
+            }
+        };
+
+        // Validate products & variants stock with atomic conditional decrement
         for (const item of items) {
-            const product = await Product.findOne({ _id: item.productId, isActive: true, isArchived: false });
-            if (!product) {
+            const baseProduct = await Product.findOne({ _id: item.productId, isActive: true, isArchived: false });
+            if (!baseProduct) {
+                await rollback();
                 return res.status(400).json({ error: true, msg: `Product ${item.productId} not found or inactive` });
             }
 
-            let unitPrice = product.discountedPrice || product.basePrice;
+            let unitPrice = baseProduct.discountedPrice || baseProduct.basePrice;
             let variantName = '';
 
-            if (product.hasVariants && item.variantId) {
-                const variant = product.variants.id(item.variantId);
+            if (baseProduct.hasVariants && item.variantId) {
+                const variant = baseProduct.variants.id(item.variantId);
                 if (!variant || !variant.isActive) {
-                    return res.status(400).json({ error: true, msg: `Variant not found or inactive for ${product.name}` });
-                }
-                if (variant.stock < item.quantity) {
-                    return res.status(400).json({ error: true, msg: `Insufficient stock for ${product.name} (${variant.name})` });
+                    await rollback();
+                    return res.status(400).json({ error: true, msg: `Variant not found or inactive for ${baseProduct.name}` });
                 }
                 unitPrice = variant.price;
                 variantName = variant.name;
-                
-                // Deduct stock
-                variant.stock -= item.quantity;
-                await product.save();
-            } else {
-                if (product.stock < item.quantity) {
-                    return res.status(400).json({ error: true, msg: `Insufficient stock for product ${product.name}` });
+
+                // Atomic conditional decrement — only succeeds if stock is still sufficient
+                const updated = await Product.findOneAndUpdate(
+                    {
+                        _id: item.productId,
+                        isActive: true,
+                        isArchived: false,
+                        variants: { $elemMatch: { _id: item.variantId, isActive: true, stock: { $gte: item.quantity } } },
+                    },
+                    { $inc: { 'variants.$[v].stock': -item.quantity } },
+                    { arrayFilters: [{ 'v._id': item.variantId }], new: true }
+                );
+                if (!updated) {
+                    await rollback();
+                    return res.status(400).json({ error: true, msg: `Insufficient stock for ${baseProduct.name} (${variant.name})` });
                 }
-                // Deduct stock
-                product.stock -= item.quantity;
-                await product.save();
+                decremented.push({ productId: item.productId, variantId: item.variantId, quantity: item.quantity });
+            } else {
+                const updated = await Product.findOneAndUpdate(
+                    { _id: item.productId, isActive: true, isArchived: false, stock: { $gte: item.quantity } },
+                    { $inc: { stock: -item.quantity } },
+                    { new: true }
+                );
+                if (!updated) {
+                    await rollback();
+                    return res.status(400).json({ error: true, msg: `Insufficient stock for product ${baseProduct.name}` });
+                }
+                decremented.push({ productId: item.productId, variantId: null, quantity: item.quantity });
             }
 
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
             processedItems.push({
-                productId: product._id,
-                productName: product.name,
+                productId: baseProduct._id,
+                productName: baseProduct.name,
                 variantId: item.variantId || null,
                 variantName,
                 quantity: item.quantity,
@@ -132,19 +165,23 @@ const createOrder = async (req, res) => {
 
         const total = subtotal; // can implement coupons later
 
-        const order = await Order.create({
-            userId: req.user.id,
-            items: processedItems,
-            subtotal,
-            total,
-            pickupStoreId,
-            scheduledPickupTime: scheduledPickupTime ? new Date(scheduledPickupTime) : null,
-            customerNote,
-            status: 'pending',
-            paymentStatus: 'pending'
-        });
-
-        return res.status(201).json({ error: false, data: order });
+        try {
+            const order = await Order.create({
+                userId: req.user.data._id,
+                items: processedItems,
+                subtotal,
+                total,
+                pickupStoreId,
+                scheduledPickupTime: scheduledPickupTime ? new Date(scheduledPickupTime) : null,
+                customerNote,
+                status: 'pending',
+                paymentStatus: 'pending'
+            });
+            return res.status(201).json({ error: false, data: order });
+        } catch (createErr) {
+            await rollback();
+            throw createErr;
+        }
     } catch (err) {
         console.error(err);
         return res.status(500).json({ error: true, msg: 'Failed to create order' });
@@ -154,8 +191,18 @@ const createOrder = async (req, res) => {
 // Simulate Payment API (or sandbox integration)
 const simulatePayment = async (req, res) => {
     try {
+        const provider = (process.env.PAYMENTS_PROVIDER || 'sandbox').toLowerCase();
+        const realPaymentsEnabled = (process.env.ENABLE_REAL_PAYMENTS || 'false').toLowerCase() === 'true';
+        if (provider !== 'sandbox' && !realPaymentsEnabled) {
+            return res.status(503).json({ error: true, msg: `Payment provider '${provider}' is not yet enabled` });
+        }
+        if (provider !== 'sandbox') {
+            // Real gateway integration point — not implemented yet
+            return res.status(501).json({ error: true, msg: `Payment provider '${provider}' integration is not implemented` });
+        }
+
         const { orderId, success } = req.body;
-        const order = await Order.findOne({ _id: orderId, userId: req.user.id });
+        const order = await Order.findOne({ _id: orderId, userId: req.user.data._id });
         if (!order) {
             return res.status(404).json({ error: true, msg: 'Order not found' });
         }
@@ -194,7 +241,7 @@ const simulatePayment = async (req, res) => {
 // User Order History
 const listMyOrders = async (req, res) => {
     try {
-        const orders = await Order.find({ userId: req.user.id })
+        const orders = await Order.find({ userId: req.user.data._id })
             .populate('pickupStoreId', 'name city address')
             .sort({ createdAt: -1 });
         return res.json({ error: false, data: orders });
@@ -206,7 +253,7 @@ const listMyOrders = async (req, res) => {
 // User Single Order Details
 const getMyOrder = async (req, res) => {
     try {
-        const order = await Order.findOne({ _id: req.params.id, userId: req.user.id })
+        const order = await Order.findOne({ _id: req.params.id, userId: req.user.data._id })
             .populate('pickupStoreId')
             .populate('items.productId', 'name images category');
         if (!order) {
@@ -221,7 +268,7 @@ const getMyOrder = async (req, res) => {
 // Cancel My Order
 const cancelMyOrder = async (req, res) => {
     try {
-        const order = await Order.findOne({ _id: req.params.id, userId: req.user.id });
+        const order = await Order.findOne({ _id: req.params.id, userId: req.user.data._id });
         if (!order) {
             return res.status(404).json({ error: true, msg: 'Order not found' });
         }

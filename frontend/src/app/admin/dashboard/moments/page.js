@@ -2,7 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
-import { Heart, Eye, Star, Trash2, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/app/components/ConfirmDialog";
+import { EmptyGalleryIllustration } from "@/app/components/SVGIcons";
+import { Heart, Eye, Star, Trash2, Search, ImageOff } from "lucide-react";
 
 const STATUS_COLORS = {
     draft: "bg-neutral-800 text-neutral-400",
@@ -17,6 +20,8 @@ const STATUS_COLORS = {
 const STATUS_OPTIONS = ["", "submitted", "under_review", "approved", "rejected", "published", "gift_assigned"];
 
 function MomentsAdminPage() {
+    const { toast } = useToast();
+    const { confirm, ConfirmDialog } = useConfirm();
     const [moments, setMoments] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -48,9 +53,12 @@ function MomentsAdminPage() {
         setActionLoading(true);
         try {
             await api.patch(`admin/moments/${selected._id}/status`, { status: newStatus, adminNotes }, { meta: { auth: "admin" } });
+            toast({ title: "Status updated", description: `Moment is now "${newStatus.replace(/_/g, " ")}".` });
             setSelected(null);
             fetchMoments();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Update failed", description: err?.response?.data?.msg, variant: "destructive" });
+        }
         setActionLoading(false);
     };
 
@@ -58,15 +66,21 @@ function MomentsAdminPage() {
         try {
             await api.patch(`admin/moments/${id}/feature`, {}, { meta: { auth: "admin" } });
             fetchMoments();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Failed to toggle feature", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm("Remove this moment permanently?")) return;
+        const ok = await confirm({ title: "Remove this moment?", description: "This will permanently delete the post.", confirmText: "Remove", danger: true });
+        if (!ok) return;
         try {
             await api.delete(`admin/moments/${id}`, { meta: { auth: "admin" } });
+            toast({ title: "Moment removed" });
             fetchMoments();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Failed to remove", description: err?.response?.data?.msg, variant: "destructive" });
+        }
     };
 
     return (
@@ -103,19 +117,31 @@ function MomentsAdminPage() {
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-white/10">
-                                    {["Caption", "User", "Media", "Status", "Featured", "Reports", "Submitted", "Actions"].map(h => (
+                                    {["", "Caption", "User", "Media", "Status", "Featured", "Reports", "Submitted", "Actions"].map(h => (
                                         <th key={h} className="text-left px-4 py-3 text-xs text-neutral-500 font-medium uppercase tracking-wider">{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={8} className="text-center py-12 text-neutral-500">Loading...</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-12 text-neutral-500">Loading...</td></tr>
                                 ) : moments.length === 0 ? (
-                                    <tr><td colSpan={8} className="text-center py-12 text-neutral-500">No moments found</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-12">
+                                        <EmptyGalleryIllustration className="w-20 h-20 mx-auto mb-2" />
+                                        <p className="text-neutral-500 text-sm">No moments found</p>
+                                    </td></tr>
                                 ) : moments.map(m => (
                                     <tr key={m._id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                                        <td className="px-4 py-3 text-sm text-white max-w-[200px] truncate">{m.caption}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 border border-white/10 shrink-0">
+                                                {m.media?.[0]?.url ? (
+                                                    <img src={m.media[0].url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-neutral-600"><ImageOff className="w-4 h-4" /></div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-white max-w-[140px] sm:max-w-[200px] truncate">{m.caption}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{m.userId?.name || "—"}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{m.media?.length || 0} files</td>
                                         <td className="px-4 py-3">
@@ -170,6 +196,25 @@ function MomentsAdminPage() {
                             <p className="text-sm text-neutral-400 mb-4">{selected.caption}</p>
                             <p className="text-xs text-neutral-500 mb-6">{selected.description}</p>
 
+                            {selected.media?.length > 0 && (
+                                <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                                    {selected.media.map((m, i) => (
+                                        <img key={i} src={m.url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0" />
+                                    ))}
+                                </div>
+                            )}
+
+                            {selected.proofs?.length > 0 && (
+                                <div className="mb-4">
+                                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2">Verification Proofs (private)</p>
+                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                        {selected.proofs.map((url, i) => (
+                                            <img key={i} src={url} alt="" className="w-20 h-20 rounded-xl object-cover border border-amber-500/20 shrink-0" />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {selected.reports?.length > 0 && (
                                 <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-xl">
                                     <p className="text-xs text-red-400 font-semibold mb-2">⚠ {selected.reports.length} Report(s)</p>
@@ -205,6 +250,8 @@ function MomentsAdminPage() {
                     </div>
                 </div>
             )}
+
+            {ConfirmDialog}
         </div>
     );
 }

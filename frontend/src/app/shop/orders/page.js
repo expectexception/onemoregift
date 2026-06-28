@@ -6,15 +6,19 @@ import api from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { useAuth } from "@/app/context/AuthContext";
-import { 
-    ShoppingBag, 
-    Calendar, 
-    MapPin, 
-    QrCode, 
-    AlertTriangle, 
-    XCircle, 
-    CheckCircle2, 
-    Clock, 
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/app/components/ConfirmDialog";
+import OrderStatusTimeline from "@/app/components/OrderStatusTimeline";
+import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
+import {
+    ShoppingBag,
+    Calendar,
+    MapPin,
+    QrCode,
+    AlertTriangle,
+    XCircle,
+    CheckCircle2,
+    Clock,
     HelpCircle,
     CreditCard
 } from "lucide-react";
@@ -22,6 +26,8 @@ import {
 export default function MyOrdersPage() {
     const router = useRouter();
     const { user, userAuthenticated, loadingUser } = useAuth();
+    const { toast } = useToast();
+    const { confirm, ConfirmDialog } = useConfirm();
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -58,21 +64,27 @@ export default function MyOrdersPage() {
 
     // Cancel order handler
     const handleCancelOrder = async (orderId) => {
-        if (!confirm("Are you sure you want to cancel this order? Stock will be restored.")) return;
-        
+        const ok = await confirm({
+            title: "Cancel this order?",
+            description: "Stock will be restored and this action cannot be undone.",
+            confirmText: "Cancel Order",
+            danger: true,
+        });
+        if (!ok) return;
+
         try {
             const { data } = await api.patch(`shop/orders/${orderId}/cancel`, {}, {
                 meta: { auth: "user" }
             });
             if (!data.error) {
-                alert("Order cancelled successfully.");
+                toast({ title: "Order cancelled", description: "Your order has been cancelled and stock restored." });
                 fetchOrders();
             } else {
-                alert(data.msg || "Failed to cancel order.");
+                toast({ title: "Cancellation failed", description: data.msg || "Failed to cancel order.", variant: "destructive" });
             }
         } catch (err) {
             console.error(err);
-            alert("Error cancelling order.");
+            toast({ title: "Error", description: "Something went wrong cancelling the order.", variant: "destructive" });
         }
     };
 
@@ -91,19 +103,19 @@ export default function MyOrdersPage() {
 
             if (!data.error) {
                 if (success) {
-                    alert("Payment simulation successful! Order paid.");
+                    toast({ title: "Payment successful", description: "Your order has been marked as paid." });
                 } else {
-                    alert("Payment simulation marked failed.");
+                    toast({ title: "Payment failed", description: "Payment simulation marked as failed.", variant: "destructive" });
                 }
                 setPaymentModalOpen(false);
                 setRetryOrder(null);
                 fetchOrders();
             } else {
-                alert("Simulation API failed.");
+                toast({ title: "Simulation error", description: "Payment simulation API failed.", variant: "destructive" });
             }
         } catch (err) {
             console.error(err);
-            alert("Payment simulation error.");
+            toast({ title: "Error", description: "Payment simulation error.", variant: "destructive" });
         } finally {
             setPaymentProcessing(false);
         }
@@ -149,7 +161,7 @@ export default function MyOrdersPage() {
                 return "bg-amber-950/20 text-amber-500 border-amber-900/30";
             case "paid":
                 return "bg-blue-950/20 text-blue-500 border-blue-900/30";
-            case "ready":
+            case "ready_for_pickup":
                 return "bg-indigo-950/20 text-indigo-500 border-indigo-900/30";
             case "collected":
                 return "bg-emerald-950/20 text-emerald-500 border-emerald-900/30";
@@ -191,7 +203,7 @@ export default function MyOrdersPage() {
                     </div>
                 ) : orders.length === 0 ? (
                     <div className="text-center py-20 border border-dashed border-neutral-800 rounded-3xl bg-neutral-950/20">
-                        <ShoppingBag className="w-12 h-12 text-neutral-600 mx-auto mb-4" />
+                        <EmptyTimelineIllustration className="w-28 h-28 mx-auto mb-2" />
                         <h3 className="text-lg font-bold text-neutral-300">No orders found</h3>
                         <p className="text-neutral-500 text-sm mt-1 mb-6">You haven&apos;t made any purchases or claims yet.</p>
                         <button
@@ -205,7 +217,7 @@ export default function MyOrdersPage() {
                     <div className="space-y-8">
                         {orders.map((order) => {
                             const isCancelable = ["pending", "paid"].includes(order.status);
-                            const hasQR = ["paid", "ready"].includes(order.status) && order.pickupCode;
+                            const hasQR = ["paid", "ready_for_pickup"].includes(order.status) && order.pickupCode;
 
                             return (
                                 <div key={order._id} className="premium-card rounded-3xl border border-neutral-900 bg-neutral-950 overflow-hidden flex flex-col">
@@ -232,6 +244,11 @@ export default function MyOrdersPage() {
                                                 {order.status}
                                             </span>
                                         </div>
+                                    </div>
+
+                                    {/* Status Timeline */}
+                                    <div className="px-6 sm:px-10 pt-6">
+                                        <OrderStatusTimeline status={order.status} />
                                     </div>
 
                                     {/* Order items grid list */}
@@ -439,6 +456,8 @@ export default function MyOrdersPage() {
                     </div>
                 </div>
             )}
+
+            {ConfirmDialog}
         </div>
     );
 }

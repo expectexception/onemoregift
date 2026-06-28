@@ -62,6 +62,8 @@ const UsersPage = () => {
 
     // Unified dialog state (one dialog, no shared-state bug)
     const [dialog, setDialog] = useState({ open: false, type: null, user: null });
+    const [banReason, setBanReason] = useState("");
+    const [banDuration, setBanDuration] = useState("");
 
     const limit = 10;
 
@@ -143,7 +145,11 @@ const UsersPage = () => {
         }
     };
 
-    const closeDialog = () => setDialog({ open: false, type: null, user: null });
+    const closeDialog = () => {
+        setDialog({ open: false, type: null, user: null });
+        setBanReason("");
+        setBanDuration("");
+    };
 
     const handleDelete = async () => {
         try {
@@ -168,9 +174,14 @@ const UsersPage = () => {
     const handleBan = async (ban) => {
         try {
             const endpoint = ban ? "admin/users/ban" : "admin/users/unban";
+            const payload = { userId: dialog.user._id };
+            if (ban) {
+                if (banReason.trim()) payload.reason = banReason.trim();
+                if (banDuration) payload.durationDays = Number(banDuration);
+            }
             const { data } = await api.post(
                 endpoint,
-                { userId: dialog.user._id },
+                payload,
                 { meta: { auth: "admin" } }
             );
             if (!data.error) {
@@ -302,6 +313,14 @@ const UsersPage = () => {
                                                     <span className={`w-1.5 h-1.5 rounded-full ${user.blocked ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"}`} />
                                                     {user.blocked ? "Blocked" : "Active"}
                                                 </span>
+                                                {user.blocked && (user.banReason || user.banExpiresAt) && (
+                                                    <div className="text-[10px] text-neutral-500 mt-1 max-w-[160px] truncate" title={user.banReason}>
+                                                        {user.banReason || "No reason given"}
+                                                        {user.banExpiresAt && (
+                                                            <> · until {new Date(user.banExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="hidden lg:table-cell">
                                                 {user.isGoogleAuth ? (
@@ -416,6 +435,34 @@ const UsersPage = () => {
                                 `Unblock ${dialog.user?.name}? They will regain full access to the platform.`}
                         </DialogDescription>
                     </DialogHeader>
+                    {dialog.type === "ban" && (
+                        <div className="space-y-3 py-1">
+                            <div>
+                                <label className="text-[10px] font-bold tracking-widest text-neutral-500 mb-1.5 block">
+                                    REASON (optional)
+                                </label>
+                                <Input
+                                    placeholder="e.g. Spam, abusive behavior..."
+                                    value={banReason}
+                                    onChange={(e) => setBanReason(e.target.value)}
+                                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 text-xs"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold tracking-widest text-neutral-500 mb-1.5 block">
+                                    DURATION IN DAYS (blank = permanent)
+                                </label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    placeholder="e.g. 7"
+                                    value={banDuration}
+                                    onChange={(e) => setBanDuration(e.target.value)}
+                                    className="bg-white/[0.03] border-white/[0.08] text-white placeholder:text-neutral-600 text-xs"
+                                />
+                            </div>
+                        </div>
+                    )}
                     <DialogFooter className="gap-2">
                         <Button
                             variant="secondary"

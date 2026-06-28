@@ -1,7 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/app/components/ConfirmDialog";
+import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
 import { Package, Search, Eye, CheckCircle, QrCode } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -16,12 +20,15 @@ const STATUS_COLORS = {
 const STATUS_OPTIONS = ["", "pending", "paid", "ready_for_pickup", "collected", "cancelled", "refunded"];
 
 function OrdersAdminPage() {
+    const { toast } = useToast();
+    const { confirm, ConfirmDialog } = useConfirm();
+    const searchParams = useSearchParams();
     const [orders, setOrders] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [status, setStatus] = useState("");
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(searchParams.get("search") || "");
     const [stats, setStats] = useState({});
     const [selected, setSelected] = useState(null);
     const [newStatus, setNewStatus] = useState("");
@@ -58,9 +65,12 @@ function OrdersAdminPage() {
         setActionLoading(true);
         try {
             await api.patch(`admin/orders/${selected._id}/status`, { status: newStatus, adminNote }, { meta: { auth: "admin" } });
+            toast({ title: "Order updated", description: `Status set to "${newStatus.replace(/_/g, " ")}".` });
             setSelected(null);
             fetchOrders(); fetchStats();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Update failed", description: err?.response?.data?.msg, variant: "destructive" });
+        }
         setActionLoading(false);
     };
 
@@ -69,22 +79,28 @@ function OrdersAdminPage() {
         setActionLoading(true);
         try {
             await api.post(`admin/orders/${selected._id}/verify-pickup`, { pickupCode }, { meta: { auth: "admin" } });
+            toast({ title: "Pickup verified", description: "Order marked as collected." });
             setSelected(null);
             fetchOrders(); fetchStats();
         } catch (err) {
-            alert(err?.response?.data?.msg || "Invalid pickup code");
+            toast({ title: "Invalid pickup code", description: err?.response?.data?.msg, variant: "destructive" });
         }
         setActionLoading(false);
     };
 
     const handleRefund = async () => {
-        if (!selected || !confirm("Process refund for this order?")) return;
+        if (!selected) return;
+        const ok = await confirm({ title: "Process refund?", description: "This will mark the order as refunded.", confirmText: "Refund", danger: true });
+        if (!ok) return;
         setActionLoading(true);
         try {
             await api.post(`admin/orders/${selected._id}/refund`, { reason: refundReason }, { meta: { auth: "admin" } });
+            toast({ title: "Refund processed" });
             setSelected(null);
             fetchOrders(); fetchStats();
-        } catch (_) {}
+        } catch (err) {
+            toast({ title: "Refund failed", description: err?.response?.data?.msg, variant: "destructive" });
+        }
         setActionLoading(false);
     };
 
@@ -144,7 +160,10 @@ function OrdersAdminPage() {
                                 {loading ? (
                                     <tr><td colSpan={8} className="text-center py-12 text-neutral-500">Loading...</td></tr>
                                 ) : orders.length === 0 ? (
-                                    <tr><td colSpan={8} className="text-center py-12 text-neutral-500">No orders found</td></tr>
+                                    <tr><td colSpan={8} className="text-center py-12">
+                                        <EmptyTimelineIllustration className="w-20 h-20 mx-auto mb-2" />
+                                        <p className="text-neutral-500 text-sm">No orders found</p>
+                                    </td></tr>
                                 ) : orders.map(o => (
                                     <tr key={o._id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                                         <td className="px-4 py-3 text-sm text-white font-mono">{o.orderNumber}</td>
@@ -256,6 +275,8 @@ function OrdersAdminPage() {
                     </div>
                 </div>
             )}
+
+            {ConfirmDialog}
         </div>
     );
 }

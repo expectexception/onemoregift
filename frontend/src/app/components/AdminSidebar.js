@@ -10,10 +10,12 @@ import SettingsIcon from "./SVGIcons/SettingsIcon";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
 import AnimatedGiftSVG from "./AnimatedGiftSVG";
+import { useAdminPendingCounts } from "@/app/hooks/useAdminPendingCounts";
 
 export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed, setIsCollapsed }) {
     const [mounted, setMounted] = useState(false);
     const onlyWidth = useWindowWidth();
+    const pendingCounts = useAdminPendingCounts();
 
     useEffect(() => {
         setMounted(true);
@@ -69,13 +71,15 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
             title: "Surprise Requests",
             href: "/admin/dashboard/surprise",
             icon: Gift,
-            variant: "ghost"
+            variant: "ghost",
+            badge: pendingCounts.surprise,
         },
         {
             title: "Happy Moments",
             href: "/admin/dashboard/moments",
             icon: Heart,
-            variant: "ghost"
+            variant: "ghost",
+            badge: pendingCounts.moments,
         },
         {
             title: "Gifts",
@@ -89,7 +93,8 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
             title: "Products",
             href: "/admin/dashboard/products",
             icon: ShoppingBag,
-            variant: "ghost"
+            variant: "ghost",
+            badge: pendingCounts.lowStock,
         },
         {
             title: "Orders",

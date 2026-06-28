@@ -40,6 +40,12 @@ export function Nav({ links, isCollapsed }) {
                                             "h-5 w-5"
                                         )} />
 
+                                        {!!link.badge && (
+                                            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-[#0b0b0b]">
+                                                {link.badge > 9 ? "9+" : link.badge}
+                                            </span>
+                                        )}
+
                                         <span className="sr-only">{link.title}</span>
                                     </Link>
                                 </TooltipTrigger>
@@ -47,7 +53,7 @@ export function Nav({ links, isCollapsed }) {
                                     side="right"
                                     className="bg-[#111] border-white/10 text-white text-xs px-3 py-1.5 rounded-md shadow-xl"
                                 >
-                                    {link.title}
+                                    {link.title}{!!link.badge && ` (${link.badge})`}
                                 </TooltipContent>
                             </Tooltip>
                         ) : (
@@ -75,7 +81,13 @@ export function Nav({ links, isCollapsed }) {
                                     {link.title}
                                 </span>
 
-                                {link.label && (
+                                {!!link.badge && (
+                                    <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                                        {link.badge > 99 ? "99+" : link.badge}
+                                    </span>
+                                )}
+
+                                {!link.badge && link.label && (
                                     <span className={cn(
                                         "ml-auto font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/[0.02] border border-white/[0.04]",
                                         isActive ? "text-white" : "text-neutral-600"

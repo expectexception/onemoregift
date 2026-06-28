@@ -2,6 +2,15 @@ import axios from "axios";
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:9000/api/v1/";
 
+// Server origin (no /api/v1 suffix) for resolving relative media URLs like /uploads/images/x.jpg
+const SERVER_ORIGIN = (process.env.NEXT_PUBLIC_SERVER_URL || baseURL.replace(/\/api\/v1\/?$/, "")).replace(/\/$/, "");
+
+// Resolves a possibly-relative media path (image/video) returned by the backend into an absolute URL.
+export const mediaUrl = (path) => {
+    if (!path) return path;
+    return path.startsWith("http") ? path : `${SERVER_ORIGIN}${path}`;
+};
+
 const api = axios.create({
     baseURL,
     timeout: 15000,

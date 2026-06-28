@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { HiOutlineLogout } from "react-icons/hi";
 import { SheetDemo } from "./Sidebar";
 import { useRouter } from 'next/navigation'
@@ -11,11 +12,24 @@ import {
 import { useAuth } from "../context/AuthContext";
 import AnimatedGiftSVG from "./AnimatedGiftSVG";
 import { UserIcon, LockIcon } from "./SVGIcons";
+import { readCartCount, CART_UPDATED_EVENT } from "../utils/cart";
 
 export default function Navbar() {
     const { userAuthenticated, loadingUser, logoutUser } = useAuth();
     let isUserLoggedIn = !loadingUser && userAuthenticated
     const router = useRouter()
+    const [cartCount, setCartCount] = useState(0);
+
+    useEffect(() => {
+        const refresh = () => setCartCount(readCartCount());
+        refresh();
+        window.addEventListener(CART_UPDATED_EVENT, refresh);
+        window.addEventListener("storage", refresh);
+        return () => {
+            window.removeEventListener(CART_UPDATED_EVENT, refresh);
+            window.removeEventListener("storage", refresh);
+        };
+    }, []);
 
     const handleUserLogout = async () => {
         await logoutUser();
@@ -43,7 +57,7 @@ export default function Navbar() {
                     <NavLink href="/" label="Home" />
                     <NavLink href="/giveaway" label="Giveaways" />
                     <NavLink href="/surprise-me" label="Surprises & Moments" />
-                    <NavLink href="/shop" label="Shop" />
+                    <NavLink href="/shop" label="Shop" badge={cartCount} />
                     <NavLink href="/winners" label="Winners" />
                     <NavLink href="/about-us" label="About" />
                 </div>
@@ -107,7 +121,7 @@ export default function Navbar() {
                                     <MobileNavLink href="/" label="Home" />
                                     <MobileNavLink href="/giveaway" label="Giveaways" />
                                     <MobileNavLink href="/surprise-me" label="Surprises & Moments" />
-                                    <MobileNavLink href="/shop" label="Shop" />
+                                    <MobileNavLink href="/shop" label="Shop" badge={cartCount} />
                                     <MobileNavLink href="/winners" label="Winners" />
                                     <MobileNavLink href="/about-us" label="About" />
                                 </div>
@@ -151,26 +165,38 @@ export default function Navbar() {
     );
 }
 
-function NavLink({ href, label }) {
+function NavLink({ href, label, badge }) {
     return (
         <Link
             href={href}
             className="text-neutral-400 hover:text-white font-medium transition-colors duration-300 relative group"
         >
-            {label}
+            <span className="inline-flex items-center gap-1.5">
+                {label}
+                {!!badge && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-none">
+                        {badge > 9 ? "9+" : badge}
+                    </span>
+                )}
+            </span>
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300" />
         </Link>
     );
 }
 
-function MobileNavLink({ href, label, icon }) {
+function MobileNavLink({ href, label, icon, badge }) {
     return (
         <Link
             href={href}
             className="flex items-center gap-3 px-3 py-2.5 text-neutral-300 hover:text-white hover:bg-white/5 rounded-xl transition-all"
         >
             {icon && <span className="text-lg text-red-500">{icon}</span>}
-            <span>{label}</span>
+            <span className="flex-1">{label}</span>
+            {!!badge && (
+                <span className="inline-flex items-center justify-center min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-none">
+                    {badge > 9 ? "9+" : badge}
+                </span>
+            )}
         </Link>
     );
 }

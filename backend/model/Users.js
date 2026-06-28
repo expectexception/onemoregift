@@ -57,6 +57,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    banReason: { type: String },
+    bannedAt: { type: Date },
+    banExpiresAt: { type: Date }, // null/unset = permanent ban
+    bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'admins' },
     resetToken: {
         token: { type: String },
         attempts: { type: Number },
@@ -198,4 +202,18 @@ userSchema.post('save', function (doc) { decryptDoc(doc); });
 
 const Users = mongoose.model('Users', userSchema);
 
+// Lazily lifts an expired temporary ban and reports whether the user is currently banned.
+async function isUserBanned(user) {
+    if (!user.blocked) return false;
+    if (user.banExpiresAt && user.banExpiresAt.getTime() <= Date.now()) {
+        await Users.findByIdAndUpdate(user._id, {
+            blocked: false,
+            $unset: { banReason: 1, bannedAt: 1, banExpiresAt: 1, bannedBy: 1 },
+        });
+        return false;
+    }
+    return true;
+}
+
 module.exports = Users;
+module.exports.isUserBanned = isUserBanned;

@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useParams, useRouter } from "next/navigation";
-import api from "@/app/utils/apiClient";
+import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
-import { 
-    ShoppingBag, 
-    Star, 
-    ShoppingCart, 
-    Plus, 
-    Minus, 
+import { useToast } from "@/hooks/use-toast";
+import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
+import {
+    ShoppingBag,
+    Star,
+    ShoppingCart,
+    Plus,
+    Minus,
     ArrowLeft,
     CheckCircle,
     Truck,
@@ -22,6 +24,7 @@ export default function ProductDetailPage() {
     const params = useParams();
     const id = params?.id;
     const router = useRouter();
+    const { toast } = useToast();
 
     const [product, setProduct] = useState(null);
     const [related, setRelated] = useState([]);
@@ -96,21 +99,22 @@ export default function ProductDetailPage() {
 
     const updateCart = (newCart) => {
         setCart(newCart);
-        localStorage.setItem("omg_cart", JSON.stringify(newCart));
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newCart));
+        notifyCartUpdated();
     };
 
     const handleAddToCart = (redirectToCheck = false) => {
         if (!product) return;
 
         const limitStock = product.hasVariants && selectedVariant ? selectedVariant.stock : product.stock;
-        
+
         if (limitStock <= 0) {
-            alert("This item/variant is currently out of stock.");
+            toast({ title: "Out of stock", description: "This item/variant is currently unavailable.", variant: "destructive" });
             return;
         }
 
         if (quantity > limitStock) {
-            alert(`Only ${limitStock} items available in stock.`);
+            toast({ title: "Stock limit reached", description: `Only ${limitStock} item(s) available.`, variant: "destructive" });
             return;
         }
 
@@ -122,7 +126,7 @@ export default function ProductDetailPage() {
         if (existingItemIndex > -1) {
             const currentQty = updatedCart[existingItemIndex].quantity;
             if (currentQty + quantity > limitStock) {
-                alert(`Cannot add more. Max stock limit is ${limitStock}.`);
+                toast({ title: "Stock limit reached", description: `Max stock limit is ${limitStock}.`, variant: "destructive" });
                 return;
             }
             updatedCart[existingItemIndex].quantity += quantity;
@@ -144,7 +148,7 @@ export default function ProductDetailPage() {
         if (redirectToCheck) {
             router.push("/shop/checkout");
         } else {
-            alert("Added to cart successfully!");
+            toast({ title: "Added to cart", description: `${product.name} is in your cart.` });
         }
     };
 
@@ -218,7 +222,7 @@ export default function ProductDetailPage() {
                         <div className="premium-card aspect-square bg-neutral-950 rounded-2xl overflow-hidden border border-neutral-900 flex items-center justify-center">
                             {activeImage ? (
                                 <img 
-                                    src={activeImage.startsWith('http') ? activeImage : `http://localhost:9000${activeImage}`} 
+                                    src={mediaUrl(activeImage)} 
                                     alt={product.name}
                                     className="w-full h-full object-cover"
                                 />
@@ -239,7 +243,7 @@ export default function ProductDetailPage() {
                                         }`}
                                     >
                                         <img 
-                                            src={img.startsWith('http') ? img : `http://localhost:9000${img}`} 
+                                            src={mediaUrl(img)} 
                                             alt={`${product.name} thumbnail ${index}`} 
                                             className="w-full h-full object-cover"
                                         />
@@ -442,7 +446,7 @@ export default function ProductDetailPage() {
                                         <div className="aspect-video bg-neutral-950 overflow-hidden relative">
                                             {prod.images?.[0] ? (
                                                 <img 
-                                                    src={prod.images[0].startsWith('http') ? prod.images[0] : `http://localhost:9000${prod.images[0]}`} 
+                                                    src={mediaUrl(prod.images[0])} 
                                                     alt={prod.name}
                                                     className="w-full h-full object-cover"
                                                 />

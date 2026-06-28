@@ -11,7 +11,7 @@ const createRequest = async (req, res) => {
         }
 
         const doc = await SurpriseRequest.create({
-            userId: req.user.id,
+            userId: req.user.data._id,
             eventName,
             eventType,
             eventDate,
@@ -36,7 +36,7 @@ const createRequest = async (req, res) => {
 // GET /api/v1/surprise/my-requests
 const listMyRequests = async (req, res) => {
     try {
-        const data = await SurpriseRequest.find({ userId: req.user.id })
+        const data = await SurpriseRequest.find({ userId: req.user.data._id })
             .populate('assignedGift', 'name estimatedValue description')
             .sort({ createdAt: -1 });
         return res.json({ error: false, data });
@@ -48,7 +48,7 @@ const listMyRequests = async (req, res) => {
 // GET /api/v1/surprise/:id
 const getMyRequest = async (req, res) => {
     try {
-        const doc = await SurpriseRequest.findOne({ _id: req.params.id, userId: req.user.id })
+        const doc = await SurpriseRequest.findOne({ _id: req.params.id, userId: req.user.data._id })
             .populate('assignedGift', 'name estimatedValue description');
         if (!doc) return res.status(404).json({ error: true, msg: 'Request not found' });
         return res.json({ error: false, data: doc });
@@ -60,7 +60,7 @@ const getMyRequest = async (req, res) => {
 // PATCH /api/v1/surprise/:id/cancel
 const cancelMyRequest = async (req, res) => {
     try {
-        const doc = await SurpriseRequest.findOne({ _id: req.params.id, userId: req.user.id });
+        const doc = await SurpriseRequest.findOne({ _id: req.params.id, userId: req.user.data._id });
         if (!doc) return res.status(404).json({ error: true, msg: 'Request not found' });
 
         if (!['draft', 'submitted', 'under_review'].includes(doc.status)) {

@@ -283,11 +283,25 @@ const allUsers = async (req, res) => {
 
 const banUser = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { userId, reason, durationDays } = req.body;
         if (!userId) return res.status(400).json({ error: true, msg: 'userId required' });
         const findUser = await Users.findById(userId);
         if (!findUser) return res.status(404).json({ error: true, msg: 'User not found' });
-        await Users.findByIdAndUpdate(userId, { blocked: true });
+
+        const update = {
+            blocked: true,
+            banReason: reason || undefined,
+            bannedAt: new Date(),
+            bannedBy: req.adminDoc?._id,
+        };
+        if (durationDays) {
+            update.banExpiresAt = new Date(Date.now() + Number(durationDays) * 24 * 60 * 60 * 1000);
+        } else {
+            update.$unset = { banExpiresAt: 1 };
+        }
+        const { $unset, ...setFields } = update;
+        const updateDoc = $unset ? { $set: setFields, $unset } : { $set: setFields };
+        await Users.findByIdAndUpdate(userId, updateDoc);
         return res.status(200).json({ error: false, msg: 'User blocked' });
     } catch (error) {
         return res.status(500).json({ error: true, msg: 'Something went wrong' });
@@ -300,7 +314,10 @@ const unBanUser = async (req, res) => {
         if (!userId) return res.status(400).json({ error: true, msg: 'userId required' });
         const findUser = await Users.findById(userId);
         if (!findUser) return res.status(404).json({ error: true, msg: 'User not found' });
-        await Users.findByIdAndUpdate(userId, { blocked: false });
+        await Users.findByIdAndUpdate(userId, {
+            blocked: false,
+            $unset: { banReason: 1, bannedAt: 1, banExpiresAt: 1, bannedBy: 1 },
+        });
         return res.status(200).json({ error: false, msg: 'User unblocked' });
     } catch (error) {
         return res.status(500).json({ error: true, msg: 'Something went wrong' });

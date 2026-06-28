@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CheckIcon, TrophyIcon, VerificationIcon, UsersIcon } from "./SVGIcons";
 import RevealOnScroll from "./RevealOnScroll";
 import { formatCompactNumber, formatIndianCurrency, usePlatformStats } from "../hooks/usePlatformStats";
+import { useCountUp } from "../hooks/useCountUp";
 
 const heroImages = [
     "/images/giftsa.webp",
@@ -19,7 +20,7 @@ const heroImages = [
     "/images/gift-8.png",
 ];
 
-export default function HeroSection() {
+export default function HeroSection({ showStats = true }) {
     const router = useRouter();
     const sectionRef = useRef(null);
     const cursorRef = useRef(null);
@@ -70,7 +71,7 @@ export default function HeroSection() {
             {heroImages.map((img, i) => (
                 <div
                     key={img}
-                    className="absolute inset-0 transition-opacity duration-[1600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    className="absolute inset-0 transition-opacity [transition-duration:1600ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]"
                     style={{
                         opacity: i === currentImage ? 0.5 : 0,
                         willChange: 'opacity',
@@ -161,52 +162,16 @@ export default function HeroSection() {
                 </RevealOnScroll>
 
                 {/* Stats */}
-                <RevealOnScroll delayMs={290}>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
-                        <StatCard Icon={CheckIcon} value={statsLoading ? "..." : formatCompactNumber(stats.activeGiveaways)} label="Active" />
-                        <StatCard Icon={TrophyIcon} value={statsLoading ? "..." : formatCompactNumber(stats.totalWinners)} label="Winners" />
-                        <StatCard Icon={VerificationIcon} value={statsLoading ? "..." : formatIndianCurrency(stats.totalPrizeValue)} label="Prizes" />
-                        <StatCard Icon={UsersIcon} value={statsLoading ? "..." : formatCompactNumber(stats.registeredUsers)} label="Users" />
-                    </div>
-                </RevealOnScroll>
-
-                {/* Steps */}
-                <RevealOnScroll delayMs={360}>
-                    <div className="mt-12 sm:mt-16 bg-white/[0.02] border border-white/[0.05] rounded-2xl p-6 sm:p-8 backdrop-blur-sm max-w-4xl mx-auto">
-                        <div className="flex flex-col md:flex-row items-center justify-center gap-6 sm:gap-10">
-                            <div className="flex flex-col items-center group">
-                                <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 group-hover:scale-110 group-hover:bg-red-500/20 transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-                                </div>
-                                <span className="text-neutral-200 font-bold text-sm tracking-wide">1. Sign Up</span>
-                            </div>
-                            
-                            <div className="hidden md:flex w-16 items-center justify-center">
-                                <div className="w-full h-px bg-gradient-to-r from-red-500/20 via-red-500/50 to-red-500/20"></div>
-                            </div>
-                            <div className="md:hidden h-8 w-px bg-gradient-to-b from-red-500/20 via-red-500/50 to-red-500/20"></div>
-
-                            <div className="flex flex-col items-center group">
-                                <div className="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                                </div>
-                                <span className="text-neutral-200 font-bold text-sm tracking-wide">2. Complete Tasks</span>
-                            </div>
-
-                            <div className="hidden md:flex w-16 items-center justify-center">
-                                <div className="w-full h-px bg-gradient-to-r from-blue-500/20 via-blue-500/50 to-amber-500/20"></div>
-                            </div>
-                            <div className="md:hidden h-8 w-px bg-gradient-to-b from-blue-500/20 via-blue-500/50 to-amber-500/20"></div>
-
-                            <div className="flex flex-col items-center group">
-                                <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 group-hover:scale-110 group-hover:bg-amber-500/20 transition-all duration-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" x2="12" y1="22" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-                                </div>
-                                <span className="text-neutral-200 font-bold text-sm tracking-wide">3. Gift Delivered</span>
-                            </div>
+                {showStats && (
+                    <RevealOnScroll delayMs={290}>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
+                            <StatCard Icon={CheckIcon} target={stats.activeGiveaways} format={formatCompactNumber} loading={statsLoading} label="Active" />
+                            <StatCard Icon={TrophyIcon} target={stats.totalWinners} format={formatCompactNumber} loading={statsLoading} label="Winners" />
+                            <StatCard Icon={VerificationIcon} target={stats.totalPrizeValue} format={formatIndianCurrency} loading={statsLoading} label="Prizes" />
+                            <StatCard Icon={UsersIcon} target={stats.registeredUsers} format={formatCompactNumber} loading={statsLoading} label="Users" />
                         </div>
-                    </div>
-                </RevealOnScroll>
+                    </RevealOnScroll>
+                )}
             </div>
 
             {/* Bottom gradient fade */}
@@ -215,13 +180,16 @@ export default function HeroSection() {
     );
 }
 
-function StatCard({ Icon, value, label }) {
+function StatCard({ Icon, target, format, loading, label }) {
+    const { ref, value } = useCountUp(target, { durationMs: 1600 });
     return (
-        <div className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
+        <div ref={ref} className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
             <div className="mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
                 <Icon className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
-            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1">{value}</div>
+            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1 tabular-nums">
+                {loading ? "..." : format(value)}
+            </div>
             <div className="text-[10px] sm:text-sm text-neutral-500 uppercase tracking-wider">{label}</div>
         </div>
     );
