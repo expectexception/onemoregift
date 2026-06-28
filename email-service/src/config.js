@@ -70,6 +70,7 @@ const config = {
     supportEmail: process.env.SUPPORT_EMAIL || process.env.SENDER_EMAIL || "support@onemoregift.in",
     primaryColor: process.env.BRAND_PRIMARY || "#ef4444",
     accentColor: process.env.BRAND_ACCENT || "#f97316",
+    logoUrl: process.env.BRAND_LOGO_URL || `${(process.env.APP_URL || "https://onemoregift.in").replace(/\/$/, "")}/images/gift.png`,
   },
   smtp: {
     host: process.env.SMTP_HOST || "",

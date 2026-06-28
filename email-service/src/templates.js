@@ -16,6 +16,7 @@ function normalizeTheme(payload = {}) {
   return {
     appName: theme.appName || payload.appName || config.brand.appName,
     appUrl: theme.appUrl || payload.appUrl || config.brand.appUrl,
+    logoUrl: theme.logoUrl || payload.logoUrl || config.brand.logoUrl,
     supportEmail: theme.supportEmail || payload.supportEmail || config.brand.supportEmail,
     primaryColor: theme.primaryColor || config.brand.primaryColor,
     accentColor: theme.accentColor || config.brand.accentColor,
@@ -106,7 +107,9 @@ function layout(payload, content) {
           <tr>
             <td style="padding:0 0 18px;text-align:center;">
               <a href="${escapeHtml(theme.appUrl)}" style="display:inline-block;text-decoration:none;color:${theme.text};font-size:26px;font-weight:900;letter-spacing:-.04em;">
-                <span style="display:inline-block;width:42px;height:42px;margin-right:10px;vertical-align:middle;border-radius:14px;background:${theme.primaryColor};text-align:center;line-height:42px;color:#ffffff;font-size:22px;">&#127873;</span>
+                ${theme.logoUrl
+      ? `<img src="${escapeHtml(theme.logoUrl)}" width="44" height="44" alt="${escapeHtml(theme.appName)}" style="display:inline-block;width:44px;height:44px;margin-right:10px;vertical-align:middle;border:0;outline:none;text-decoration:none;">`
+      : `<span style="display:inline-block;width:42px;height:42px;margin-right:10px;vertical-align:middle;border-radius:14px;background:${theme.primaryColor};text-align:center;line-height:42px;color:#ffffff;font-size:22px;">&#127873;</span>`}
                 ${brandHtml(theme)}
               </a>
             </td>
