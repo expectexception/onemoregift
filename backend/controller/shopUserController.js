@@ -66,7 +66,8 @@ const getProduct = async (req, res) => {
 // Create Order
 const createOrder = async (req, res) => {
     try {
-        const { items, pickupStoreId, scheduledPickupTime, customerNote } = req.body;
+        const { items, pickupStoreId, scheduledPickupTime, customerNote, paymentMethod } = req.body;
+        const method = String(paymentMethod || 'online').toLowerCase() === 'cod' ? 'cod' : 'online';
         if (!items || !items.length) {
             return res.status(400).json({ error: true, msg: 'Order items cannot be empty' });
         }
@@ -166,7 +167,7 @@ const createOrder = async (req, res) => {
         const total = subtotal; // can implement coupons later
 
         try {
-            const order = await Order.create({
+            const orderData = {
                 userId: req.user.data._id,
                 items: processedItems,
                 subtotal,
@@ -176,7 +177,24 @@ const createOrder = async (req, res) => {
                 customerNote,
                 status: 'pending',
                 paymentStatus: 'pending'
-            });
+            };
+
+            // Cash on Delivery / Pay at Pickup: confirm the order immediately (no online
+            // payment step). Payment is collected on pickup, so paymentStatus stays 'pending'.
+            if (method === 'cod') {
+                orderData.paymentMethod = 'COD';
+                orderData.status = 'ready_for_pickup';
+                orderData.pickupCode = crypto.randomBytes(6).toString('hex').toUpperCase();
+            }
+
+            const order = await Order.create(orderData);
+
+            if (method === 'cod') {
+                for (const item of order.items) {
+                    Product.findByIdAndUpdate(item.productId, { $inc: { totalOrders: item.quantity } }).exec().catch(() => {});
+                }
+            }
+
             return res.status(201).json({ error: false, data: order });
         } catch (createErr) {
             await rollback();

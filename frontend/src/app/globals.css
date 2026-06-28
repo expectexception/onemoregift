@@ -11,10 +11,14 @@ body {
   color: #f1f1f1;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  /* Prevent stray horizontal scroll on mobile (decorative blur glows, wide rows, etc.).
-     `clip` is used instead of `hidden` so it does NOT create a scroll container and
-     therefore does not break the sticky navbar's position: sticky. */
-  overflow-x: clip;
+}
+
+/* Prevent stray horizontal scroll on mobile (decorative blur glows, wide rows, etc.)
+   WITHOUT breaking vertical scrolling. Applying overflow-x to <body> makes the
+   computed overflow-y `clip` too (CSS spec), which freezes the page — so we scope
+   the horizontal clip to the root <html> element instead, where it is safe. */
+html {
+  overflow-x: hidden;
 }
 
 html {

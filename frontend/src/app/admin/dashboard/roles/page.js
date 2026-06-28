@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
-import { Shield, RefreshCw, Power } from "lucide-react";
+import { Shield, RefreshCw, Power, Check, Minus, Star } from "lucide-react";
 
 const ROLE_LABELS = {
     super_admin: { label: "Super Admin", color: "bg-red-500/10 text-red-400 border-red-500/20" },
@@ -169,10 +169,10 @@ function RolesAdminPage() {
                                 {Object.entries(PERMISSION_MATRIX).map(([perm, access]) => (
                                     <tr key={perm} className="border-b border-white/5">
                                         <td className="px-4 py-2 text-xs text-neutral-400 font-mono">{perm}</td>
-                                        <td className="px-3 py-2 text-center text-yellow-400 text-sm">★</td>
+                                        <td className="px-3 py-2 text-center text-yellow-400"><Star className="w-4 h-4 mx-auto fill-yellow-400" /></td>
                                         {access.map((has, i) => (
-                                            <td key={i} className={`px-3 py-2 text-center text-sm ${has ? "text-green-400" : "text-neutral-700"}`}>
-                                                {has ? "✓" : "—"}
+                                            <td key={i} className={`px-3 py-2 text-center ${has ? "text-green-400" : "text-neutral-700"}`}>
+                                                {has ? <Check className="w-4 h-4 mx-auto" /> : <Minus className="w-4 h-4 mx-auto" />}
                                             </td>
                                         ))}
                                     </tr>

@@ -12,12 +12,13 @@ import {
     Calendar, 
     Clock, 
     FileText, 
-    CreditCard, 
-    ShieldCheck, 
+    CreditCard,
+    ShieldCheck,
     AlertTriangle,
     X,
     CheckCircle2,
-    Lock
+    Lock,
+    Banknote
 } from "lucide-react";
 
 // Short codes must match the backend enum exactly (model/Store.js operatingHoursSchema.day)
@@ -48,6 +49,7 @@ export default function CheckoutPage() {
     const [pickupDate, setPickupDate] = useState("");
     const [pickupTime, setPickupTime] = useState("");
     const [customerNote, setCustomerNote] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' | 'cod'
 
     // Checkout Flow States
     const [submitting, setSubmitting] = useState(false);
@@ -176,7 +178,8 @@ export default function CheckoutPage() {
                 })),
                 pickupStoreId: selectedStoreId,
                 scheduledPickupTime: chosenDateTime.toISOString(),
-                customerNote
+                customerNote,
+                paymentMethod
             };
 
             const { data } = await api.post("shop/orders", payload, {
@@ -185,7 +188,14 @@ export default function CheckoutPage() {
 
             if (!data.error && data.data) {
                 setCreatedOrder(data.data);
-                setPaymentModalOpen(true);
+                if (paymentMethod === "cod") {
+                    // COD order is confirmed immediately — no online payment step.
+                    localStorage.removeItem("omg_cart");
+                    setCart([]);
+                    router.push("/shop/orders");
+                } else {
+                    setPaymentModalOpen(true);
+                }
             } else {
                 setErrorMsg(data.msg || "Failed to submit order. Please check item stock.");
             }
@@ -439,12 +449,41 @@ export default function CheckoutPage() {
                                     </div>
                                 </div>
 
+                                {/* Payment method selection */}
+                                <div className="pt-4 border-t border-neutral-900">
+                                    <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Payment Method</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod("online")}
+                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${paymentMethod === "online"
+                                                ? "border-red-500 bg-red-500/10"
+                                                : "border-white/10 bg-white/[0.02] hover:border-white/20"}`}
+                                        >
+                                            <CreditCard className={`w-6 h-6 ${paymentMethod === "online" ? "text-red-400" : "text-neutral-400"}`} />
+                                            <span className="text-xs font-semibold text-white">Pay Online</span>
+                                            <span className="text-[10px] text-neutral-500">Card / UPI (sandbox)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod("cod")}
+                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${paymentMethod === "cod"
+                                                ? "border-red-500 bg-red-500/10"
+                                                : "border-white/10 bg-white/[0.02] hover:border-white/20"}`}
+                                        >
+                                            <Banknote className={`w-6 h-6 ${paymentMethod === "cod" ? "text-red-400" : "text-neutral-400"}`} />
+                                            <span className="text-xs font-semibold text-white">Cash on Pickup</span>
+                                            <span className="text-[10px] text-neutral-500">Pay when you collect</span>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <button
                                     type="submit"
                                     disabled={submitting || !shopEnabled}
                                     className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                    {submitting ? "Placing Order..." : !shopEnabled ? "Checkout Unavailable" : "Place Order & Pay"}
+                                    {submitting ? "Placing Order..." : !shopEnabled ? "Checkout Unavailable" : paymentMethod === "cod" ? "Place Order (Pay on Pickup)" : "Place Order & Pay"}
                                 </button>
 
                                 <div className="flex justify-center items-center gap-1.5 text-[10px] text-neutral-500">

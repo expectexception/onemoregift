@@ -5,7 +5,7 @@ import withAdminAuth from "@/app/components/withAdminAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import { EmptyGalleryIllustration } from "@/app/components/SVGIcons";
-import { Heart, Eye, Star, Trash2, Search, ImageOff } from "lucide-react";
+import { Heart, Eye, Star, Trash2, Search, ImageOff, X } from "lucide-react";
 
 const STATUS_COLORS = {
     draft: "bg-neutral-800 text-neutral-400",
@@ -191,7 +191,7 @@ function MomentsAdminPage() {
                         <div className="p-6">
                             <div className="flex justify-between items-start mb-6">
                                 <h2 className="text-lg font-bold text-white">Review Moment</h2>
-                                <button onClick={() => setSelected(null)} className="text-neutral-500 hover:text-white">✕</button>
+                                <button onClick={() => setSelected(null)} className="text-neutral-500 hover:text-white"><X className="w-5 h-5" /></button>
                             </div>
                             <p className="text-sm text-neutral-400 mb-4">{selected.caption}</p>
                             <p className="text-xs text-neutral-500 mb-6">{selected.description}</p>
