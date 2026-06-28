@@ -12,7 +12,25 @@ import {
 import { useAuth } from "../context/AuthContext";
 import AnimatedGiftSVG from "./AnimatedGiftSVG";
 import { UserIcon, LockIcon } from "./SVGIcons";
+import { ShoppingCart } from "lucide-react";
 import { readCartCount, CART_UPDATED_EVENT } from "../utils/cart";
+
+function CartButton({ count, onClick, className = "" }) {
+    return (
+        <button
+            onClick={onClick}
+            aria-label={`Cart (${count} item${count === 1 ? "" : "s"})`}
+            className={`relative w-10 h-10 rounded-xl glass flex items-center justify-center border border-white/10 hover:border-red-600/40 transition-colors ${className}`}
+        >
+            <ShoppingCart className="w-5 h-5 text-white" />
+            {!!count && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    {count > 9 ? "9+" : count}
+                </span>
+            )}
+        </button>
+    );
+}
 
 export default function Navbar() {
     const { userAuthenticated, loadingUser, logoutUser } = useAuth();
@@ -65,6 +83,7 @@ export default function Navbar() {
                 {/* Desktop Auth Buttons */}
                 {isUserLoggedIn ? (
                     <div className="hidden lg:flex items-center gap-2 xl:gap-3">
+                        <CartButton count={cartCount} onClick={() => router.push('/shop/checkout')} />
                         <button
                             className="px-4 xl:px-6 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-medium transition-all duration-300 border border-white/10 hover:border-white/20"
                             onClick={() => router.push('/my-profile')}
@@ -83,6 +102,7 @@ export default function Navbar() {
                     </div>
                 ) : (
                     <div className="hidden lg:flex items-center gap-2 xl:gap-3">
+                        <CartButton count={cartCount} onClick={() => router.push('/shop/checkout')} />
                         <button
                             className="px-3 xl:px-6 py-2.5 text-neutral-400 hover:text-white transition-colors duration-300 font-medium"
                             onClick={() => router.push('/login')}
@@ -101,7 +121,8 @@ export default function Navbar() {
                 )}
 
                 {/* Mobile Menu */}
-                <div className="lg:hidden">
+                <div className="lg:hidden flex items-center gap-2">
+                    <CartButton count={cartCount} onClick={() => router.push('/shop/checkout')} />
                     <Popover>
                         <PopoverTrigger asChild>
                             <button className="w-10 h-10 rounded-xl glass flex items-center justify-center border border-white/10 hover:border-red-600/40 transition-colors">
