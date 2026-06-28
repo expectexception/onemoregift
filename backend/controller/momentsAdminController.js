@@ -56,12 +56,15 @@ const updateStatus = async (req, res) => {
         doc.reviewedBy = req.adminDoc?._id;
         doc.reviewedAt = new Date();
 
-        if (status === 'published') {
+        // Any of these statuses makes the moment publicly visible in the gallery.
+        // (Previously only 'published' did, so admins picking 'approved' left moments hidden.)
+        const PUBLIC_STATUSES = ['approved', 'gift_assigned', 'published'];
+        if (PUBLIC_STATUSES.includes(status)) {
             doc.isPublished = true;
-            doc.publishedAt = new Date();
-        }
-        if (status === 'rejected') {
+            if (!doc.publishedAt) doc.publishedAt = new Date();
+        } else {
             doc.isPublished = false;
+            if (status === 'rejected') doc.unpublishedAt = new Date();
         }
 
         await doc.save();
