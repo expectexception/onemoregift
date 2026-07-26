@@ -560,6 +560,17 @@ function PaymentsTab({ cfg }) {
                 icon={QrCode}
                 accent="amber"
             >
+                {/* With QR payment on but nothing to pay to, the payment screen is a
+                    dead end for the customer — make that impossible to miss. */}
+                {draft.qrPaymentEnabled && !draft.paymentUpiId && !draft.paymentQrImage && !draft.paymentWhatsapp && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-200 leading-relaxed">
+                            UPI QR payment is switched on but you have not set a UPI ID, a QR image or a WhatsApp number.
+                            Customers who pick this method will have no way to pay you — fill at least one in below.
+                        </p>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Field label="UPI ID" hint="Used to auto-generate a QR if you don't upload one.">
                         <Input
