@@ -313,6 +313,31 @@ function OrdersAdminPage() {
                                 </div>
                             )}
 
+                            {/* Once verified or rejected the block above disappears, which used to
+                                take the evidence with it. Keep it readable for disputes. */}
+                            {selected.paymentStatus !== "verification_pending"
+                                && Array.isArray(selected.paymentProofs) && selected.paymentProofs.length > 0 && (
+                                <div className="border border-white/10 bg-white/[0.02] rounded-xl p-4 mb-6 space-y-3">
+                                    <h3 className="text-sm font-semibold text-neutral-300 flex items-center gap-2">
+                                        <BadgeCheck className="w-4 h-4 text-neutral-500" /> Payment proof on record
+                                    </h3>
+                                    {selected.paymentReference && (
+                                        <p className="text-xs text-neutral-400">
+                                            UPI Ref: <span className="text-white font-mono">{selected.paymentReference}</span>
+                                        </p>
+                                    )}
+                                    {selected.paymentVerifiedAt && (
+                                        <p className="text-xs text-neutral-500">
+                                            Verified: {new Date(selected.paymentVerifiedAt).toLocaleString("en-IN")}
+                                        </p>
+                                    )}
+                                    {selected.paymentRejectedReason && (
+                                        <p className="text-xs text-red-400">Rejected: {selected.paymentRejectedReason}</p>
+                                    )}
+                                    <MediaReviewer items={selected.paymentProofs} />
+                                </div>
+                            )}
+
                             {/* Status Update */}
                             <div className="space-y-3 mb-4">
                                 <h3 className="text-sm font-semibold text-white">Update Status</h3>
