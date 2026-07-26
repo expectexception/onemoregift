@@ -1,110 +1,1535 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Trash2, RotateCcw, AlertTriangle, RefreshCw, Lock, Shield, CheckCircle } from "lucide-react";
+import {
+    Database, Trash2, AlertTriangle, RefreshCw, Shield, CheckCircle, ShoppingBag,
+    LayoutTemplate, QrCode, Upload, CreditCard, Banknote, CalendarDays, Phone,
+    Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info, Megaphone, Wrench, Type, Eye, Clock,
+    Bell, FileDown, BarChart3,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
-import api from "@/app/utils/apiClient";
+import api, { mediaUrl } from "@/app/utils/apiClient";
+import { invalidateSiteConfig } from "@/app/utils/siteConfig";
 import withAdminAuth from "../../../components/withAdminAuth";
+import UpiQr from "@/app/components/UpiQr";
 
-function AdminSettings() {
+// Every key this page owns. The draft is diffed against the last saved config so
+// only genuinely changed keys are sent, and the "unsaved" badge can be accurate.
+const EDITABLE_KEYS = [
+    // shop & drop
+    "shopEnabled", "weeklyDropEnabled", "dropRevealDays", "dropSaleDays", "dropPickupDays",
+    "orderAutoCancelHours", "paymentProofWindowHours", "forcedShopPhase", "shopMaxQtyPerOrder",
+    "saleStartTime", "saleEndTime", "shopClosedDates", "shopOpenDates",
+    // site-wide
+    "announcementEnabled", "announcementText", "announcementLink",
+    "maintenanceMode", "maintenanceMessage", "heroTitle", "heroSubtitle",
+    // payments
+    "qrPaymentEnabled", "codEnabled", "paymentGatewayEnabled",
+    "paymentUpiId", "paymentPayeeName", "paymentWhatsapp", "paymentInstructions", "paymentQrImage",
+    // features
+    "giveawaysEnabled", "surpriseEnabled", "momentsEnabled",
+    "showUpcoming", "showEnded", "requireSurpriseProof", "requireMomentProof", "surpriseOneActivePerUser",
+    // homepage
+    "homeShowStats", "homeShowSteps", "homeShowMoments", "homeShowShop",
+    // contact
+    "contactEmail", "contactPhone", "contactWhatsapp", "businessAddress", "instagramUrl",
+    // counters
+    "statOverrides",
+];
+
+const TABS = [
+    { key: "shop", label: "Shop & Drop", icon: Store },
+    { key: "payments", label: "Payments", icon: CreditCard },
+    { key: "features", label: "Features", icon: Sparkles },
+    { key: "site", label: "Site & Content", icon: Megaphone },
+    { key: "stats", label: "Counters", icon: BarChart3 },
+    { key: "homepage", label: "Homepage", icon: LayoutTemplate },
+    { key: "contact", label: "Contact", icon: Phone },
+    { key: "system", label: "Data & Security", icon: Shield },
+];
+
+const PHASE_LABELS = {
+    pickup: "Order Pickup",
+    reveal: "Product & Price Reveal",
+    sale: "Sale Live",
+    prep: "Preparing Orders",
+};
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// The schedule is defined in IST, so show it back in IST whatever the admin's own
+// timezone happens to be.
+const formatIst = (iso) => {
+    if (!iso) return "";
+    try {
+        return new Date(iso).toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata", weekday: "short", day: "numeric",
+            month: "short", hour: "numeric", minute: "2-digit",
+        }) + " IST";
+    } catch {
+        return "";
+    }
+};
+
+// ---------------------------------------------------------------- primitives
+
+function ToggleRow({ title, desc, value, onToggle, accent = "red", disabled = false }) {
+    const on = {
+        red: "bg-red-600", emerald: "bg-emerald-600", amber: "bg-amber-600",
+        blue: "bg-blue-600", fuchsia: "bg-fuchsia-600", cyan: "bg-cyan-600",
+    }[accent] || "bg-red-600";
+
+    return (
+        <div className={`flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] ${disabled ? "opacity-50" : ""}`}>
+            <div className="min-w-0">
+                <div className="text-sm font-semibold text-white">{title}</div>
+                <div className="text-xs text-neutral-500 mt-0.5 leading-relaxed">{desc}</div>
+            </div>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={onToggle}
+                aria-pressed={!!value}
+                aria-label={title}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 disabled:cursor-not-allowed ${value ? on : "bg-neutral-800"}`}
+            >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+        </div>
+    );
+}
+
+function Field({ label, hint, children }) {
+    return (
+        <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-500 pl-1 block">{label}</label>
+            {children}
+            {hint && <p className="text-[10px] text-neutral-600 pl-1 leading-relaxed">{hint}</p>}
+        </div>
+    );
+}
+
+function Panel({ title, desc, icon: Icon, accent = "red", children }) {
+    const tone = {
+        red: "bg-red-600/10 text-red-500", amber: "bg-amber-600/10 text-amber-500",
+        emerald: "bg-emerald-600/10 text-emerald-500", blue: "bg-blue-600/10 text-blue-500",
+        fuchsia: "bg-fuchsia-600/10 text-fuchsia-500", cyan: "bg-cyan-600/10 text-cyan-500",
+        teal: "bg-teal-600/10 text-teal-500", indigo: "bg-indigo-600/10 text-indigo-500",
+    }[accent];
+
+    return (
+        <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+            <header className="p-5 sm:p-6 border-b border-white/[0.05]">
+                <h2 className="text-lg font-bold text-white flex items-center gap-3">
+                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${tone}`}>
+                        <Icon className="w-4.5 h-4.5" />
+                    </span>
+                    {title}
+                </h2>
+                {desc && <p className="text-neutral-500 text-xs mt-2 leading-relaxed">{desc}</p>}
+            </header>
+            <div className="p-5 sm:p-6 space-y-4">{children}</div>
+        </section>
+    );
+}
+
+// Weekday chip row for one drop phase. A day can only belong to one phase, so days
+// taken by another phase are shown locked rather than silently rejected on save.
+function DayWindowPicker({ label, hint, value, onChange, takenBy, accent = "amber" }) {
+    const selected = String(value || "")
+        .split(",")
+        .map((d) => Number(d.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+
+    const toggleDay = (day) => {
+        const next = selected.includes(day)
+            ? selected.filter((d) => d !== day)
+            : [...selected, day].sort((a, b) => a - b);
+        onChange(next.join(","));
+    };
+
+    const activeTone = {
+        amber: "bg-amber-600 border-amber-500 text-white",
+        emerald: "bg-emerald-600 border-emerald-500 text-white",
+        blue: "bg-blue-600 border-blue-500 text-white",
+    }[accent];
+
+    return (
+        <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-500 pl-1 block">{label}</label>
+            <div className="grid grid-cols-7 gap-1.5">
+                {DAY_LABELS.map((name, day) => {
+                    const isOn = selected.includes(day);
+                    const owner = takenBy?.[day];
+                    const locked = !isOn && !!owner;
+                    return (
+                        <button
+                            key={day}
+                            type="button"
+                            onClick={() => !locked && toggleDay(day)}
+                            disabled={locked}
+                            title={locked ? `Used by ${owner}` : name}
+                            className={`h-9 rounded-lg border text-[10px] font-bold uppercase tracking-wide transition-all ${
+                                isOn ? activeTone
+                                    : locked ? "bg-white/[0.01] border-white/[0.04] text-neutral-700 cursor-not-allowed"
+                                        : "bg-white/[0.02] border-white/[0.06] text-neutral-400 hover:border-white/20 hover:text-white"
+                            }`}
+                        >
+                            {name}
+                        </button>
+                    );
+                })}
+            </div>
+            {hint && <p className="text-[10px] text-neutral-600 pl-1">{hint}</p>}
+            {!selected.length && (
+                <p className="text-[10px] text-amber-500 pl-1">Pick at least one day. This window is currently empty.</p>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------- config state
+
+function useConfigDraft() {
     const { toast } = useToast();
-    const [loading, setLoading] = useState(false);
+    const [saved, setSaved] = useState(null);
+    const [draft, setDraft] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    const handleClearAll = async () => {
-        if (!confirm("CRITICAL: This will clear ALL participations system-wide. Are you absolutely sure?")) return;
-
+    const load = useCallback(async () => {
         setLoading(true);
         try {
-            const { data } = await api.post("admin/maintenance/clear-all", {}, { meta: { auth: "admin" } });
-            if (!data.error) {
-                toast({
-                    title: "System Reset Successful",
-                    description: "All entries have been cleared.",
-                });
+            const { data } = await api.get("admin/config", { meta: { auth: "admin" } });
+            if (!data.error && data.config) {
+                setSaved(data.config);
+                setDraft(data.config);
             } else {
-                toast({ title: "Error", description: data.msg, variant: "destructive" });
+                toast({ title: "Failed to load settings", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Failed", description: "Maintenance action failed.", variant: "destructive" });
+            toast({
+                title: "Failed to load settings",
+                description: error?.response?.data?.msg || "Could not reach the server.",
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
+    }, [toast]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const setField = useCallback((key, value) => {
+        setDraft((prev) => ({ ...prev, [key]: value }));
+    }, []);
+
+    const toggle = useCallback((key) => {
+        setDraft((prev) => ({ ...prev, [key]: !prev[key] }));
+    }, []);
+
+    const changedKeys = useMemo(() => {
+        if (!draft || !saved) return [];
+        return EDITABLE_KEYS.filter((key) => {
+            const a = draft[key];
+            const b = saved[key];
+            // statOverrides is an object, so compare structurally rather than as a string
+            if (typeof a === "object" || typeof b === "object") {
+                return JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+            }
+            return String(a ?? "") !== String(b ?? "");
+        });
+    }, [draft, saved]);
+
+    const save = useCallback(async () => {
+        if (!draft || !changedKeys.length) return;
+        setSaving(true);
+        try {
+            const payload = Object.fromEntries(changedKeys.map((key) => [key, draft[key]]));
+            const { data } = await api.post("admin/config", payload, { meta: { auth: "admin" } });
+            if (!data.error) {
+                invalidateSiteConfig();
+                // Trust the server's echo: it normalises day lists and clamps numbers
+                setSaved(data.config);
+                setDraft(data.config);
+                toast({
+                    title: "Settings saved",
+                    description: (
+                        <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span>Live on the site immediately.</span>
+                        </div>
+                    ),
+                });
+            } else {
+                toast({ title: "Save failed", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({
+                title: "Save failed",
+                description: error?.response?.data?.msg || "Request failed.",
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    }, [changedKeys, draft, toast]);
+
+    const reset = useCallback(() => setDraft(saved), [saved]);
+
+    return { draft, saved, loading, saving, setField, toggle, changedKeys, save, reset, reload: load };
+}
+
+// ---------------------------------------------------------------- page
+
+function AdminSettings() {
+    const [tab, setTab] = useState("shop");
+    const cfg = useConfigDraft();
+    const { draft, loading, saving, changedKeys, save, reset } = cfg;
+
+    return (
+        <div className="min-h-screen bg-[#070707] pb-28">
+            <div className="p-4 md:p-8 max-w-6xl mx-auto">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 flex items-center justify-center shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)] shrink-0">
+                        <Settings2 className="text-red-400 w-7 h-7" />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight">Control Centre</h1>
+                        <p className="text-neutral-500 font-medium text-sm">
+                            Everything on the live site: shop, payments, giveaways, surprises & moments
+                        </p>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-6 -mx-1 px-1 scrollbar-none">
+                    {TABS.map(({ key, label, icon: Icon }) => (
+                        <button
+                            key={key}
+                            onClick={() => setTab(key)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
+                                tab === key
+                                    ? "bg-white text-black border-white"
+                                    : "bg-white/[0.02] text-neutral-400 border-white/[0.06] hover:text-white hover:border-white/20"
+                            }`}
+                        >
+                            <Icon className="w-3.5 h-3.5" />
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
+                {loading || !draft ? (
+                    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-16 text-center text-neutral-500 text-sm animate-pulse">
+                        Loading live configuration…
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {tab === "shop" && <ShopTab cfg={cfg} />}
+                        {tab === "payments" && <PaymentsTab cfg={cfg} />}
+                        {tab === "features" && <FeaturesTab cfg={cfg} />}
+                        {tab === "site" && <SiteTab cfg={cfg} />}
+                        {tab === "stats" && <StatsTab cfg={cfg} />}
+                        {tab === "homepage" && <HomepageTab cfg={cfg} />}
+                        {tab === "contact" && <ContactTab cfg={cfg} />}
+                        {tab === "system" && <SystemTab />}
+                    </div>
+                )}
+            </div>
+
+            {/* Sticky save bar. Settings on this page apply to the live site, so an
+                unsaved change must never be easy to walk away from. */}
+            {changedKeys.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0b0b0b]/95 backdrop-blur-xl">
+                    <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                            <p className="text-xs text-neutral-300 font-semibold truncate">
+                                {changedKeys.length} unsaved {changedKeys.length === 1 ? "change" : "changes"}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                                onClick={reset}
+                                disabled={saving}
+                                className="h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08] text-xs font-semibold px-4"
+                            >
+                                Discard
+                            </Button>
+                            <Button
+                                onClick={save}
+                                disabled={saving}
+                                className="h-10 rounded-lg bg-white text-black hover:bg-neutral-200 font-bold text-xs px-6 active:scale-[0.98] transition-all"
+                            >
+                                {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <><Save className="w-3.5 h-3.5 mr-2" />Save changes</>}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------- tabs
+
+function ShopTab({ cfg }) {
+    const { draft, setField, toggle } = cfg;
+
+    // Build a day -> owning phase map so each picker can lock days another phase owns
+    const owners = useMemo(() => {
+        const map = {};
+        const claim = (key, name) => {
+            String(draft[key] || "").split(",").forEach((d) => {
+                const day = Number(d.trim());
+                if (Number.isInteger(day) && day >= 0 && day <= 6) map[day] = name;
+            });
+        };
+        claim("dropRevealDays", "Reveal");
+        claim("dropSaleDays", "Sale");
+        claim("dropPickupDays", "Pickup");
+        return map;
+    }, [draft]);
+
+    const ownersExcept = (name) => Object.fromEntries(
+        Object.entries(owners).filter(([, value]) => value !== name)
+    );
+
+    return (
+        <>
+            <Panel
+                title="Shop"
+                desc="The master switch blocks new orders while leaving the catalogue browsable."
+                icon={ShoppingBag}
+                accent="amber"
+            >
+                <ToggleRow
+                    title="Shop checkout"
+                    desc="Off = customers can browse products but cannot place any order"
+                    value={draft.shopEnabled}
+                    onToggle={() => toggle("shopEnabled")}
+                    accent="amber"
+                />
+                <ToggleRow
+                    title="Weekly drop cycle"
+                    desc="Restrict ordering to the sale window below. Off = shop behaves like a regular always-open store"
+                    value={draft.weeklyDropEnabled}
+                    onToggle={() => toggle("weeklyDropEnabled")}
+                    accent="amber"
+                />
+
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                    <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                    <p className="text-xs text-neutral-300">
+                        Right now it is{" "}
+                        <span className="text-amber-400 font-bold">
+                            {PHASE_LABELS[draft.shopPhase] || draft.shopPhase}
+                        </span>
+                        {draft.shopPhases?.[draft.shopPhase]?.days
+                            ? <span className="text-neutral-500"> ({draft.shopPhases[draft.shopPhase].days})</span>
+                            : null}
+                        {draft.phaseIsForced && <span className="text-red-400 font-semibold"> (pinned manually)</span>}
+                    </p>
+                </div>
+
+                <Field
+                    label="Override the current stage"
+                    hint="Pin the shop to one stage. Useful to open a sale early or hold one back without touching the weekly schedule."
+                >
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {[
+                            { value: "", label: "Follow schedule" },
+                            { value: "reveal", label: "Reveal" },
+                            { value: "sale", label: "Sale" },
+                            { value: "prep", label: "Preparing" },
+                            { value: "pickup", label: "Pickup" },
+                        ].map((option) => (
+                            <button
+                                key={option.value || "auto"}
+                                type="button"
+                                onClick={() => setField("forcedShopPhase", option.value)}
+                                className={`h-10 rounded-lg border text-[11px] font-bold transition-all ${
+                                    (draft.forcedShopPhase || "") === option.value
+                                        ? "bg-amber-600 border-amber-500 text-white"
+                                        : "bg-white/[0.02] border-white/[0.06] text-neutral-400 hover:border-white/20 hover:text-white"
+                                }`}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </Field>
+            </Panel>
+
+            <Panel
+                title="Weekly drop schedule"
+                desc="Pick which weekdays each stage of the cycle runs on. A day can belong to only one stage; anything left over becomes the preparation day."
+                icon={CalendarDays}
+                accent="blue"
+            >
+                <DayWindowPicker
+                    label="Reveal: products & prices go public"
+                    value={draft.dropRevealDays}
+                    onChange={(v) => setField("dropRevealDays", v)}
+                    takenBy={ownersExcept("Reveal")}
+                    accent="blue"
+                />
+                <DayWindowPicker
+                    label="Sale: orders can be placed"
+                    value={draft.dropSaleDays}
+                    onChange={(v) => setField("dropSaleDays", v)}
+                    takenBy={ownersExcept("Sale")}
+                    accent="amber"
+                    hint="Outside these days the cart and checkout are locked."
+                />
+                <DayWindowPicker
+                    label="Pickup: customers collect from the store"
+                    value={draft.dropPickupDays}
+                    onChange={(v) => setField("dropPickupDays", v)}
+                    takenBy={ownersExcept("Pickup")}
+                    accent="emerald"
+                    hint="Customers can only schedule a pickup slot on these days."
+                />
+            </Panel>
+
+            <Panel
+                title="Shopping hours"
+                desc="On a sale day, customers can only order between these times. Leave 00:00 to 23:59 to keep the whole day open."
+                icon={Clock}
+                accent="emerald"
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Ordering opens at" hint="24 hour time, IST.">
+                        <Input
+                            type="time"
+                            value={draft.saleStartTime || "00:00"}
+                            onChange={(e) => setField("saleStartTime", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field label="Ordering closes at" hint="Must be later than the opening time.">
+                        <Input
+                            type="time"
+                            value={draft.saleEndTime || "23:59"}
+                            onChange={(e) => setField("saleEndTime", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15">
+                    <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-neutral-300 leading-relaxed">
+                        Customers can order: <span className="text-emerald-400 font-bold">{draft.saleWindowLabel || "not set"}</span>
+                        <span className="block mt-1 text-neutral-500">
+                            {draft.shopOpen
+                                ? `Open right now${draft.saleClosesAt ? `, closes ${formatIst(draft.saleClosesAt)}` : ""}.`
+                                : draft.saleOpensAt
+                                    ? `Closed right now. Next opens ${formatIst(draft.saleOpensAt)}.`
+                                    : draft.phaseIsForced
+                                        ? "The stage is pinned by hand, so the schedule is being ignored."
+                                        : "Closed, and no upcoming opening is scheduled."}
+                        </span>
+                    </div>
+                </div>
+            </Panel>
+
+            <Panel
+                title="Special dates"
+                desc="Exceptions to the weekly pattern. One date per line, in YYYY-MM-DD form."
+                icon={CalendarDays}
+                accent="red"
+            >
+                <Field
+                    label="Closed on these dates"
+                    hint="Holidays or breaks. Beats everything except a manual stage pin."
+                >
+                    <textarea
+                        value={(draft.shopClosedDates || "").split(",").filter(Boolean).join("\n")}
+                        onChange={(e) => setField("shopClosedDates", e.target.value.split("\n").map(v => v.trim()).filter(Boolean).join(","))}
+                        rows={3}
+                        placeholder={"2026-08-15\n2026-10-02"}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 font-mono focus:outline-none focus:border-red-500/50 resize-none"
+                    />
+                </Field>
+                <Field
+                    label="Open on these dates"
+                    hint="One-off drops on a day that is not normally a sale day. The shopping hours above still apply."
+                >
+                    <textarea
+                        value={(draft.shopOpenDates || "").split(",").filter(Boolean).join("\n")}
+                        onChange={(e) => setField("shopOpenDates", e.target.value.split("\n").map(v => v.trim()).filter(Boolean).join(","))}
+                        rows={3}
+                        placeholder={"2026-08-20"}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 font-mono focus:outline-none focus:border-emerald-500/50 resize-none"
+                    />
+                </Field>
+            </Panel>
+
+            <NotifyListPanel />
+
+            <Panel
+                title="Order housekeeping"
+                desc="Automatic cleanup so unpaid orders don't hold stock forever."
+                icon={Gift}
+                accent="emerald"
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field
+                        label="Auto-cancel unpaid orders after (hours)"
+                        hint="0 = never. Stock is restored automatically. Orders already awaiting payment verification are never auto-cancelled."
+                    >
+                        <Input
+                            type="number" min="0"
+                            value={draft.orderAutoCancelHours}
+                            onChange={(e) => setField("orderAutoCancelHours", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field
+                        label="Payment proof window (hours)"
+                        hint="How long the customer is told they have to upload the payment screenshot."
+                    >
+                        <Input
+                            type="number" min="0"
+                            value={draft.paymentProofWindowHours}
+                            onChange={(e) => setField("paymentProofWindowHours", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field
+                        label="Max units of one item per order"
+                        hint="0 = no limit. Stops one buyer clearing out a limited drop."
+                    >
+                        <Input
+                            type="number" min="0"
+                            value={draft.shopMaxQtyPerOrder}
+                            onChange={(e) => setField("shopMaxQtyPerOrder", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                </div>
+            </Panel>
+        </>
+    );
+}
+
+function PaymentsTab({ cfg }) {
+    const { draft, setField, toggle } = cfg;
+    const { toast } = useToast();
+    const [uploadingQr, setUploadingQr] = useState(false);
+    const fileRef = useRef(null);
+
+    const gatewayReady = draft.onlinePaymentReady || draft.sandboxPaymentsAllowed;
+
+    const handleQrUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setUploadingQr(true);
+        const formData = new FormData();
+        formData.append("image", file);
+        try {
+            const { data } = await api.post("upload", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+                meta: { auth: "admin" },
+            });
+            if (!data.error && data.url) {
+                setField("paymentQrImage", data.url);
+                toast({ title: "QR image uploaded", description: "Hit Save changes to publish it." });
+            } else {
+                toast({ title: "Upload failed", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({
+                title: "Upload failed",
+                description: error?.response?.data?.msg || "Could not upload image",
+                variant: "destructive",
+            });
+        }
+        setUploadingQr(false);
+        if (fileRef.current) fileRef.current.value = "";
     };
 
     return (
-        <div className="min-h-screen bg-[#070707]">
-            <div className="p-4 md:p-8 max-w-7xl mx-auto">
-                <div className="flex items-center gap-4 mb-10">
-                    <div className="w-14 h-14 rounded-lg bg-red-600 flex items-center justify-center">
-                        <Database className="text-white w-7 h-7" />
+        <>
+            <Panel
+                title="Payment methods"
+                desc="What customers can choose at checkout. At least one must stay on, or checkout is blocked."
+                icon={CreditCard}
+                accent="emerald"
+            >
+                <ToggleRow
+                    title="UPI QR + screenshot"
+                    desc="Customer scans your QR, pays, then uploads the payment screenshot for you to verify"
+                    value={draft.qrPaymentEnabled}
+                    onToggle={() => toggle("qrPaymentEnabled")}
+                    accent="emerald"
+                />
+                <ToggleRow
+                    title="Cash on pickup"
+                    desc="Customer pays in cash when collecting the order from the store"
+                    value={draft.codEnabled}
+                    onToggle={() => toggle("codEnabled")}
+                    accent="emerald"
+                />
+                <ToggleRow
+                    title="Online payment gateway"
+                    desc={gatewayReady
+                        ? "Card / UPI gateway checkout"
+                        : "No live gateway is connected yet, so this stays hidden at checkout until one is wired up"}
+                    value={draft.paymentGatewayEnabled}
+                    onToggle={() => toggle("paymentGatewayEnabled")}
+                    accent="emerald"
+                />
+
+                {draft.paymentGatewayEnabled && !gatewayReady && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-neutral-300 leading-relaxed">
+                            Provider is <span className="text-amber-400 font-semibold">{draft.paymentsProvider}</span>, which cannot
+                            actually collect money. Customers will not see the &quot;Pay Online&quot; option and the server refuses to mark
+                            any order as paid through it. Use UPI QR or cash on pickup until a real gateway is integrated.
+                        </p>
                     </div>
-                    <div>
-                        <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight">System Settings</h1>
-                        <p className="text-neutral-500 font-medium">Platform maintenance and safety controls</p>
+                )}
+
+                {!draft.qrPaymentEnabled && !draft.codEnabled && !gatewayReady && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-200 leading-relaxed">
+                            No usable payment method is enabled, so customers cannot check out at all.
+                        </p>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel
+                title="Your payment details"
+                desc="Shown to the customer right after they place an order, on the payment screen and in the order email."
+                icon={QrCode}
+                accent="amber"
+            >
+                {/* With QR payment on but nothing to pay to, the payment screen is a
+                    dead end for the customer, so make that impossible to miss. */}
+                {draft.qrPaymentEnabled && !draft.paymentUpiId && !draft.paymentQrImage && !draft.paymentWhatsapp && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-200 leading-relaxed">
+                            UPI QR payment is switched on but you have not set a UPI ID, a QR image or a WhatsApp number.
+                            Customers who pick this method will have no way to pay you, so fill at least one in below.
+                        </p>
+                    </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Field label="UPI ID" hint="Used to auto-generate a QR if you don't upload one.">
+                        <Input
+                            value={draft.paymentUpiId}
+                            onChange={(e) => setField("paymentUpiId", e.target.value)}
+                            placeholder="yourupi@bank"
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field label="Payee name">
+                        <Input
+                            value={draft.paymentPayeeName}
+                            onChange={(e) => setField("paymentPayeeName", e.target.value)}
+                            placeholder="OneMoreGift"
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field label="WhatsApp number for payment screenshots" hint="With country code, digits only. For example 919876543210">
+                        <Input
+                            value={draft.paymentWhatsapp}
+                            onChange={(e) => setField("paymentWhatsapp", e.target.value.replace(/[^\d+]/g, ""))}
+                            placeholder="919876543210"
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field label="Payment QR image" hint="Optional. Overrides the auto-generated UPI QR.">
+                        <div className="flex items-center gap-3">
+                            {draft.paymentQrImage ? (
+                                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10 bg-white shrink-0">
+                                    <img src={mediaUrl(draft.paymentQrImage)} alt="Payment QR" className="w-full h-full object-contain" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setField("paymentQrImage", "")}
+                                        className="absolute top-0 right-0 bg-black/80 text-white text-[10px] px-1.5 py-0.5 hover:text-red-400"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="w-16 h-16 rounded-xl border border-dashed border-white/15 flex items-center justify-center text-neutral-600 shrink-0">
+                                    <QrCode className="w-6 h-6" />
+                                </div>
+                            )}
+                            <label className="flex-1 flex items-center justify-center gap-2 h-11 border border-white/10 border-dashed rounded-lg cursor-pointer bg-white/[0.01] hover:bg-white/[0.04] transition-all text-xs text-neutral-400">
+                                <Upload className={`w-4 h-4 ${uploadingQr ? "animate-bounce text-amber-400" : ""}`} />
+                                {uploadingQr ? "Uploading…" : "Upload QR"}
+                                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleQrUpload} disabled={uploadingQr} />
+                            </label>
+                        </div>
+                    </Field>
+                </div>
+
+                <Field label="Payment instructions" hint="Shown under the QR. Keep it short and specific.">
+                    <textarea
+                        value={draft.paymentInstructions}
+                        onChange={(e) => setField("paymentInstructions", e.target.value)}
+                        rows={3}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-amber-500/50 resize-none"
+                    />
+                </Field>
+            </Panel>
+
+            <CustomerPaymentPreview draft={draft} />
+        </>
+    );
+}
+
+// Mirrors the customer's payment screen using the unsaved draft, so the QR and UPI
+// details can be checked before they go live rather than by placing a test order.
+function CustomerPaymentPreview({ draft }) {
+    const upiId = String(draft.paymentUpiId || "").trim();
+    const payeeName = String(draft.paymentPayeeName || "OneMoreGift").trim();
+    const whatsapp = String(draft.paymentWhatsapp || "").replace(/\D/g, "");
+    const uploadedQr = draft.paymentQrImage ? mediaUrl(draft.paymentQrImage) : "";
+    const sampleTotal = 499;
+
+    const upiLink = upiId
+        ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${sampleTotal}&cu=INR&tn=${encodeURIComponent("Order OMG-SAMPLE")}`
+        : "";
+
+    return (
+        <Panel
+            title="Customer preview"
+            desc="Exactly what a customer sees after placing an order, using the values above (sample amount ₹499)."
+            icon={Eye}
+            accent="blue"
+        >
+            <div className="max-w-sm mx-auto w-full rounded-2xl border border-white/10 bg-black/50 p-5 space-y-4">
+                <div className="text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Amount to pay</p>
+                    <p className="text-2xl font-extrabold text-white mt-0.5">₹{sampleTotal}</p>
+                </div>
+
+                {uploadedQr || upiLink ? (
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="bg-white p-2.5 rounded-2xl">
+                            {uploadedQr ? (
+                                <img src={uploadedQr} alt="Payment QR" className="w-40 h-40 object-contain" />
+                            ) : (
+                                <UpiQr value={upiLink} size={160} className="w-40 h-40" />
+                            )}
+                        </div>
+                        <p className="text-[10px] text-neutral-500">
+                            {uploadedQr ? "Your uploaded QR image" : "Generated from your UPI ID"}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/20 text-amber-400 text-[11px] text-center">
+                        No QR to show. Add a UPI ID or upload a QR image.
+                    </div>
+                )}
+
+                {upiId && (
+                    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                        <span className="text-xs text-neutral-300 font-mono truncate">{upiId}</span>
+                        <span className="text-[10px] font-bold text-red-400 uppercase shrink-0 ml-2">Copy</span>
+                    </div>
+                )}
+
+                <p className="text-[11px] text-neutral-400 leading-relaxed text-center">
+                    {draft.paymentInstructions || "Pay on the QR, then upload your payment screenshot below."}
+                </p>
+
+                {whatsapp ? (
+                    <div className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                        <Phone className="w-3.5 h-3.5" />
+                        Send screenshot on WhatsApp
+                    </div>
+                ) : (
+                    <p className="text-[10px] text-neutral-600 text-center">No WhatsApp number set, so the chat button stays hidden.</p>
+                )}
+
+                <div className="border border-dashed border-white/10 rounded-xl py-3 text-center text-[11px] text-neutral-500">
+                    Upload payment screenshot
+                </div>
+            </div>
+        </Panel>
+    );
+}
+
+function FeaturesTab({ cfg }) {
+    const { draft, toggle } = cfg;
+    return (
+        <>
+            <Panel
+                title="Feature switches"
+                desc="Turn whole sections of the site on or off. Existing data is never touched. Off simply stops new submissions and hides the nav link."
+                icon={Sparkles}
+                accent="cyan"
+            >
+                <ToggleRow title="Giveaways" desc="Users can browse and enter giveaways" value={draft.giveawaysEnabled} onToggle={() => toggle("giveawaysEnabled")} accent="cyan" />
+                <ToggleRow title="Surprise applications" desc="Users can apply for a surprise gift" value={draft.surpriseEnabled} onToggle={() => toggle("surpriseEnabled")} accent="cyan" />
+                <ToggleRow title="Happy moments" desc="Users can share their moments to the public gallery" value={draft.momentsEnabled} onToggle={() => toggle("momentsEnabled")} accent="cyan" />
+            </Panel>
+
+            <Panel title="Giveaway visibility" desc="Which giveaways appear in public listings." icon={Gift} accent="blue">
+                <ToggleRow title="Show upcoming" desc="List giveaways that haven't started yet" value={draft.showUpcoming} onToggle={() => toggle("showUpcoming")} accent="blue" />
+                <ToggleRow title="Show ended" desc="Keep finished giveaways in public lists" value={draft.showEnded} onToggle={() => toggle("showEnded")} accent="blue" />
+            </Panel>
+
+            <Panel
+                title="Surprises & moments rules"
+                desc="Verification requirements and application limits."
+                icon={Camera}
+                accent="fuchsia"
+            >
+                <ToggleRow title="Require surprise proof" desc="Applicants must upload supporting documents" value={draft.requireSurpriseProof} onToggle={() => toggle("requireSurpriseProof")} accent="fuchsia" />
+                <ToggleRow title="Require moment proof" desc="Users must attach verification proof with a shared moment" value={draft.requireMomentProof} onToggle={() => toggle("requireMomentProof")} accent="fuchsia" />
+                <ToggleRow title="One application per user" desc="A user can only have one surprise application in flight at a time" value={draft.surpriseOneActivePerUser} onToggle={() => toggle("surpriseOneActivePerUser")} accent="fuchsia" />
+            </Panel>
+        </>
+    );
+}
+
+function SiteTab({ cfg }) {
+    const { draft, setField, toggle } = cfg;
+    return (
+        <>
+            <Panel
+                title="Announcement bar"
+                desc="A strip across the top of every public page. Use it for drop times, delays or offers."
+                icon={Megaphone}
+                accent="red"
+            >
+                <ToggleRow
+                    title="Show announcement"
+                    desc="Visitors can dismiss it; changing the text shows it again"
+                    value={draft.announcementEnabled}
+                    onToggle={() => toggle("announcementEnabled")}
+                />
+                <Field label="Announcement text" hint="Keep it to one line. Long text wraps awkwardly on mobile.">
+                    <Input
+                        value={draft.announcementText}
+                        onChange={(e) => setField("announcementText", e.target.value)}
+                        placeholder="This week's drop goes live Friday 8 PM!"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Link (optional)" hint="Internal path like /shop, or a full https:// URL.">
+                    <Input
+                        value={draft.announcementLink}
+                        onChange={(e) => setField("announcementLink", e.target.value)}
+                        placeholder="/shop"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+
+                {draft.announcementEnabled && !String(draft.announcementText || "").trim() && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-neutral-300">The bar is switched on but has no text, so nothing will show.</p>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel
+                title="Maintenance mode"
+                desc="Puts a notice on the site and stops customers submitting anything: orders, applications, moments. Browsing and the admin panel keep working."
+                icon={Wrench}
+                accent="amber"
+            >
+                <ToggleRow
+                    title="Maintenance mode"
+                    desc="On = customers can look around but cannot place orders or submit forms"
+                    value={draft.maintenanceMode}
+                    onToggle={() => toggle("maintenanceMode")}
+                    accent="amber"
+                />
+                <Field label="Message shown to visitors">
+                    <textarea
+                        value={draft.maintenanceMessage}
+                        onChange={(e) => setField("maintenanceMessage", e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-amber-500/50 resize-none"
+                    />
+                </Field>
+                {draft.maintenanceMode && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-200 leading-relaxed">
+                            Maintenance mode is on, so no customer can place an order or submit an application right now.
+                        </p>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel
+                title="Homepage hero text"
+                desc="Leave blank to keep the built-in wording."
+                icon={Type}
+                accent="fuchsia"
+            >
+                <Field label="Headline">
+                    <Input
+                        value={draft.heroTitle}
+                        onChange={(e) => setField("heroTitle", e.target.value)}
+                        placeholder="Win Free Rewards Daily"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Sub-headline">
+                    <textarea
+                        value={draft.heroSubtitle}
+                        onChange={(e) => setField("heroSubtitle", e.target.value)}
+                        rows={2}
+                        placeholder="Join exclusive giveaway contests, complete simple tasks…"
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-fuchsia-500/50 resize-none"
+                    />
+                </Field>
+            </Panel>
+        </>
+    );
+}
+
+const STAT_ROWS = [
+    { key: "registeredUsers", label: "Registered users", where: "Home hero, About" },
+    { key: "totalGiveaways", label: "Giveaways hosted", where: "About" },
+    { key: "activeGiveaways", label: "Active giveaways", where: "Home hero" },
+    { key: "completedGiveaways", label: "Giveaways closed", where: "Winners" },
+    { key: "totalWinners", label: "Gifts and wins delivered", where: "Home hero, About" },
+    { key: "giveawayWinners", label: "Giveaway winners", where: "Winners" },
+    { key: "giftsDelivered", label: "Surprise gifts delivered", where: "Counts toward wins" },
+    { key: "momentsShared", label: "Happy moments shared", where: "Counts toward wins" },
+    { key: "ordersCompleted", label: "Shop orders collected", where: "Reports" },
+    { key: "totalPrizeValue", label: "Total prize value in ₹", where: "Home hero, About" },
+    { key: "verifiedDrawRate", label: "Results declared %", where: "Winners" },
+];
+
+const MODES = [
+    { value: "auto", label: "Live" },
+    { value: "manual", label: "Manual" },
+    { value: "hidden", label: "Hidden" },
+];
+
+// One counter's control row. The real figure is always shown beside the control so
+// a pinned number can be compared against the truth at a glance.
+function StatRow({ row, entry, liveValue, onChange }) {
+    const mode = entry?.mode || "auto";
+
+    return (
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-3">
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white">{row.label}</div>
+                    <div className="text-xs text-neutral-600 mt-0.5">Shown on: {row.where}</div>
+                </div>
+                <div className="text-right shrink-0">
+                    <div className="text-[10px] uppercase tracking-wider text-neutral-600 font-bold">Live now</div>
+                    <div className="text-sm font-mono text-neutral-300">
+                        {liveValue === undefined ? "-" : Number(liveValue).toLocaleString("en-IN")}
                     </div>
                 </div>
+            </div>
 
-                <div className="h-px bg-white/[0.06] mb-10" />
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-4">
-                    {/* Data Maintenance Card */}
-                    <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-red-600 opacity-60 transition-opacity" />
-                        <CardHeader className="p-8 pb-4">
-                            <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-red-600/10 flex items-center justify-center">
-                                    <RotateCcw className="w-5 h-5 text-red-500" />
-                                </div>
-                                Maintenance Mode
-                            </CardTitle>
-                            <CardDescription className="text-neutral-500 text-sm mt-2 leading-relaxed">
-                                Irreversibly clear all participation records across the platform. Use this carefully for system resets or new season preparation.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-8 pt-4 space-y-8">
-                            <div className="p-5 rounded-2xl bg-red-600/5 border border-red-600/10 flex gap-4">
-                                <AlertTriangle className="text-red-500 w-6 h-6 shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                    <strong className="text-red-500 text-sm font-semibold block">Caution: destructive action</strong>
-                                    <p className="text-sm text-neutral-400 leading-relaxed font-medium">
-                                        This action will wipe all <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">JoinedGiveaway</code> collections and reset
-                                        participant lists in all events.
-                                    </p>
-                                </div>
-                            </div>
-                            <Button
-                                variant="destructive"
-                                className="w-full h-12 rounded-lg font-semibold text-base active:scale-[0.98] transition-all group/btn"
-                                onClick={handleClearAll}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <RefreshCw className="animate-spin mr-3" />
-                                ) : (
-                                    <Trash2 className="mr-3 w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                                )}
-                                Purge All Participation Data
-                            </Button>
-                        </CardContent>
-                    </Card>
-
-                    {/* Security Management Card */}
-                    <SecurityCard />
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-white/[0.08] overflow-hidden">
+                    {MODES.map((m) => (
+                        <button
+                            key={m.value}
+                            type="button"
+                            onClick={() => onChange(row.key, m.value, entry?.value)}
+                            className={`px-3 h-9 text-[11px] font-bold transition-colors ${
+                                mode === m.value
+                                    ? m.value === "hidden" ? "bg-neutral-700 text-white"
+                                        : m.value === "manual" ? "bg-amber-600 text-white"
+                                            : "bg-emerald-600 text-white"
+                                    : "bg-transparent text-neutral-500 hover:text-white"
+                            }`}
+                        >
+                            {m.label}
+                        </button>
+                    ))}
                 </div>
 
-                <div className="mt-20 py-8 border-t border-white/[0.06] text-center">
-                    <p className="text-xs text-neutral-600 font-medium">
-                        OneMoreGift admin controls for {new Date().getFullYear()}
-                    </p>
-                </div>
+                {mode === "manual" && (
+                    <Input
+                        type="number"
+                        min="0"
+                        value={entry?.value ?? ""}
+                        onChange={(e) => onChange(row.key, "manual", e.target.value)}
+                        placeholder="Enter the number to show"
+                        className="h-9 w-44 rounded-lg bg-white/[0.03] border-white/[0.08] text-white text-sm"
+                    />
+                )}
+                {mode === "hidden" && (
+                    <span className="text-[11px] text-neutral-500">This tile is removed from the page.</span>
+                )}
             </div>
         </div>
     );
 }
 
-function SecurityCard() {
+function StatsTab({ cfg }) {
+    const { draft, setField } = cfg;
+    const [live, setLive] = useState(null);
+
+    useEffect(() => {
+        api.get("admin/stats")
+            .then(({ data }) => { if (!data.error) setLive(data); })
+            .catch(() => {});
+    }, []);
+
+    const overrides = draft.statOverrides && typeof draft.statOverrides === "object" ? draft.statOverrides : {};
+
+    const change = (key, mode, value) => {
+        const next = { ...overrides };
+        if (mode === "auto") {
+            delete next[key];
+        } else if (mode === "manual") {
+            next[key] = { mode: "manual", value: value === "" ? "" : Number(value) };
+        } else {
+            next[key] = { mode: "hidden" };
+        }
+        setField("statOverrides", next);
+    };
+
+    const pinned = Object.values(overrides).filter(e => e?.mode === "manual").length;
+    const hiddenCount = Object.values(overrides).filter(e => e?.mode === "hidden").length;
+
+    return (
+        <>
+            <Panel
+                title="Public counters"
+                desc="Every number shown to visitors. Leave a counter on Live to read the real database figure, pin it to a fixed number, or hide the tile completely."
+                icon={BarChart3}
+                accent="blue"
+            >
+                {(pinned > 0 || hiddenCount > 0) && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-neutral-300 leading-relaxed">
+                            {pinned > 0 && <>{pinned} counter{pinned === 1 ? " is" : "s are"} pinned to a manual number. </>}
+                            {hiddenCount > 0 && <>{hiddenCount} {hiddenCount === 1 ? "is" : "are"} hidden. </>}
+                            A pinned number stops reflecting reality, so it is worth revisiting when the real figures catch up.
+                        </p>
+                    </div>
+                )}
+
+                <div className="space-y-3">
+                    {STAT_ROWS.map((row) => (
+                        <StatRow
+                            key={row.key}
+                            row={row}
+                            entry={overrides[row.key]}
+                            liveValue={live?.[row.key]}
+                            onChange={change}
+                        />
+                    ))}
+                </div>
+
+                <Button
+                    onClick={() => setField("statOverrides", {})}
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08] text-xs font-semibold"
+                >
+                    Reset every counter to Live
+                </Button>
+            </Panel>
+        </>
+    );
+}
+
+function HomepageTab({ cfg }) {
+    const { draft, toggle } = cfg;
+    return (
+        <Panel
+            title="Homepage sections"
+            desc="Toggle which showcase blocks render on the public homepage."
+            icon={LayoutTemplate}
+            accent="fuchsia"
+        >
+            <ToggleRow title="Hero stats" desc="Animated live counters in the hero section" value={draft.homeShowStats} onToggle={() => toggle("homeShowStats")} accent="fuchsia" />
+            <ToggleRow title="How it works" desc="The animated 3-step process strip" value={draft.homeShowSteps} onToggle={() => toggle("homeShowSteps")} accent="fuchsia" />
+            <ToggleRow title="Popular moments" desc="Showcase of happy moments shared by users" value={draft.homeShowMoments} onToggle={() => toggle("homeShowMoments")} accent="fuchsia" />
+            <ToggleRow title="Featured products" desc="Showcase of products from the shop" value={draft.homeShowShop} onToggle={() => toggle("homeShowShop")} accent="fuchsia" />
+        </Panel>
+    );
+}
+
+function ContactTab({ cfg }) {
+    const { draft, setField } = cfg;
+    return (
+        <Panel
+            title="Contact & business details"
+            desc="Shown in the site footer and on help sections. Leave a field empty to hide it."
+            icon={Phone}
+            accent="teal"
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Contact email">
+                    <Input
+                        value={draft.contactEmail}
+                        onChange={(e) => setField("contactEmail", e.target.value)}
+                        placeholder="contact@onemoregift.in"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Contact phone">
+                    <Input
+                        value={draft.contactPhone}
+                        onChange={(e) => setField("contactPhone", e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="WhatsApp number" hint="Country code, digits only. Used for the footer chat link.">
+                    <Input
+                        value={draft.contactWhatsapp}
+                        onChange={(e) => setField("contactWhatsapp", e.target.value.replace(/[^\d+]/g, ""))}
+                        placeholder="919876543210"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Instagram URL">
+                    <Input
+                        value={draft.instagramUrl}
+                        onChange={(e) => setField("instagramUrl", e.target.value)}
+                        placeholder="https://instagram.com/…"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+            </div>
+
+            <Field label="Shop / business address" hint="Appears in the footer. Use separate lines for street, city and pincode.">
+                <textarea
+                    value={draft.businessAddress}
+                    onChange={(e) => setField("businessAddress", e.target.value)}
+                    rows={3}
+                    placeholder={"Shop 12, Main Market\nJhajjar, Haryana 124103"}
+                    className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-teal-500/50 resize-none"
+                />
+            </Field>
+        </Panel>
+    );
+}
+
+// ---------------------------------------------------------------- system tab
+
+// The people who asked to be told when the next drop opens, plus the one button
+// that emails all of them.
+function NotifyListPanel() {
+    const { toast } = useToast();
+    const [state, setState] = useState({ loading: true, data: [], total: 0, waiting: 0 });
+    const [sending, setSending] = useState(false);
+    const [message, setMessage] = useState("");
+
+    const load = useCallback(async () => {
+        setState((p) => ({ ...p, loading: true }));
+        try {
+            const { data } = await api.get("admin/drop-subscribers", { params: { limit: 20 }, meta: { auth: "admin" } });
+            if (!data.error) {
+                setState({ loading: false, data: data.data || [], total: data.total || 0, waiting: data.waiting || 0 });
+                return;
+            }
+        } catch (error) { /* fall through to the empty state */ }
+        setState((p) => ({ ...p, loading: false }));
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const notifyAll = async () => {
+        if (!confirm(`Email ${state.waiting} subscriber(s) that the drop is opening?`)) return;
+        setSending(true);
+        try {
+            const { data } = await api.post("admin/drop-subscribers/notify", { message }, { meta: { auth: "admin" } });
+            if (!data.error) {
+                toast({ title: "Notifications sent", description: data.msg });
+                setMessage("");
+                load();
+            } else {
+                toast({ title: "Failed", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Failed", description: error?.response?.data?.msg || "Could not send notifications", variant: "destructive" });
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <Panel
+            title="Drop notify list"
+            desc="Visitors who asked to be told when the next drop opens. Signing up does not need an account, so this is your warm list for the reveal window."
+            icon={Bell}
+            accent="amber"
+        >
+            <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">On the list</div>
+                    <div className="text-2xl font-extrabold text-white mt-1">{state.total}</div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Not yet emailed</div>
+                    <div className="text-2xl font-extrabold text-amber-400 mt-1">{state.waiting}</div>
+                </div>
+            </div>
+
+            {state.loading ? (
+                <div className="text-neutral-500 text-sm animate-pulse py-6 text-center">Loading the list...</div>
+            ) : state.data.length ? (
+                <div className="rounded-xl border border-white/[0.05] overflow-hidden max-h-64 overflow-y-auto">
+                    {state.data.map((s) => (
+                        <div key={s._id} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.04] last:border-0">
+                            <span className="text-xs text-neutral-300 font-mono truncate">{s.email}</span>
+                            <span className="text-[10px] text-neutral-600 shrink-0">
+                                {s.productId?.name || "Any drop"}
+                                {s.notifiedAt ? " · emailed" : ""}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-xs text-neutral-600 text-center py-6">
+                    Nobody has signed up yet. The form appears on the shop page whenever the sale is closed.
+                </p>
+            )}
+
+            <Field label="Custom message (optional)" hint="Leave blank to send the default note with the next opening time.">
+                <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={2}
+                    placeholder="This week's drop is live now, limited stock!"
+                    className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-amber-500/50 resize-none"
+                />
+            </Field>
+
+            <div className="flex gap-2">
+                <Button
+                    onClick={notifyAll}
+                    disabled={sending || !state.waiting}
+                    className="flex-1 h-11 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold text-sm disabled:opacity-40 active:scale-[0.98] transition-all"
+                >
+                    {sending ? <RefreshCw className="animate-spin w-4 h-4" /> : `Email ${state.waiting} waiting subscriber(s)`}
+                </Button>
+                <Button
+                    onClick={load}
+                    className="h-11 px-4 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08]"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                </Button>
+            </div>
+        </Panel>
+    );
+}
+
+// Downloads go through the authenticated api client, so the admin token travels
+// with them rather than relying on a cookie in a plain link.
+function ExportPanel() {
+    const { toast } = useToast();
+    const [busy, setBusy] = useState("");
+
+    const download = async (kind, label) => {
+        setBusy(kind);
+        try {
+            const response = await api.get(`admin/export/${kind}`, {
+                responseType: "blob", timeout: 120000, meta: { auth: "admin" },
+            });
+            const disposition = response.headers["content-disposition"] || "";
+            const match = disposition.match(/filename="(.+)"/);
+            const filename = match ? match[1] : `omg-${kind}.csv`;
+
+            const url = window.URL.createObjectURL(response.data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: `${label} exported`, description: filename });
+        } catch (error) {
+            toast({
+                title: "Export failed",
+                description: error?.response?.data?.msg || "Could not generate the file.",
+                variant: "destructive",
+            });
+        } finally {
+            setBusy("");
+        }
+    };
+
+    const items = [
+        { kind: "orders", label: "Orders", desc: "Every order with items, totals, payment and pickup details" },
+        { kind: "users", label: "Customers", desc: "Accounts with contact details and join dates" },
+        { kind: "subscribers", label: "Notify list", desc: "Everyone waiting to hear about the next drop" },
+    ];
+
+    return (
+        <Panel
+            title="Export to CSV"
+            desc="Opens in Excel or Google Sheets. Values that could be read as formulas are escaped."
+            icon={FileDown}
+            accent="blue"
+        >
+            {items.map(({ kind, label, desc }) => (
+                <div key={kind} className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white">{label}</div>
+                        <div className="text-xs text-neutral-500 mt-0.5">{desc}</div>
+                    </div>
+                    <Button
+                        onClick={() => download(kind, label)}
+                        disabled={!!busy}
+                        className="h-9 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-neutral-200 hover:bg-white/[0.1] text-xs font-semibold shrink-0"
+                    >
+                        {busy === kind ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Download"}
+                    </Button>
+                </div>
+            ))}
+        </Panel>
+    );
+}
+
+function SystemTab() {
+    return (
+        <>
+            <ExportPanel />
+            <DbStatusPanel />
+            <BackupPanel />
+            <SecurityPanel />
+            <MaintenancePanel />
+        </>
+    );
+}
+
+function DbStatusPanel() {
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState(null);
+
+    const fetchDbStatus = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.get("admin/maintenance/db-status", { meta: { auth: "admin" } });
+            if (!data.error && data.stats) setStats(data.stats);
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to fetch database status", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => { fetchDbStatus(); }, [fetchDbStatus]);
+
+    return (
+        <Panel title="Database status" desc="Live document counts." icon={Database} accent="indigo">
+            {loading && !stats ? (
+                <div className="text-neutral-500 text-sm animate-pulse py-6 text-center">Loading metrics…</div>
+            ) : stats ? (
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {[
+                            { label: "Users", value: stats.users },
+                            { label: "Giveaways", value: stats.giveaways },
+                            { label: "Entries", value: stats.entries },
+                            { label: "Banned users", value: stats.bannedUsers },
+                            { label: "Administrators", value: stats.admins },
+                        ].map(({ label, value }) => (
+                            <div key={label} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
+                                <div className="text-2xl font-extrabold text-white mt-1">{value}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <Button
+                        onClick={fetchDbStatus}
+                        disabled={loading}
+                        className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08] text-xs font-semibold"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+                </>
+            ) : (
+                <div className="text-red-400 text-sm py-6 text-center">Failed to load statistics.</div>
+            )}
+        </Panel>
+    );
+}
+
+function BackupPanel() {
+    const { toast } = useToast();
+    const [downloading, setDownloading] = useState(false);
+    const [includeMedia, setIncludeMedia] = useState(false);
+
+    const handleDownload = async () => {
+        setDownloading(true);
+        try {
+            const response = await api.get("admin/maintenance/backup", {
+                params: includeMedia ? { includeMedia: 1 } : {},
+                responseType: "blob",
+                timeout: 300000,
+                meta: { auth: "admin" },
+            });
+            const disposition = response.headers["content-disposition"] || "";
+            const match = disposition.match(/filename="(.+)"/);
+            const filename = match ? match[1] : `omg-backup-${new Date().toISOString().slice(0, 10)}.json.gz`;
+
+            const url = window.URL.createObjectURL(response.data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Backup downloaded", description: filename });
+        } catch (error) {
+            const msg = error?.response?.status === 403
+                ? "Root admin access required for backups."
+                : error?.response?.data?.msg || "Backup download failed.";
+            toast({ title: "Backup failed", description: msg, variant: "destructive" });
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    return (
+        <Panel
+            title="Database backup"
+            desc="Full gzipped JSON snapshot of every collection (root admin only). Personal data stays encrypted inside the dump."
+            icon={Database}
+            accent="teal"
+        >
+            <label className="flex items-center gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] cursor-pointer">
+                <input
+                    type="checkbox"
+                    checked={includeMedia}
+                    onChange={(e) => setIncludeMedia(e.target.checked)}
+                    className="accent-teal-500 w-4 h-4"
+                />
+                <div>
+                    <div className="text-sm font-semibold text-white">Include media blobs</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">Adds DB-stored images/videos, which makes the file much larger</div>
+                </div>
+            </label>
+            <Button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="w-full h-11 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold text-sm active:scale-[0.98] transition-all"
+            >
+                {downloading ? <RefreshCw className="animate-spin w-4 h-4" /> : "Download full backup (.json.gz)"}
+            </Button>
+        </Panel>
+    );
+}
+
+function SecurityPanel() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [currentPassword, setCurrentPassword] = useState("");
@@ -113,86 +1538,111 @@ function SecurityCard() {
     const handleUpdate = async (e) => {
         e.preventDefault();
         if (!currentPassword || !newPassword) return;
+        if (newPassword.length < 6) {
+            toast({ title: "Invalid password", description: "New password must be at least 6 characters.", variant: "destructive" });
+            return;
+        }
 
         setLoading(true);
         try {
-            const { data } = await api.patch("admin/change-password", {
-                currentPassword,
-                newPassword
-            }, { meta: { auth: "admin" } });
-
+            const { data } = await api.patch("admin/change-password", { currentPassword, newPassword }, { meta: { auth: "admin" } });
             if (!data.error) {
                 toast({
-                    title: "Security Updated",
+                    title: "Security updated",
                     description: (
                         <div className="flex items-center gap-2">
                             <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span>Your administrative password has been changed.</span>
+                            <span>Your admin password has been changed.</span>
                         </div>
-                    )
+                    ),
                 });
                 setCurrentPassword("");
                 setNewPassword("");
             } else {
-                toast({ title: "Update Failed", description: data.msg, variant: "destructive" });
+                toast({ title: "Update failed", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "Request failed.", variant: "destructive" });
+            toast({ title: "Error", description: error?.response?.data?.msg || "Request failed.", variant: "destructive" });
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     return (
-        <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
-            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-600 opacity-60 transition-opacity" />
-            <CardHeader className="p-8 pb-4">
-                <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600/10 flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-emerald-500" />
-                    </div>
-                    Security & Access
-                </CardTitle>
-                <CardDescription className="text-neutral-500 text-sm mt-2 leading-relaxed">
-                    Update your administrative credentials. Ensure you use a strong password to maintain platform security.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="p-8 pt-4">
-                <form onSubmit={handleUpdate} className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-neutral-500 pl-1">Current password</label>
-                        <Input
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
-                        />
-                    </div>
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold text-neutral-500 pl-1">New secure password</label>
-                            <Input
-                                type="password"
-                                required
-                                placeholder="Min 6 characters"
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                className="h-12 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
-                            />
-                        </div>
-                        <Button
-                            type="submit"
-                            disabled={loading || !currentPassword || !newPassword}
-                            className="w-full h-12 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold transition-all active:scale-[0.98]"
-                        >
-                            {loading ? <RefreshCw className="animate-spin" /> : "Update Credentials"}
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
+        <Panel title="Security & access" desc="Update your administrator credentials." icon={Lock} accent="emerald">
+            <form onSubmit={handleUpdate} className="space-y-4">
+                <Field label="Current password">
+                    <Input
+                        type="password" required placeholder="••••••••"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="New password">
+                    <Input
+                        type="password" required placeholder="Min 6 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Button
+                    type="submit"
+                    disabled={loading || !currentPassword || !newPassword}
+                    className="w-full h-11 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold text-sm active:scale-[0.98] transition-all"
+                >
+                    {loading ? <RefreshCw className="animate-spin w-4 h-4" /> : "Update credentials"}
+                </Button>
+            </form>
+        </Panel>
+    );
+}
+
+function MaintenancePanel() {
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(false);
+
+    const handleClearAll = async () => {
+        if (!confirm("CRITICAL: This will clear ALL participations system-wide. Are you absolutely sure?")) return;
+        setLoading(true);
+        try {
+            const { data } = await api.post("admin/maintenance/clear-all", {}, { meta: { auth: "admin" } });
+            if (!data.error) {
+                toast({ title: "System reset successful", description: "All entries have been cleared." });
+            } else {
+                toast({ title: "Error", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Failed", description: error?.response?.data?.msg || "Maintenance action failed.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Panel
+            title="Maintenance"
+            desc="Irreversibly clear every participation record. Used for a season reset."
+            icon={Trash2}
+            accent="red"
+        >
+            <div className="p-4 rounded-xl bg-red-600/5 border border-red-600/15 flex gap-3">
+                <AlertTriangle className="text-red-500 w-5 h-5 shrink-0 mt-0.5" />
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                    Wipes the <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">JoinedGiveaway</code> collection and
+                    resets participant lists on every giveaway. This cannot be undone, so take a backup first.
+                </p>
+            </div>
+            <Button
+                variant="destructive"
+                className="w-full h-11 rounded-lg font-semibold text-sm active:scale-[0.98] transition-all"
+                onClick={handleClearAll}
+                disabled={loading}
+            >
+                {loading ? <RefreshCw className="animate-spin w-4 h-4" /> : <><Trash2 className="mr-2 w-4 h-4" />Purge all participation data</>}
+            </Button>
+        </Panel>
     );
 }
 

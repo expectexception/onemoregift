@@ -15,7 +15,9 @@ import {
     RefreshCw,
     Lock,
     CheckCircle,
-    AlertCircle
+    AlertCircle,
+    ShoppingBag,
+    ExternalLink,
 } from "lucide-react";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,8 @@ const UserProfilePage = () => {
     const [joinedGiveaway, setJoinedGiveaway] = useState(0);
     const [won, setWon] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [orders, setOrders] = useState([]);
+    const [ordersLoading, setOrdersLoading] = useState(true);
 
     // Password reset state
     const [newPassword, setNewPassword] = useState("");
@@ -90,15 +94,33 @@ const UserProfilePage = () => {
                 toast({ title: "Update Failed", description: data.msg, variant: "destructive" });
             }
         } catch (error) {
-            toast({ title: "Error", description: "Failed to update password", variant: "destructive" });
+            const message = error?.response?.data?.msg || "Failed to update password";
+            toast({ title: "Error", description: message, variant: "destructive" });
         } finally {
             setResetLoading(false);
         }
     };
 
+    const fetchOrders = useCallback(async () => {
+        try {
+            setOrdersLoading(true);
+            const { data } = await api.get(`admin/orders?userId=${userId}&limit=50`, {
+                meta: { auth: "admin" },
+            });
+            if (!data.error) setOrders(data.data || []);
+        } catch (error) {
+            // Non-fatal, order history is supplementary to the profile
+        } finally {
+            setOrdersLoading(false);
+        }
+    }, [userId]);
+
     useEffect(() => {
-        if (userId) fetchUser();
-    }, [userId, fetchUser]);
+        if (userId) {
+            fetchUser();
+            fetchOrders();
+        }
+    }, [userId, fetchUser, fetchOrders]);
 
     if (loading) {
         return (
@@ -120,9 +142,9 @@ const UserProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-[#070707] p-4 md:p-8">
-            <div className="max-w-5xl mx-auto">
+            <div className="max-w-[1500px] mx-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <button
                         onClick={() => router.back()}
                         className="flex items-center gap-2 text-neutral-500 hover:text-white transition-colors group"
@@ -138,14 +160,14 @@ const UserProfilePage = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                     {/* Left Column: Profile Card */}
-                    <div className="lg:col-span-1 space-y-8">
+                    <div className="xl:col-span-5 2xl:col-span-4 space-y-6 min-w-0">
                         <Card className="border-white/[0.06] bg-white/[0.02] overflow-hidden rounded-lg">
                             <div className="h-24 bg-gradient-to-r from-red-600/20 to-neutral-900" />
-                            <CardContent className="relative pt-0 px-6 pb-8">
-                                <div className="absolute -top-12 left-6">
-                                    <div className="w-24 h-24 rounded-lg bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl">
+                            <CardContent className="relative px-6 md:px-7 pb-8">
+                                <div className="-mt-12 flex justify-center sm:justify-start">
+                                    <div className="w-24 h-24 rounded-xl bg-neutral-900 border-4 border-black flex items-center justify-center overflow-hidden shadow-2xl shrink-0">
                                         {user.avatar ? (
                                             <Image src={user.avatar || "/images/user.png"} alt={user.name || "User"} width={96} height={96} className="w-full h-full object-cover" />
                                         ) : (
@@ -153,11 +175,11 @@ const UserProfilePage = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="mt-16">
-                                    <h2 className="text-2xl font-bold text-white mb-1">{user.name}</h2>
-                                    <p className="text-neutral-500 text-sm mb-6 truncate">{user.email}</p>
+                                <div className="mt-6 text-center sm:text-left min-w-0">
+                                    <h2 className="text-2xl font-bold text-white mb-1 break-words leading-tight">{user.name}</h2>
+                                    <p className="text-neutral-500 text-sm mb-6 break-all leading-relaxed">{user.email}</p>
 
-                                    <div className="space-y-4">
+                                    <div className="space-y-5">
                                         <ProfileInfo icon={Mail} label="Email Address" value={user.email} />
                                         <ProfileInfo icon={Phone} label="Phone Number" value={user.phone || "Not set"} />
                                         <ProfileInfo icon={MapPin} label="Location" value={user.address || "No address provided"} />
@@ -175,7 +197,7 @@ const UserProfilePage = () => {
                     </div>
 
                     {/* Right Column: Actions & Details */}
-                    <div className="lg:col-span-2 space-y-8">
+                    <div className="xl:col-span-7 2xl:col-span-8 space-y-8 min-w-0">
                         {/* Security Management */}
                         <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
                             <CardHeader>
@@ -191,7 +213,7 @@ const UserProfilePage = () => {
                                 <form onSubmit={handlePasswordReset} className="space-y-6">
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold text-neutral-500">Set new password</label>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col sm:flex-row gap-3">
                                             <Input
                                                 type="password"
                                                 placeholder="Enter secure password"
@@ -202,7 +224,7 @@ const UserProfilePage = () => {
                                             <Button
                                                 type="submit"
                                                 disabled={resetLoading}
-                                                className="px-6 rounded-lg h-12 font-semibold whitespace-nowrap bg-red-600 text-white hover:bg-red-500"
+                                                className="px-6 rounded-lg h-12 font-semibold whitespace-nowrap bg-red-600 text-white hover:bg-red-500 sm:min-w-[170px]"
                                             >
                                                 {resetLoading ? <RefreshCw className="animate-spin" /> : "Reset Access"}
                                             </Button>
@@ -215,14 +237,57 @@ const UserProfilePage = () => {
                             </CardContent>
                         </Card>
 
-                        {/* Additional Info / Activity Placeholder */}
-                        <Card className="border-white/[0.06] bg-white/[0.02] border-dashed opacity-60 rounded-lg">
-                            <CardContent className="p-12 flex flex-col items-center justify-center text-center">
-                                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4">
-                                    <Shield className="w-8 h-8 text-neutral-700" />
-                                </div>
-                                <h3 className="text-neutral-400 font-bold mb-1">User Activity Logs</h3>
-                                <p className="text-neutral-600 text-sm max-w-xs">Detailed participation history and security logs will be available here in the next update.</p>
+                        {/* Shop Order History */}
+                        <Card className="border-white/[0.06] bg-white/[0.02] rounded-lg">
+                            <CardHeader>
+                                <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                                    <ShoppingBag className="w-5 h-5 text-red-500" />
+                                    Shop Order History
+                                </CardTitle>
+                                <CardDescription className="text-neutral-500">
+                                    {orders.length} order{orders.length !== 1 ? "s" : ""} placed by this user
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {ordersLoading ? (
+                                    <div className="space-y-2">
+                                        {Array.from({ length: 3 }).map((_, i) => (
+                                            <div key={i} className="h-14 w-full bg-white/[0.04] rounded animate-pulse" />
+                                        ))}
+                                    </div>
+                                ) : orders.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {orders.map((order) => (
+                                            <button
+                                                key={order._id}
+                                                onClick={() => router.push(`/admin/dashboard/orders?search=${order.orderNumber}`)}
+                                                className="w-full flex items-center justify-between gap-3 p-3 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] transition-colors text-left"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-white truncate">{order.orderNumber}</div>
+                                                    <div className="text-xs text-neutral-500 mt-0.5">
+                                                        {new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                                        {" · "}₹{order.total}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-white/[0.06] text-neutral-300 border border-white/[0.08] capitalize">
+                                                        {order.status.replace(/_/g, " ")}
+                                                    </span>
+                                                    <ExternalLink className="w-3.5 h-3.5 text-neutral-600" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-center py-10">
+                                        <div className="w-16 h-16 rounded-2xl bg-white/[0.03] flex items-center justify-center mb-4">
+                                            <ShoppingBag className="w-8 h-8 text-neutral-700" />
+                                        </div>
+                                        <h3 className="text-neutral-400 font-bold mb-1">No orders yet</h3>
+                                        <p className="text-neutral-600 text-sm max-w-xs">This user hasn&apos;t placed any shop orders.</p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -233,13 +298,13 @@ const UserProfilePage = () => {
 };
 
 const ProfileInfo = ({ icon: Icon, label, value }) => (
-    <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+    <div className="flex items-start gap-4 text-left min-w-0">
+        <div className="w-9 h-9 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
             <Icon className="w-4 h-4 text-neutral-500" />
         </div>
-        <div className="overflow-hidden">
-            <p className="text-xs font-semibold text-neutral-500">{label}</p>
-            <p className="text-neutral-300 text-sm truncate">{value}</p>
+        <div className="overflow-hidden min-w-0">
+            <p className="text-[11px] font-semibold text-neutral-500 tracking-wide uppercase">{label}</p>
+            <p className="text-neutral-200 text-sm leading-6 break-words">{value}</p>
         </div>
     </div>
 );
@@ -247,8 +312,8 @@ const ProfileInfo = ({ icon: Icon, label, value }) => (
 const StatBox = ({ icon: Icon, label, value, color }) => (
     <div className="border border-white/[0.06] bg-white/[0.02] p-5 rounded-lg flex flex-col items-center text-center hover:bg-white/[0.04] transition-all">
         <Icon className={`w-6 h-6 ${color} mb-3 group-hover:scale-110 transition-transform`} />
-        <span className="text-2xl font-semibold text-white">{value}</span>
-        <span className="text-xs font-semibold text-neutral-500 mt-1">{label}</span>
+        <span className="text-2xl font-semibold text-white leading-none">{value}</span>
+        <span className="text-xs font-semibold text-neutral-500 mt-2 tracking-wide uppercase">{label}</span>
     </div>
 );
 

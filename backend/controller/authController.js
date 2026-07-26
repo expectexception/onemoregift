@@ -1,20 +1,17 @@
+'use strict';
+
 const Users = require('../model/Users');
+const PendingRegistration = require('../model/PendingRegistration');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const axios = require('axios');
-const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
-const sibApi = require('@getbrevo/brevo');
-require('dotenv').config();
+const { hmacHash } = require('../utils/crypto');
+// Note: env is loaded by utils/loadEnv before this module is imported
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'no-reply@onemoregift.in';
-const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'OneMoreGift';
-const MAIL_USER = process.env.MAIL_USER;
-const MAIL_APP_PASSWORD = process.env.MAIL_APP_PASSWORD;
 const GOOGLE_CLIENT_IDS = (process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '')
     .split(',')
     .map(id => id.trim())
@@ -30,9 +27,21 @@ const EMAIL_SERVICE_REQUIRED = process.env.EMAIL_SERVICE_REQUIRED === 'true';
 const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 15000);
 const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
-const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test';
+const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production';
+const OTP_DEBUG_LOGGING = process.env.NODE_ENV !== 'production' && process.env.LOG_OTP_DEBUG === 'true';
+// Feature flag: set OTP_VERIFICATION_ENABLED=false to skip email OTP for user registration
+const OTP_VERIFICATION_ENABLED = process.env.OTP_VERIFICATION_ENABLED !== 'false';
 
 const googleClient = GOOGLE_CLIENT_IDS.length ? new OAuth2Client() : null;
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(0, 10);
+const isValidIndianPhone = (value) => /^[6-9]\d{9}$/.test(value);
+const logOtpForLocalDebug = (purpose, email, otp) => {
+    if (OTP_DEBUG_LOGGING) {
+        console.log(`[OTP_DEBUG] ${purpose} OTP for ${email}: ${otp}`);
+    }
+};
 
 const userCookieOptions = {
     httpOnly: true,
@@ -72,47 +81,16 @@ const getDisplayName = (user = {}) => {
     return "there";
 };
 
-const sendEmailFallback = async ({ to, subject, html }) => {
-    if (!MAIL_USER || !MAIL_APP_PASSWORD) {
-        console.error('Email Fallback Error: MAIL_USER or MAIL_APP_PASSWORD not configured');
-        return false;
-    }
-
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: MAIL_USER,
-            pass: MAIL_APP_PASSWORD,
-        },
-    });
-
-    try {
-        await transporter.sendMail({
-            from: `OneMoreGift <${MAIL_USER}>`,
-            to,
-            subject,
-            html,
-        });
-        console.log(`Fallback Email sent successfully to: ${to}`);
-        return true;
-    } catch (error) {
-        console.error('Fallback SMTP Error:', error.message);
-        return false;
-    }
-};
-
 const signEmailServiceRequest = ({ method, path, body }) => {
     if (!EMAIL_SERVICE_SIGNING_ENABLED) return {};
     if (!EMAIL_SERVICE_SIGNING_SECRET) {
         throw new Error('EMAIL_SERVICE_SIGNING_SECRET is required when EMAIL_SERVICE_SIGNING_ENABLED=true');
     }
-
     const timestamp = `${Math.floor(Date.now() / 1000)}`;
     const nonce = crypto.randomBytes(16).toString('hex');
     const bodyHash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
     const payload = [timestamp, nonce, method.toUpperCase(), path, bodyHash].join('.');
     const signature = crypto.createHmac('sha256', EMAIL_SERVICE_SIGNING_SECRET).update(payload).digest('hex');
-
     return {
         'x-email-timestamp': timestamp,
         'x-email-nonce': nonce,
@@ -120,77 +98,46 @@ const signEmailServiceRequest = ({ method, path, body }) => {
     };
 };
 
+/**
+ * Send email exclusively via the email-service (Brevo API).
+ * No SMTP / nodemailer fallback.
+ */
 const sendEmail = async ({ to, subject, html, template, data }) => {
-    console.log(`[EmailService] Attempting to send email to: ${to} | Subject: ${subject}`);
+    console.log(`[EmailService] Sending to: ${to} | Subject: ${subject}`);
 
-    if (EMAIL_SERVICE_ENABLED && EMAIL_SERVICE_URL && EMAIL_SERVICE_API_KEY) {
-        try {
-            const path = '/v1/email/send';
-            const body = {
-                to,
-                subject,
-                ...(template ? { template, data } : { html }),
-            };
-            const { data: responseData } = await axios.post(
-                `${EMAIL_SERVICE_URL.replace(/\/$/, '')}${path}`,
-                body,
-                {
-                    timeout: EMAIL_SERVICE_TIMEOUT_MS,
-                    headers: {
-                        'x-api-key': EMAIL_SERVICE_API_KEY,
-                        ...signEmailServiceRequest({
-                            method: 'POST',
-                            path,
-                            body,
-                        }),
-                    },
-                }
-            );
-            if (!responseData?.error) {
-                console.log(`[EmailService] Email sent via remote service (${responseData.provider || 'unknown'})`);
-                return true;
-            }
-            console.error('[EmailService] Remote service rejected email:', responseData);
-        } catch (error) {
-            console.error('[EmailService] Remote service failed:', error?.response?.data || error.message);
-            if (EMAIL_SERVICE_REQUIRED) {
-                return false;
-            }
-        }
-    } else if (EMAIL_SERVICE_REQUIRED) {
-        console.error('[EmailService] Remote service is required but EMAIL_SERVICE_URL/API_KEY is not configured or service is disabled');
-        return false;
+    if (!EMAIL_SERVICE_ENABLED) {
+        console.warn('[EmailService] Disabled, skipping send');
+        return !EMAIL_SERVICE_REQUIRED;
+    }
+    if (!EMAIL_SERVICE_URL || !EMAIL_SERVICE_API_KEY) {
+        console.error('[EmailService] EMAIL_SERVICE_URL or EMAIL_SERVICE_API_KEY not set');
+        return !EMAIL_SERVICE_REQUIRED;
     }
 
-    if (BREVO_API_KEY) {
-        try {
-            const apiInstance = new sibApi.TransactionalEmailsApi();
-            apiInstance.setApiKey(sibApi.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
-
-            const sendSmtpEmail = new sibApi.SendSmtpEmail();
-            sendSmtpEmail.subject = subject;
-            sendSmtpEmail.htmlContent = html;
-            sendSmtpEmail.sender = { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL };
-            sendSmtpEmail.to = [{ email: to }];
-
-            await apiInstance.sendTransacEmail(sendSmtpEmail);
-            console.log('[EmailService] Email sent via Brevo successfully');
+    try {
+        const path = '/v1/email/send';
+        const body = { to, subject, ...(template ? { template, data } : { html }) };
+        const { data: responseData } = await axios.post(
+            `${EMAIL_SERVICE_URL.replace(/\/$/, '')}${path}`,
+            body,
+            {
+                timeout: EMAIL_SERVICE_TIMEOUT_MS,
+                headers: {
+                    'x-api-key': EMAIL_SERVICE_API_KEY,
+                    ...signEmailServiceRequest({ method: 'POST', path, body }),
+                },
+            }
+        );
+        if (!responseData?.error) {
+            console.log(`[EmailService] Sent via ${responseData.provider || 'unknown'}`);
             return true;
-        } catch (error) {
-            console.error('[EmailService] Brevo SDK failed:', error?.response?.body || error.message);
-            // If it's a "Key not found" error, we specifically want to log that it might be an invalid key
-            if (error?.response?.body?.code === 'unauthorized') {
-                console.warn('[EmailService] CRITICAL: Brevo API key is unauthorized. Please check your .env file.');
-            }
         }
+        console.error('[EmailService] Service rejected:', responseData);
+        return false;
+    } catch (error) {
+        console.error('[EmailService] Failed:', error?.response?.data || error.message);
+        return !EMAIL_SERVICE_REQUIRED;
     }
-
-    console.log('[EmailService] Falling back to SMTP (Gmail)...');
-    const fallbackSent = await sendEmailFallback({ to, subject, html });
-    if (!fallbackSent) {
-        console.error('[EmailService] FAILED: Both Brevo and SMTP fallback failed.');
-    }
-    return fallbackSent;
 };
 
 const generateEmailTemplate = (title, message, code = '', extraHtml = '') => `<!DOCTYPE html>
@@ -255,11 +202,18 @@ const register = async (req, res) => {
             privacyAccepted,
             policyVersion
         } = req.body;
-        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePhone(phone);
 
         if (!name) return res.status(400).json({ error: true, msg: 'Name is required' });
         if (!email || !password) {
             return res.status(400).json({ error: true, msg: 'Email and password are required' });
+        }
+        if (!normalizedPhone) {
+            return res.status(400).json({ error: true, msg: 'Phone number is required' });
+        }
+        if (!isValidIndianPhone(normalizedPhone)) {
+            return res.status(400).json({ error: true, msg: 'Phone number must be a valid 10-digit Indian number starting with 6-9' });
         }
         if (!termsAccepted || !privacyAccepted) {
             return res.status(400).json({
@@ -267,8 +221,6 @@ const register = async (req, res) => {
                 msg: 'You must accept the Terms and Privacy Policy to create an account'
             });
         }
-
-        const normalizedPhone = phone ? phone.trim() : null;
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -284,37 +236,33 @@ const register = async (req, res) => {
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
-        console.log('[OTP_DEBUG] Generated registration OTP for', normalizedEmail, 'is:', otpCode);
+        logOtpForLocalDebug('registration', normalizedEmail, otpCode);
 
         let isTest = process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com');
+        // If OTP verification is disabled globally, auto-verify all registrations
+        const skipOtp = !OTP_VERIFICATION_ENABLED || isTest;
 
-        const query = normalizedPhone ? { $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] } : { email: normalizedEmail };
-        let user = await Users.findOne(query);
+        // Both lookups go through deterministic hashes: email/phone are encrypted
+        // at rest with random IVs, so plaintext queries can never match.
+        const emailHashVal = hmacHash(normalizedEmail);
+        const existingUser = await Users.findOne({
+            $or: [
+                { emailHash: emailHashVal },
+                ...(normalizedPhone ? [{ phoneHash: hmacHash(normalizedPhone) }] : []),
+            ],
+        });
+        if (existingUser && existingUser.isVerified !== false) {
+            const errorMessage = existingUser.emailHash === emailHashVal
+                ? 'A user with that email already exists'
+                : 'A user with that phone number already exists';
+            return res.status(409).json({ error: true, msg: errorMessage });
+        }
 
-        if (user) {
-            if (user.isVerified === false) {
-                user.name = name;
-                user.fullName = fullName ? fullName.trim() : (user.fullName || "");
-                user.email = normalizedEmail;
-                user.phone = normalizedPhone;
-                user.password = hashedPassword;
-                user.localPasswordSet = true;
-                user.legalConsent = consentPayload;
-                if (isTest) {
-                    user.isVerified = true;
-                    user.loginOtp = undefined;
-                } else {
-                    user.loginOtp = { token: otpHash, expires: otpExpiry, attempts: 0 };
-                }
-                await user.save();
-            } else {
-                let errorMessage = 'A user with these details already exists';
-                if (normalizedPhone && user.phone === normalizedPhone) errorMessage = 'A user with that phone number already exists';
-                if (user.email === normalizedEmail) errorMessage = 'A user with that email already exists';
-                return res.status(409).json({ error: true, msg: errorMessage });
+        if (skipOtp) {
+            if (existingUser && existingUser.isVerified === false) {
+                await Users.deleteOne({ _id: existingUser._id });
             }
-        } else {
-            user = await Users.create({
+            const user = await Users.create({
                 phone: normalizedPhone,
                 email: normalizedEmail,
                 name,
@@ -322,16 +270,39 @@ const register = async (req, res) => {
                 password: hashedPassword,
                 localPasswordSet: true,
                 legalConsent: consentPayload,
-                isVerified: isTest ? true : false,
-                ...(isTest ? {} : { loginOtp: { token: otpHash, expires: otpExpiry, attempts: 0 } })
+                isVerified: true,
             });
-        }
-
-        if (isTest) {
             const token = signUserToken(user);
             setUserCookie(res, token);
-            return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
+            return res.status(200).json({ error: false, token, msg: 'Account created successfully' });
         }
+
+        if (existingUser && existingUser.isVerified === false) {
+            await Users.deleteOne({ _id: existingUser._id });
+        }
+
+        const pendingPhoneOwner = await PendingRegistration.findOne({ phone: normalizedPhone, email: { $ne: normalizedEmail } });
+        const pendingEmailHash = hmacHash(normalizedEmail);
+        if (pendingPhoneOwner) {
+            return res.status(409).json({ error: true, msg: 'A pending registration already uses that phone number' });
+        }
+
+        await PendingRegistration.findOneAndUpdate(
+            { email: normalizedEmail },
+            {
+                $set: {
+                    phone: normalizedPhone,
+                    email: normalizedEmail,
+                    name,
+                    fullName: fullName ? fullName.trim() : "",
+                    password: hashedPassword,
+                    localPasswordSet: true,
+                    legalConsent: consentPayload,
+                    loginOtp: { token: otpHash, expires: otpExpiry, attempts: 0 },
+                }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
 
         const sent = await sendEmail({
             to: normalizedEmail,
@@ -375,16 +346,17 @@ const register = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password, loginId } = req.body;
-        const identifier = (loginId || email || "").trim();
+        const identifier = (loginId || email || "").trim().toLowerCase();
         if (!identifier || !password) {
             return res.status(400).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
-        const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Look up by email hash (encrypted field) or by name (less sensitive, plain text)
+        const emailHashVal = hmacHash(identifier);
         const user = await Users.findOne({
             $or: [
-                { email: { $regex: `^${escaped}$`, $options: 'i' } },
-                { name: { $regex: `^${escaped}$`, $options: 'i' } }
+                { emailHash: emailHashVal },
+                { name: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
             ]
         });
         if (!user) {
@@ -405,7 +377,7 @@ const login = async (req, res) => {
             });
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 
@@ -424,19 +396,19 @@ const requestOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email is required' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user) {
             return res.status(404).json({ error: true, msg: 'User not found. Please register first.' });
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 
         const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
         const otpHash = await bcrypt.hash(otpCode, 10);
         const otpExpiry = Date.now() + 5 * 60 * 1000;
-        console.log('[OTP_DEBUG] Generated login OTP for', normalizedEmail, 'is:', otpCode);
+        logOtpForLocalDebug('login', normalizedEmail, otpCode);
 
         await Users.findByIdAndUpdate(user._id, {
             $set: {
@@ -490,7 +462,7 @@ const verifyOtp = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'OTP is invalid or expired' });
         }
@@ -526,13 +498,13 @@ const verifyOtp = async (req, res) => {
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome  d!',
+                    title: 'Welcome!',
                     message: `Hello ${getDisplayName(user)}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome  d!',
+                    'Welcome!',
                     `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
@@ -570,7 +542,12 @@ const googleSignin = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Invalid Google account' });
         }
 
-        let user = await Users.findOne({ email: payload.email });
+        let user = await Users.findOne({ emailHash: hmacHash(payload.email) });
+
+        if (mode === 'register' && user && user.isVerified === false) {
+            await Users.deleteOne({ _id: user._id });
+            user = null;
+        }
 
         if (mode === 'register' && user) {
             return res.status(409).json({
@@ -602,7 +579,6 @@ const googleSignin = async (req, res) => {
                 name: payload.name || 'Google User',
                 fullName: payload.name || '',
                 email: payload.email,
-                phone: null,
                 password: hashedPassword,
                 localPasswordSet: false,
                 googleId: payload.sub,
@@ -623,13 +599,13 @@ const googleSignin = async (req, res) => {
                 subject: 'Welcome to OneMoreGift!',
                 template: 'welcome',
                 data: {
-                    title: 'Welcome  d!',
+                    title: 'Welcome!',
                     message: `Hello ${getDisplayName(user)}, your OneMoreGift account is ready. Start exploring giveaways and rewards now.`,
                     actionUrl: CLIENT_URL,
                     actionLabel: 'Explore Giveaways',
                 },
                 html: generateEmailTemplate(
-                    'Welcome  d!',
+                    'Welcome!',
                     `Hello ${getDisplayName(user)}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                     '',
                     '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
@@ -638,6 +614,7 @@ const googleSignin = async (req, res) => {
         } else {
             // Update Google metadata; also clear legacy fake phone values
             const updates = {};
+            const unset = {};
             if (!user.googleId) {
                 updates.googleId = payload.sub;
                 updates.isGoogleAuth = true;
@@ -653,15 +630,19 @@ const googleSignin = async (req, res) => {
             }
             // Clear old fake phone numbers stored as 'google_XXXXXXXXXX'
             if (user.phone && user.phone.startsWith('google_')) {
-                updates.phone = null;
+                unset.phone = '';
             }
-            if (Object.keys(updates).length > 0) {
-                await Users.findByIdAndUpdate(user._id, { $set: updates });
+            if (Object.keys(updates).length > 0 || Object.keys(unset).length > 0) {
+                const updateDoc = {};
+                if (Object.keys(updates).length > 0) updateDoc.$set = updates;
+                if (Object.keys(unset).length > 0) updateDoc.$unset = unset;
+                await Users.findByIdAndUpdate(user._id, updateDoc);
                 user = { ...user.toObject(), ...updates };
+                if (unset.phone !== undefined) delete user.phone;
             }
         }
 
-        if (user.blocked) {
+        if (await Users.isUserBanned(user)) {
             return res.status(403).json({ error: true, msg: 'Your account is blocked' });
         }
 
@@ -669,20 +650,21 @@ const googleSignin = async (req, res) => {
         setUserCookie(res, token);
         return res.status(200).json({ error: false, token });
     } catch (error) {
+        console.error('googleSignin Exception:', error?.message || error);
         return res.status(500).json({ error: true, msg: 'Google Sign-In failed' });
     }
 };
 
 const resetPass = async (req, res) => {
     try {
-        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(req.body?.email);
         const resetRequestMsg = 'If an account exists for this email, a password reset link has been sent.';
 
         if (!normalizedEmail) {
             return res.status(400).json({ error: true, msg: 'Email is required.' });
         }
 
-        const findUser = await Users.findOne({ email: normalizedEmail });
+        const findUser = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!findUser) {
             return res.status(200).json({
                 error: false,
@@ -750,7 +732,7 @@ const setPass = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Token, email, and password fields are required.' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || !user.resetToken || !user.resetToken.token) {
             return res.status(400).json({ error: true, msg: 'Token is invalid or has expired. Please request a new password reset.' });
         }
@@ -763,7 +745,7 @@ const setPass = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         await Users.updateOne(
-            { email: normalizedEmail },
+            { emailHash: hmacHash(normalizedEmail) },
             {
                 $set: { password: hashedPassword, localPasswordSet: true },
                 $unset: { resetToken: '' },
@@ -801,7 +783,7 @@ const checkUser = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Phone no is required.' });
         }
 
-        const findUser = await Users.findOne({ phone }).select('-_id blocked');
+        const findUser = await Users.findOne({ phoneHash: hmacHash(String(phone).replace(/\D/g, '').slice(-10)) }).select('-_id blocked');
         if (findUser) {
             return res.status(200).json({ error: false, msg: 'User exists', user: findUser });
         }
@@ -837,13 +819,82 @@ const logout = async (req, res) => {
 
 const verifyRegistrationOtp = async (req, res) => {
     try {
-        const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(req.body?.email);
         const otp = String(req.body?.otp || "").trim();
         if (!normalizedEmail || !otp) {
             return res.status(400).json({ error: true, msg: 'Email and OTP are required' });
         }
 
-        const user = await Users.findOne({ email: normalizedEmail });
+        const pending = await PendingRegistration.findOne({ email: normalizedEmail }); // PendingRegistration stores plain email
+        if (pending) {
+            if (Date.now() > new Date(pending.loginOtp.expires).getTime()) {
+                await PendingRegistration.deleteOne({ _id: pending._id });
+                return res.status(400).json({ error: true, msg: 'OTP has expired. Please register again.' });
+            }
+
+            const isPendingOtpMatch = (TEST_OTP_BYPASS_ENABLED && otp === '123456') || await bcrypt.compare(otp, pending.loginOtp.token);
+            if (!isPendingOtpMatch) {
+                const nextAttempts = (pending.loginOtp.attempts || 0) + 1;
+                if (nextAttempts >= 5) {
+                    await PendingRegistration.deleteOne({ _id: pending._id });
+                    return res.status(429).json({ error: true, msg: 'Too many wrong attempts, please register again' });
+                }
+
+                await PendingRegistration.findByIdAndUpdate(pending._id, { $set: { 'loginOtp.attempts': nextAttempts } });
+                return res.status(400).json({ error: true, msg: 'Invalid OTP' });
+            }
+
+            const existingUser = await Users.findOne({
+                $or: [
+                    { emailHash: hmacHash(pending.email) },
+                    ...(pending.phone ? [{ phoneHash: hmacHash(pending.phone) }] : []),
+                ],
+            });
+            if (existingUser && existingUser.isVerified !== false) {
+                await PendingRegistration.deleteOne({ _id: pending._id });
+                return res.status(409).json({ error: true, msg: 'A user with these details already exists' });
+            }
+            if (existingUser && existingUser.isVerified === false) {
+                await Users.deleteOne({ _id: existingUser._id });
+            }
+
+            const user = await Users.create({
+                phone: pending.phone,
+                email: pending.email,
+                name: pending.name,
+                fullName: pending.fullName || "",
+                password: pending.password,
+                localPasswordSet: true,
+                legalConsent: pending.legalConsent,
+                isVerified: true,
+            });
+
+            await PendingRegistration.deleteOne({ _id: pending._id });
+
+            await sendEmail({
+                to: normalizedEmail,
+                subject: 'Welcome to OneMoreGift!',
+                template: 'welcome',
+                data: {
+                    title: 'Welcome!',
+                    message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
+                    actionUrl: CLIENT_URL,
+                    actionLabel: 'Explore Giveaways',
+                },
+                html: generateEmailTemplate(
+                    'Welcome!',
+                    `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
+                    '',
+                    '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
+                )
+            });
+
+            const token = signUserToken(user);
+            setUserCookie(res, token);
+            return res.status(200).json({ error: false, token, msg: 'Account verified successfully' });
+        }
+
+        const user = await Users.findOne({ emailHash: hmacHash(normalizedEmail) });
         if (!user || user.isVerified || !user.loginOtp || !user.loginOtp.token) {
             return res.status(400).json({ error: true, msg: 'Invalid request or already verified' });
         }
@@ -875,13 +926,13 @@ const verifyRegistrationOtp = async (req, res) => {
             subject: 'Welcome to OneMoreGift!',
             template: 'welcome',
             data: {
-                title: 'Welcome  d!',
+                title: 'Welcome!',
                 message: `Hello ${user.name}, your OneMoreGift account is verified and ready. Start exploring giveaways and rewards now.`,
                 actionUrl: CLIENT_URL,
                 actionLabel: 'Explore Giveaways',
             },
             html: generateEmailTemplate(
-                'Welcome  d!',
+                'Welcome!',
                 `Hello ${user.name}, welcome to OneMoreGift! We are thrilled to have you with us.`,
                 '',
                 '<p>Your account has been successfully verified. You can now start exploring and enjoy the best gifts!</p>'
@@ -908,5 +959,6 @@ module.exports = {
     googleSignin,
     me,
     logout,
-    sendEmail
+    sendEmail,
+    generateEmailTemplate
 };

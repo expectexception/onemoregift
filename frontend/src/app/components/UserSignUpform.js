@@ -152,7 +152,7 @@ export default function UserSignupForm() {
             if (status === 409) {
                 toast({
                     title: "Account already exists",
-                    description: "This email is already registered. Please sign in instead.",
+                    description: message,
                     variant: "destructive"
                 });
                 router.push("/login");
@@ -444,7 +444,7 @@ export default function UserSignupForm() {
                             <div className="flex flex-col space-y-1">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="phone" className="text-neutral-300 text-xs flex items-center gap-1.5"><PhoneIcon className="w-3.5 h-3.5" />Phone Number</Label>
-                                    <span className="text-[10px] text-neutral-500">Optional</span>
+                                    <span className="text-[10px] text-red-400">Required</span>
                                 </div>
                                 <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-2">
                                     <input
@@ -469,10 +469,9 @@ export default function UserSignupForm() {
                                         placeholder="10-digit phone number"
                                         className="premium-input h-10 text-white placeholder:text-neutral-600 text-sm"
                                         {...register("phone", {
-                                            required: false,
+                                            required: "Phone number is required",
                                             setValueAs: (value) => (value || "").replace(/\D/g, "").slice(0, 10),
                                             validate: (value) => {
-                                                if (!value) return true;
                                                 return /^[6-9]\d{9}$/.test(value) || "Must be 10 digits, starting with 6–9";
                                             }
                                         })}

@@ -2,6 +2,7 @@ services:
   - type: web
     name: onemoregift-email-service
     runtime: node
+    rootDir: email-service
     plan: starter
     buildCommand: npm ci
     startCommand: npm start

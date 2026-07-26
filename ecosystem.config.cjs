@@ -11,6 +11,10 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 9000,
+        // APP_MASTER_KEY: "PASTE_YOUR_64_CHAR_HEX_MASTER_KEY_HERE",
+        // ↑ Uncomment and fill in after running: node scripts/gen-keys.js
+        // Then encrypt your .env: node scripts/env-encrypt.js --key <key> --input .env --output .env.enc
+        // This key decrypts .env.enc at startup. Keep it safe — never commit it.
       },
     },
     {

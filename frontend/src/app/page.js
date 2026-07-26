@@ -1,17 +1,37 @@
 "use client"
-import Image from "next/image";
 import Navbar from "./components/Navbar";
 import HeroSection from "./components/HeroSection";
 import Footer from "./components/Footer";
-import Sidebar from "./components/Sidebar";
-import { useState } from "react";
 import Boxes from "./components/Boxes";
-export default function Home() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+import HowItWorks from "./components/HowItWorks";
+import PopularMoments from "./components/PopularMoments";
+import FeaturedProducts from "./components/FeaturedProducts";
+import { useEffect, useState } from "react";
+import { fetchSiteConfig } from "./utils/siteConfig";
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+const DEFAULT_HOME_CONFIG = {
+  homeShowSteps: true,
+  homeShowStats: true,
+  homeShowMoments: true,
+  homeShowShop: true,
+  shopEnabled: true,
+};
+
+export default function Home() {
+  const [config, setConfig] = useState(DEFAULT_HOME_CONFIG);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSiteConfig()
+      .then((cfg) => {
+        if (!cancelled && cfg) {
+          setConfig({ ...DEFAULT_HOME_CONFIG, ...cfg });
+        }
+      })
+      .catch(() => { /* fall back to defaults */ });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div>
       {/* Sticky Navbar */}
@@ -20,8 +40,15 @@ export default function Home() {
       </div>
 
       {/* Main Content */}
-      <HeroSection />
+      <HeroSection
+        showStats={config.homeShowStats}
+        heroTitle={config.heroTitle}
+        heroSubtitle={config.heroSubtitle}
+      />
+      {config.homeShowSteps && <HowItWorks />}
       <Boxes />
+      {config.homeShowMoments && <PopularMoments />}
+      {config.homeShowShop && config.shopEnabled && <FeaturedProducts />}
       <Footer />
     </div>
   );

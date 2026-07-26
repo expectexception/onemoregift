@@ -113,6 +113,20 @@ module.exports = {
   'spin-slow': {
   from: { transform: 'rotate(0deg)' },
   to: { transform: 'rotate(360deg)' }
+  },
+  'fade-out': {
+  from: { opacity: '1' },
+  to: { opacity: '0' }
+  },
+  'scale-out': {
+  from: { opacity: '1', transform: 'scale(1)' },
+  to: { opacity: '0', transform: 'scale(0.95)' }
+  },
+  'heart-pop': {
+  '0%': { transform: 'scale(1)' },
+  '30%': { transform: 'scale(1.35)' },
+  '60%': { transform: 'scale(0.9)' },
+  '100%': { transform: 'scale(1)' }
   }
   },
   animation: {
@@ -126,7 +140,10 @@ module.exports = {
   'fade-in': 'fade-in 0.4s ease-out forwards',
   'scale-in': 'scale-in 0.4s ease-out forwards',
   'slide-up': 'slide-up 0.5s ease-out forwards',
-  'spin-slow': 'spin-slow 20s linear infinite'
+  'spin-slow': 'spin-slow 20s linear infinite',
+  'fade-out': 'fade-out 0.25s ease-in forwards',
+  'scale-out': 'scale-out 0.25s ease-in forwards',
+  'heart-pop': 'heart-pop 0.4s ease-out'
   },
   backgroundImage: {
   'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

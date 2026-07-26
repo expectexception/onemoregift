@@ -11,8 +11,15 @@ export async function POST(req) {
             );
         }
 
-        // The hmacKey must match what was used in createChallenge
-        const hmacKey = process.env.ALTCHA_HMAC_KEY || 'default_dev_hmac_secret_key_12345';
+        // The hmacKey must match what was used in createChallenge.
+        const hmacKey = process.env.ALTCHA_HMAC_KEY;
+        if (!hmacKey) {
+            console.error('ALTCHA_HMAC_KEY is not configured');
+            return new Response(
+                JSON.stringify({ success: false, message: "Captcha is not configured" }),
+                { status: 500 }
+            );
+        }
 
         const isVerified = await verifySolution(payload, hmacKey);
 

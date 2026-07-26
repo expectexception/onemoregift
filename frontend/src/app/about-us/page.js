@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import { HiSparkles, HiLightBulb, HiEye, HiHeart, HiShieldCheck, HiGift, HiUsers, HiStar } from "react-icons/hi";
 import { HiGift as HiGiftLogo } from "react-icons/hi2";
 import { GiveawayMetricSvg, TrustMetricSvg, UsersMetricSvg, WinnerMetricSvg } from "../components/MetricSvgs";
+import { usePlatformStats } from "../hooks/usePlatformStats";
 
 function useCountUp(target, duration = 2000, startWhen = false) {
     const [count, setCount] = useState(0);
@@ -26,38 +27,18 @@ function useCountUp(target, duration = 2000, startWhen = false) {
 export default function AboutUs() {
     const statsRef = useRef(null);
     const [statsVisible, setStatsVisible] = useState(false);
-    const [platformStats, setPlatformStats] = useState({
-        users: 1530, // fallback numbers while loading
-        giveaways: 120,
-        winners: 450,
-        satisfaction: 98
-    });
+    const { stats: platformStats } = usePlatformStats({ refreshMs: 10000 });
+
+    // Counters the admin hid are left out rather than rendered as a zero
+    const hiddenStats = platformStats.statsHidden || {};
+    const visibleStats = [
+        { key: "registeredUsers", icon: <UsersMetricSvg className="w-5 h-5" />, target: platformStats.registeredUsers, label: "Registered Users", color: "from-blue-400 to-cyan-400" },
+        { key: "totalGiveaways", icon: <GiveawayMetricSvg className="w-5 h-5" />, target: platformStats.totalGiveaways, label: "Giveaways Hosted", color: "from-purple-400 to-fuchsia-400" },
+        { key: "totalWinners", icon: <WinnerMetricSvg className="w-5 h-5" />, target: platformStats.totalWinners, label: "Gifts & Wins Delivered", color: "from-amber-400 to-orange-400" },
+        { key: "totalPrizeValue", icon: <TrustMetricSvg className="w-5 h-5" />, target: platformStats.totalPrizeValue, prefix: "₹", suffix: "+", label: "Total Prize Value", color: "from-emerald-400 to-teal-400" },
+    ].filter((s) => !hiddenStats[s.key]);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                // Fetch live platform metrics
-                // This assumes an endpoint like /api/admin/stats exists or similar.
-                // We previously noticed /admin/stats returns activeGiveaways, totalWinners, totalPrizeValue.
-                // We'll map them appropriately.
-                const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/admin/stats');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (!data.error) {
-                        setPlatformStats({
-                            users: data.totalWinners * 15 || 1530,   // Approximation if totalUsers not provided in this specific endpoint
-                            giveaways: data.activeGiveaways * 5 || 120, // Approximation or use real if updated
-                            winners: data.totalWinners || 450,
-                            satisfaction: data.verifiedLegit || 98
-                        });
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to load platform stats:", err);
-            }
-        };
-        fetchStats();
-
         const observer = new IntersectionObserver(
             ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
             { threshold: 0.3 }
@@ -98,13 +79,16 @@ export default function AboutUs() {
                 <div className="relative max-w-6xl mx-auto">
                     <div className="text-center mb-8">
                         <h3 className="text-2xl md:text-3xl font-bold text-white">Platform Highlights</h3>
-                        <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing giveaway community.</p>
+                        <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing gifting community.</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.users} suffix="+" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
-                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.giveaways} suffix="+" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
-                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.winners} suffix="+" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
-                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.satisfaction} suffix="%" label="Trusted Platform" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
+                    <div className={`grid gap-4 ${
+                        visibleStats.length >= 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                            : visibleStats.length === 3 ? "grid-cols-1 sm:grid-cols-3"
+                                : visibleStats.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-xs mx-auto"
+                    }`}>
+                        {visibleStats.map((s) => (
+                            <StatCounter key={s.key} icon={s.icon} target={s.target} prefix={s.prefix || ""} suffix={s.suffix || ""} label={s.label} color={s.color} startWhen={statsVisible} />
+                        ))}
                     </div>
                 </div>
             </section>
@@ -235,7 +219,7 @@ function ValueCard({ icon, title, description, delay }) {
     );
 }
 
-function StatCounter({ icon, target, suffix, label, color, startWhen }) {
+function StatCounter({ icon, target, prefix = "", suffix = "", label, color, startWhen }) {
     const count = useCountUp(target, 1800, startWhen);
     return (
         <div className="premium-card rounded-2xl p-5 border border-white/[0.08] bg-black/45 backdrop-blur-md hover:border-white/[0.16] transition-all duration-300 group">
@@ -246,7 +230,7 @@ function StatCounter({ icon, target, suffix, label, color, startWhen }) {
                 <span className="text-[10px] uppercase tracking-wider text-neutral-500">Live</span>
             </div>
             <div className={`text-3xl md:text-4xl font-black tabular-nums text-transparent bg-clip-text bg-gradient-to-br ${color}`}>
-                {startWhen ? count.toLocaleString() : "0"}{suffix}
+                {prefix}{startWhen ? count.toLocaleString() : "0"}{suffix}
             </div>
             <div className="mt-2 text-xs md:text-sm text-neutral-400 font-medium uppercase tracking-wide">{label}</div>
         </div>

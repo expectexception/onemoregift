@@ -3,40 +3,25 @@
 
 import { useState, useEffect } from "react";
 import { Nav } from "@/components/ui/nav";
-import {
-    LayoutDashboard,
-    ChevronRight,
-    UsersRound,
-    Gift,
-    BadgePlus,
-    LogOut,
-    Trophy,
-    ChevronLeft
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronRight, ChevronLeft, Gift, ShoppingBag, Heart, Package, Store, Star, ClipboardList, Shield, BarChart3, FileText, Ticket } from "lucide-react";
+import { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon } from "./SVGIcons";
+import TrophyIcon from "./SVGIcons/TrophyIcon";
+import SettingsIcon from "./SVGIcons/SettingsIcon";
 import { useWindowWidth } from "@react-hook/window-size";
 import { cn } from "@/lib/utils";
-import { Menu, X } from "lucide-react";
+import AnimatedGiftSVG from "./AnimatedGiftSVG";
+import { useAdminPendingCounts } from "@/app/hooks/useAdminPendingCounts";
 
-function AdminMonogram() {
-    return (
-        <svg viewBox="0 0 44 44" className="w-6 h-6" fill="none" aria-hidden="true">
-            <rect x="2" y="2" width="40" height="40" rx="12" fill="rgba(255,255,255,0.12)" />
-            <path d="M14 30L20.5 14H23.5L30 30H26.8L25.4 26.3H18.6L17.2 30H14ZM19.6 23.8H24.4L22 17.3L19.6 23.8Z" fill="white" />
-        </svg>
-    );
-}
-
-export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
+export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapsed, setIsCollapsed }) {
     const [mounted, setMounted] = useState(false);
     const onlyWidth = useWindowWidth();
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const pendingCounts = useAdminPendingCounts();
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const mobileWidth = mounted ? onlyWidth < 768 : false;
+    const mobileWidth = mounted ? onlyWidth < 1024 : false;
 
     function toggleSidebar() {
         setIsCollapsed(!isCollapsed);
@@ -47,40 +32,120 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
     }
 
     const navLinks = [
+        // ── Core ─────────────────────────────────────────────────────────────
         {
             title: "Dashboard",
             href: "/admin/dashboard",
-            icon: LayoutDashboard,
+            icon: DashboardIcon,
             variant: "default"
         },
         {
             title: "Users",
             href: "/admin/dashboard/users",
-            icon: UsersRound,
+            icon: UsersIcon,
             variant: "ghost"
         },
+
+        // ── Giveaways ────────────────────────────────────────────────────────
         {
             title: "Giveaways",
             href: "/admin/dashboard/giveaways",
-            icon: Gift,
+            icon: GiveawayIcon,
             variant: "ghost"
         },
         {
             title: "Add Giveaway",
             href: "/admin/dashboard/add",
-            icon: BadgePlus,
+            icon: AddIcon,
             variant: "ghost"
         },
         {
             title: "Winners",
             href: "/admin/dashboard/winners",
-            icon: Trophy,
+            icon: TrophyIcon,
+            variant: "ghost"
+        },
+
+        // ── Surprise Me ──────────────────────────────────────────────────────
+        {
+            title: "Surprise Requests",
+            href: "/admin/dashboard/surprise",
+            icon: Gift,
+            variant: "ghost",
+            badge: pendingCounts.surprise,
+        },
+        {
+            title: "Happy Moments",
+            href: "/admin/dashboard/moments",
+            icon: Heart,
+            variant: "ghost",
+            badge: pendingCounts.moments,
+        },
+        {
+            title: "Gifts",
+            href: "/admin/dashboard/gifts",
+            icon: Star,
+            variant: "ghost"
+        },
+
+        // ── Shop ─────────────────────────────────────────────────────────────
+        {
+            title: "Coupons",
+            href: "/admin/dashboard/coupons",
+            icon: Ticket,
+            variant: "ghost"
+        },
+        {
+            title: "Products",
+            href: "/admin/dashboard/products",
+            icon: ShoppingBag,
+            variant: "ghost",
+            badge: pendingCounts.lowStock,
+        },
+        {
+            title: "Orders",
+            href: "/admin/dashboard/orders",
+            icon: Package,
+            variant: "ghost"
+        },
+        {
+            title: "Stores",
+            href: "/admin/dashboard/stores",
+            icon: Store,
+            variant: "ghost"
+        },
+
+        // ── Admin ────────────────────────────────────────────────────────────
+        {
+            title: "Reports",
+            href: "/admin/dashboard/reports",
+            icon: BarChart3,
+            variant: "ghost"
+        },
+        {
+            title: "Roles & Access",
+            href: "/admin/dashboard/roles",
+            icon: Shield,
+            variant: "ghost"
+        },
+        {
+            title: "Audit Logs",
+            href: "/admin/dashboard/audit-logs",
+            icon: FileText,
+            variant: "ghost"
+        },
+
+        // ── System ───────────────────────────────────────────────────────────
+        {
+            title: "Settings",
+            href: "/admin/dashboard/settings",
+            icon: SettingsIcon,
             variant: "ghost"
         },
         {
             title: "Logout",
             href: "/admin/logout",
-            icon: LogOut,
+            icon: LogoutIcon,
             variant: "ghost"
         }
     ];
@@ -88,7 +153,7 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
     return (
         <div
             className={cn(
-                "relative flex flex-col border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out z-50",
+                "fixed inset-y-0 left-0 z-50 flex h-dvh shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#0b0b0b] transition-all duration-300 ease-in-out",
                 mobileWidth
                     ? (isMobileOpen ? "fixed inset-y-0 left-0 w-[260px] translate-x-0" : "fixed inset-y-0 left-0 w-[260px] -translate-x-full")
                     : (isCollapsed ? "w-[80px]" : "w-[260px]")
@@ -96,8 +161,8 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
         >
             {/* Branding Area */}
             <div className="h-20 flex items-center px-5 border-b border-white/10 relative overflow-hidden">
-                <div className="w-10 h-10 rounded-md bg-red-600 flex items-center justify-center shrink-0">
-                    <AdminMonogram />
+                <div className="w-10 h-10 flex items-center justify-center shrink-0">
+                    <AnimatedGiftSVG className="w-9 h-9" />
                 </div>
                 {(mounted && !isCollapsed && !mobileWidth) || (mobileWidth && isMobileOpen) ? (
                     <div className="ml-3 animate-in fade-in slide-in-from-left-2 duration-300">

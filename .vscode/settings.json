@@ -1,0 +1,13 @@
+{
+    "python-envs.pythonProjects": [
+        {
+            "path": "dist",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ],
+    "css.lint.unknownAtRules": "ignore",
+    "files.associations": {
+        "*.css": "tailwindcss"
+    }
+}

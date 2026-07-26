@@ -1,15 +1,26 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const isAdmin = require('../middleware/isAdmin');
 const isRootAdmin = require('../middleware/isRootAdmin');
-const { register, login, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword } = require('../controller/adminController');
+const { register, login, verifyAdminOtp, allUsers, banUser, unBanUser, delUser, adminHome, updateUser, getUserById, getAllGiveaways, singleGiveaway, me, logout, getPublicStats, clearParticipants, clearAllJoined, changeAdminPassword, getDbStatus, downloadBackup } = require('../controller/adminController');
 const { getWinnersForAdmin } = require('../controller/giveawayController');
+const { getAdminConfig, updateConfig } = require('../controller/configController');
+
+const adminAuthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === 'test',
+});
 
 // Public stats
 router.get('/stats', getPublicStats);
 
-router.post('/register', register);
-router.post('/login', login);
+router.post('/register', adminAuthLimiter, register);
+router.post('/login', adminAuthLimiter, login);
+router.post('/verify-otp', adminAuthLimiter, verifyAdminOtp);
 router.get('/me', isAdmin, me);
 router.post('/logout', logout);
 router.patch('/change-password', isAdmin, changeAdminPassword);
@@ -24,8 +35,34 @@ router.get('/giveaways', isAdmin, getAllGiveaways)
 router.get('/winners', isAdmin, getWinnersForAdmin)
 router.get('/giveaway/:id', isAdmin, singleGiveaway)
 
+// Config management
+// Coupons
+const { listCoupons, createCoupon, updateCoupon, deleteCoupon } = require('../controller/couponController');
+router.get('/coupons', isAdmin, listCoupons);
+router.post('/coupons', isAdmin, createCoupon);
+router.patch('/coupons/:id', isAdmin, updateCoupon);
+router.delete('/coupons/:id', isAdmin, deleteCoupon);
+
+// CSV exports
+const { exportOrders, exportUsers, exportSubscribers } = require('../controller/exportController');
+router.get('/export/orders', isAdmin, exportOrders);
+router.get('/export/users', isAdmin, exportUsers);
+router.get('/export/subscribers', isAdmin, exportSubscribers);
+
+// Drop notify list
+const { listSubscribers, notifySubscribers, removeSubscriber } = require('../controller/dropSubscriberController');
+router.get('/drop-subscribers', isAdmin, listSubscribers);
+router.post('/drop-subscribers/notify', isAdmin, notifySubscribers);
+router.delete('/drop-subscribers/:id', isAdmin, removeSubscriber);
+
+router.get('/config', isAdmin, getAdminConfig);
+router.post('/config', isAdmin, updateConfig);
+
 // Database Maintenance
 router.post('/maintenance/reset/:id', isAdmin, isRootAdmin, clearParticipants);
 router.post('/maintenance/clear-all', isAdmin, isRootAdmin, clearAllJoined);
+router.get('/maintenance/db-status', isAdmin, getDbStatus);
+router.get('/maintenance/backup', isAdmin, isRootAdmin, downloadBackup);
 
 module.exports = router;
+

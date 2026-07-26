@@ -7,9 +7,10 @@ import GiveawayDetails from "@/app/components/GiveawayDetails";
 import api from "@/app/utils/apiClient";
 
 export default function Page({ params }) {
-    const slug = use(params).id
-    let [giveaway, setGiveaway] = useState({});
-    let [loading, setLoading] = useState(true);
+    const resolvedParams = use(params);
+    const slug = resolvedParams.id;
+    const [giveaway, setGiveaway] = useState({});
+    const [loading, setLoading] = useState(true);
 
     const fetchGiveaway = useCallback(async () => {
         try {

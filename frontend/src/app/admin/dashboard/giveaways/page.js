@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Trash2, Plus, Gift, Target, Trophy, Clock, ShieldCheck } from "lucide-react";
 import api from "@/app/utils/apiClient";
 import { cn } from "@/lib/utils";
+import dayjs from "@/app/utils/dayjs";
 
 function ViewSvg() {
     return <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" /><circle cx="12" cy="12" r="3" /></svg>;
@@ -48,6 +49,16 @@ const columns = [
         )
     },
     {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${row.original.statusColor}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${row.original.statusLabel === "Running" ? "bg-emerald-400 animate-pulse" : row.original.statusLabel === "Pending" ? "bg-blue-400" : "bg-red-400"}`} />
+                {row.original.statusLabel}
+            </div>
+        )
+    },
+    {
         accessorKey: "startDate",
         header: "Initiation",
         cell: ({ row }) => <span className="font-mono text-[10px] text-neutral-400 ">{row.original.startDate}</span>,
@@ -81,45 +92,58 @@ function GiveawaysDashboardPage() {
                 { meta: { auth: "admin" } }
             );
 
-            const dayjsModule = await import("dayjs");
-            const dayjs = dayjsModule.default;
-            const utc = (await import("dayjs/plugin/utc")).default;
-            const timezone = (await import("dayjs/plugin/timezone")).default;
-            dayjs.extend(utc);
-            dayjs.extend(timezone);
             const formatStr = "DD MMM YYYY | HH:mm";
 
             setData(
-                data.data.map((item) => ({
-                    ...item,
-                    startDate: item.startDate ? dayjs(item.startDate).tz("Asia/Kolkata").format(formatStr) : "N/A",
-                    endDate: item.endDate ? dayjs(item.endDate).tz("Asia/Kolkata").format(formatStr) : "N/A",
-                    actions: (
-                        <div className="flex gap-2 justify-end">
-                            <button
-                                onClick={() => router.push(`/admin/dashboard/giveaways/${item._id}`)}
-                                className="admin-action-btn view"
-                            >
-                                <ViewSvg />
-                            </button>
-                            <button
-                                onClick={() => router.push(`/admin/dashboard/giveaways/edit/${item._id}`)}
-                                className="admin-action-btn edit"
-                            >
-                                <EditSvg />
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setSelectedGiveawayId(item._id);
-                                    setIsDeleteDialogOpen(true);
-                                }}
-                                className="admin-action-btn danger"
-                            >
-                                <DeleteSvg />
-                            </button>
-                        </div>
-                    ),
-                }))
+                data.data.map((item) => {
+                    const now = dayjs().tz("Asia/Kolkata");
+                    const start = item.startDate ? dayjs(item.startDate).tz("Asia/Kolkata") : null;
+                    const end = item.endDate ? dayjs(item.endDate).tz("Asia/Kolkata") : null;
+                    
+                    let statusLabel = "Running";
+                    let statusColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                    
+                    if (start && now.isBefore(start)) {
+                        statusLabel = "Pending";
+                        statusColor = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+                    } else if (end && now.isAfter(end)) {
+                        statusLabel = "Ended";
+                        statusColor = "bg-red-500/10 text-red-400 border-red-500/20";
+                    }
+
+                    return {
+                        ...item,
+                        statusLabel,
+                        statusColor,
+                        startDate: item.startDate ? dayjs(item.startDate).tz("Asia/Kolkata").format(formatStr) : "N/A",
+                        endDate: item.endDate ? dayjs(item.endDate).tz("Asia/Kolkata").format(formatStr) : "N/A",
+                        actions: (
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => router.push(`/admin/dashboard/giveaways/${item._id}`)}
+                                    className="admin-action-btn view"
+                                >
+                                    <ViewSvg />
+                                </button>
+                                <button
+                                    onClick={() => router.push(`/admin/dashboard/giveaways/edit/${item._id}`)}
+                                    className="admin-action-btn edit"
+                                >
+                                    <EditSvg />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSelectedGiveawayId(item._id);
+                                        setIsDeleteDialogOpen(true);
+                                    }}
+                                    className="admin-action-btn danger"
+                                >
+                                    <DeleteSvg />
+                                </button>
+                            </div>
+                        ),
+                    };
+                })
             );
             setTotalPages(Math.ceil(data.total / pageSize));
         } catch (error) {
@@ -150,8 +174,8 @@ function GiveawaysDashboardPage() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 rounded-lg bg-red-600 flex items-center justify-center border border-red-500/20">
-                            <Gift className="text-white w-8 h-8" />
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500/20 to-amber-500/5 border border-red-500/30 flex items-center justify-center shadow-[0_8px_32px_-8px_rgba(239,68,68,0.35)] shrink-0">
+                            <Gift className="text-red-400 w-7 h-7" />
                         </div>
                         <div className="flex flex-col">
                             <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-white">

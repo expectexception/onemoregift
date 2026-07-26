@@ -15,6 +15,7 @@ function MobileAdminMark() {
 
 const AdminLayout = ({ children }) => {
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     return (
         <div className="flex min-h-screen bg-[#070707] overflow-hidden relative">
@@ -43,9 +44,14 @@ const AdminLayout = ({ children }) => {
                 />
             )}
 
-            <AdminSidebar isMobileOpen={isMobileOpen} setIsMobileOpen={setIsMobileOpen} />
+            <AdminSidebar
+                isMobileOpen={isMobileOpen}
+                setIsMobileOpen={setIsMobileOpen}
+                isCollapsed={isSidebarCollapsed}
+                setIsCollapsed={setIsSidebarCollapsed}
+            />
 
-            <main className="flex-grow relative w-full lg:w-auto overflow-y-auto pt-16 lg:pt-0">
+            <main className={`relative min-h-screen w-full overflow-y-auto pt-16 transition-[margin] duration-300 ease-in-out lg:pt-0 ${isSidebarCollapsed ? "lg:ml-[80px]" : "lg:ml-[260px]"}`}>
                 {children}
             </main>
         </div>

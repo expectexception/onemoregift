@@ -9,7 +9,7 @@ This setup deploys:
 The production domains used below are:
 
 - Frontend: `https://onemoregift.in`
-- Backend API: `https://api.onemoregift.in`
+- Backend API: `https://onemoregift.in`
 - Email service: `https://your-email-service.onrender.com`
 
 ## 1. Pre-flight Checks
@@ -116,7 +116,7 @@ NODE_ENV=production
 MONGO_URI=your_production_mongodb_uri
 JWT_SECRET=long_random_secret
 CLIENT_URL=https://onemoregift.in
-SERVER_URL=https://api.onemoregift.in
+SERVER_URL=https://onemoregift.in
 CORS_ORIGIN=https://onemoregift.in,https://www.onemoregift.in
 COOKIE_DOMAIN=.onemoregift.in
 EMAIL_SERVICE_URL=https://your-email-service.onrender.com
@@ -129,8 +129,8 @@ Do not paste a Brevo SMTP key into backend `BREVO_API_KEY`. The backend should c
 Required frontend values:
 
 ```env
-NEXT_PUBLIC_BASE_URL=https://api.onemoregift.in/api/v1/
-NEXT_PUBLIC_API_URL=https://api.onemoregift.in/api/v1
+NEXT_PUBLIC_BASE_URL=https://onemoregift.in/api/v1/
+NEXT_PUBLIC_API_URL=https://onemoregift.in/api/v1
 NEXT_PUBLIC_ALTCHA_CHALLENGE_URL=https://onemoregift.in/api/altcha/challenge
 ALTCHA_HMAC_KEY=long_random_secret
 ```
@@ -211,7 +211,7 @@ https://onemoregift.in/admin
 Basic checks:
 
 ```bash
-curl https://api.onemoregift.in/api/v1/health
+curl https://onemoregift.in/api/v1/health
 curl https://your-email-service.onrender.com/health
 curl -I https://onemoregift.in
 ```
@@ -232,7 +232,7 @@ Manual smoke test:
 - Open giveaway pages.
 - Log in as admin.
 - Create a giveaway with an uploaded image.
-- Confirm the image URL starts with `https://api.onemoregift.in/uploads/images/`.
+- Confirm the image URL starts with `https://onemoregift.in/uploads/images/`.
 
 ## 9. Deploy Updates
 

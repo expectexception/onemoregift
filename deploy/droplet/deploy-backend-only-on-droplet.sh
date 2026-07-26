@@ -26,12 +26,7 @@ fi
 echo "[4/6] Start PM2 apps (backend + frontend dist)"
 cd "$APP_DIR"
 pm2 delete all || true
-pm2 start "$APP_DIR/backend/index.js" \
-  --name onemoregift-backend \
-  --cwd "$APP_DIR/backend"
-pm2 start "$FRONTEND_DIST_DIR/standalone/server.js" \
-  --name onemoregift-frontend-dist \
-  --cwd "$FRONTEND_DIST_DIR/standalone"
+pm2 start ecosystem.backend-only.config.cjs
 pm2 save
 
 echo "[5/6] Configure nginx"
@@ -48,6 +43,24 @@ server {
     gzip_types text/plain text/css application/json application/javascript application/xml+rss image/svg+xml;
 
     location /api/ {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /media/ {
         proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

@@ -25,4 +25,4 @@ bash deploy/droplet/deploy-backend-only-on-droplet.sh
 
 - Backend runs from repo at `/var/www/onemoregift/backend`.
 - Frontend runtime runs from uploaded artifact at `/var/www/onemoregift-frontend-dist/standalone`.
-- PM2 config used: `ecosystem.backend-only.cjs`.
+- PM2 config used: `ecosystem.backend-only.config.cjs`.

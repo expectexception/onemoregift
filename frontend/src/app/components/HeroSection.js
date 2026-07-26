@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import api from "../utils/apiClient";
-import { CheckIcon, TrophyIcon, VerificationIcon, ShieldIcon } from "./SVGIcons";
+import { CheckIcon, TrophyIcon, VerificationIcon, UsersIcon } from "./SVGIcons";
 import RevealOnScroll from "./RevealOnScroll";
+import { formatCompactNumber, formatIndianCurrency, usePlatformStats } from "../hooks/usePlatformStats";
+import { useCountUp } from "../hooks/useCountUp";
 
 const heroImages = [
     "/images/giftsa.webp",
@@ -19,17 +20,27 @@ const heroImages = [
     "/images/gift-8.png",
 ];
 
-export default function HeroSection() {
+export default function HeroSection({ showStats = true, heroTitle = "", heroSubtitle = "" }) {
     const router = useRouter();
     const sectionRef = useRef(null);
     const cursorRef = useRef(null);
     const [currentImage, setCurrentImage] = useState(0);
-    const [stats, setStats] = useState({
-        activeGiveaways: "50+",
-        totalWinners: "10K+",
-        totalPrizeValue: "₹5L+",
-        verifiedLegit: "100%"
-    });
+    const { stats, loading: statsLoading } = usePlatformStats({ refreshMs: 10000 });
+
+    // Between draws there is nothing running, and a hard "Active 0" reads as broken.
+    // Fall back to the upcoming count (relabelled) so the tile stays truthful.
+    const liveGiveaways = stats.activeGiveaways > 0 || stats.upcomingGiveaways === 0
+        ? { count: stats.activeGiveaways, label: "Active" }
+        : { count: stats.upcomingGiveaways, label: "Upcoming" };
+
+    // Counters the admin hid are dropped, and the grid re-columns to suit whatever is left
+    const hidden = stats.statsHidden || {};
+    const visibleTiles = [
+        { key: "activeGiveaways", Icon: CheckIcon, target: liveGiveaways.count, format: formatCompactNumber, label: liveGiveaways.label },
+        { key: "totalWinners", Icon: TrophyIcon, target: stats.totalWinners, format: formatCompactNumber, label: "Winners" },
+        { key: "totalPrizeValue", Icon: VerificationIcon, target: stats.totalPrizeValue, format: formatIndianCurrency, label: "Prizes" },
+        { key: "registeredUsers", Icon: UsersIcon, target: stats.registeredUsers, format: formatCompactNumber, label: "Users" },
+    ].filter((tile) => !hidden[tile.key]);
 
     // Auto-change background images
     useEffect(() => {
@@ -37,26 +48,6 @@ export default function HeroSection() {
             setCurrentImage((prev) => (prev + 1) % heroImages.length);
         }, 5000);
         return () => clearInterval(interval);
-    }, []);
-
-    // Fetch live stats
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const { data } = await api.get('admin/stats');
-                if (!data.error) {
-                    setStats({
-                        activeGiveaways: `${data.activeGiveaways}+`,
-                        totalWinners: data.totalWinners > 1000 ? `${(data.totalWinners / 1000).toFixed(1)}K+` : `${data.totalWinners}+`,
-                        totalPrizeValue: `₹${data.totalPrizeValue > 100000 ? (data.totalPrizeValue / 100000).toFixed(1) + 'L' : data.totalPrizeValue}+`,
-                        verifiedLegit: "100%"
-                    });
-                }
-            } catch (error) {
-                console.error("Hero stats error:", error);
-            }
-        };
-        fetchStats();
     }, []);
 
     // Cursor glow effect
@@ -95,7 +86,7 @@ export default function HeroSection() {
             {heroImages.map((img, i) => (
                 <div
                     key={img}
-                    className="absolute inset-0 transition-opacity duration-[1600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+                    className="absolute inset-0 transition-opacity [transition-duration:1600ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]"
                     style={{
                         opacity: i === currentImage ? 0.5 : 0,
                         willChange: 'opacity',
@@ -119,15 +110,6 @@ export default function HeroSection() {
             {/* Subtle red accent glows */}
             <div className="absolute top-20 left-[10%] w-72 h-72 bg-red-600/10 rounded-full blur-[120px]" />
             <div className="absolute bottom-20 right-[10%] w-96 h-96 bg-red-700/8 rounded-full blur-[140px]" />
-
-            {/* Grid pattern */}
-            <div
-                className="absolute inset-0 opacity-[0.04]"
-                style={{
-                    backgroundImage: `linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px)`,
-                    backgroundSize: '80px 80px'
-                }}
-            />
 
             {/* Cursor glow */}
             <div
@@ -157,19 +139,29 @@ export default function HeroSection() {
                 {/* Main Heading */}
                 <RevealOnScroll delayMs={60}>
                     <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1]">
-                        <span className="text-white">Win </span>
-                        <span className="text-gradient">Premium</span>
-                        <br className="hidden sm:block" />
-                        <span className="text-white"> Rewards Daily</span>
+                        {heroTitle ? (
+                            <span className="text-white">{heroTitle}</span>
+                        ) : (
+                            <>
+                                <span className="text-white">Win </span>
+                                <span className="text-gradient">Free</span>
+                                <br className="hidden sm:block" />
+                                <span className="text-white"> Rewards Daily</span>
+                            </>
+                        )}
                     </h1>
                 </RevealOnScroll>
 
                 {/* Subtitle */}
                 <RevealOnScroll delayMs={140}>
                     <p className="text-sm sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed font-medium drop-shadow-lg">
-                        Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
-                        <span className="text-red-400 font-semibold"> real prizes </span>
-                        delivered straight to your doorstep.
+                        {heroSubtitle || (
+                            <>
+                                Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
+                                <span className="text-red-400 font-semibold"> real prizes </span>
+                                delivered straight to your doorstep.
+                            </>
+                        )}
                     </p>
                 </RevealOnScroll>
 
@@ -195,14 +187,19 @@ export default function HeroSection() {
                 </RevealOnScroll>
 
                 {/* Stats */}
-                <RevealOnScroll delayMs={290}>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
-                        <StatCard Icon={CheckIcon} value={stats.activeGiveaways} label="Active" />
-                        <StatCard Icon={TrophyIcon} value={stats.totalWinners} label="Winners" />
-                        <StatCard Icon={VerificationIcon} value={stats.totalPrizeValue} label="Prizes" />
-                        <StatCard Icon={ShieldIcon} value={stats.verifiedLegit} label="Legit" />
-                    </div>
-                </RevealOnScroll>
+                {showStats && (
+                    <RevealOnScroll delayMs={290}>
+                        <div className={`grid gap-3 sm:gap-6 max-w-3xl mx-auto ${
+                            visibleTiles.length >= 4 ? "grid-cols-2 lg:grid-cols-4"
+                                : visibleTiles.length === 3 ? "grid-cols-3"
+                                    : visibleTiles.length === 2 ? "grid-cols-2" : "grid-cols-1 max-w-xs"
+                        }`}>
+                            {visibleTiles.map(({ key, Icon, target, format, label }) => (
+                                <StatCard key={key} Icon={Icon} target={target} format={format} loading={statsLoading} label={label} />
+                            ))}
+                        </div>
+                    </RevealOnScroll>
+                )}
             </div>
 
             {/* Bottom gradient fade */}
@@ -211,13 +208,16 @@ export default function HeroSection() {
     );
 }
 
-function StatCard({ Icon, value, label }) {
+function StatCard({ Icon, target, format, loading, label }) {
+    const { ref, value } = useCountUp(target, { durationMs: 1600 });
     return (
-        <div className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
+        <div ref={ref} className="glass rounded-xl p-3 sm:p-4 border border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group">
             <div className="mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
                 <Icon className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
-            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1">{value}</div>
+            <div className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-0.5 sm:mb-1 tabular-nums">
+                {loading ? "..." : format(value)}
+            </div>
             <div className="text-[10px] sm:text-sm text-neutral-500 uppercase tracking-wider">{label}</div>
         </div>
     );

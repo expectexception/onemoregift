@@ -2,7 +2,7 @@
 
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import withUserAuth from "../../components/withUserAuth";
 import Image from "next/image";
 import userImage from "../../../../public/images/user.png";
+import SearchableSelect from "../../components/SearchableSelect";
 
 const emptyAddress = () => ({
     label: "Home",
@@ -24,11 +25,27 @@ const emptyAddress = () => ({
     line2: "",
     city: "",
     state: "",
-    country: "",
+    country: "India",
+    countryCode: "IN",
     postalCode: "",
     phone: "",
     isDefault: false,
 });
+
+// Strips +91 / leading 0 so pasted numbers don't get silently truncated to a wrong number
+const cleanPhone = (value) => {
+    let digits = String(value || "").replace(/\D/g, "");
+    if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2);
+    if (digits.length > 10 && digits.startsWith("0")) digits = digits.slice(1);
+    return digits.slice(0, 10);
+};
+
+const getApiErrorMessage = (error, fallback) => (
+    error?.response?.data?.msg
+    || error?.response?.data?.message
+    || error?.message
+    || fallback
+);
 
 function Home() {
     const { toast } = useToast();
@@ -45,6 +62,8 @@ function Home() {
     const [avatar, setAvatar] = useState("");
     const [canSetFirstPassword, setCanSetFirstPassword] = useState(false);
     const [addresses, setAddresses] = useState([{ ...emptyAddress(), isDefault: true }]);
+    const [indianStates, setIndianStates] = useState([]);
+    const phoneInputRef = useRef(null);
 
     const handleAvatarChange = (e) => {
         const file = e.target.files[0];
@@ -128,13 +147,16 @@ function Home() {
             } else {
                 toast({ title: "Error", description: data.msg || "Password change failed.", variant: "destructive" });
             }
-        } catch {
-            toast({ title: "Error", description: "An error occurred while changing the password.", variant: "destructive" });
+        } catch (error) {
+            toast({ title: "Error", description: getApiErrorMessage(error, "An error occurred while changing the password."), variant: "destructive" });
         }
     };
 
     const fetchUserProfile = async () => {
         try {
+            const { State } = await import("country-state-city");
+            setIndianStates(State.getStatesOfCountry("IN"));
+
             const { data } = await api.get("profile/", { meta: { auth: "user" } });
             const profile = data.myProfile || {};
             setName(profile.name || "");
@@ -150,8 +172,15 @@ function Home() {
                     ? [{ ...emptyAddress(), line1: profile.address, fullName: profile.fullName || profile.name || "", phone: profile.phone || "", isDefault: true }]
                     : [{ ...emptyAddress(), isDefault: true }];
 
-            if (!incomingAddresses.some((item) => item.isDefault)) incomingAddresses[0].isDefault = true;
-            setAddresses(incomingAddresses);
+            // Country column removed: everything is India for now
+            const mappedAddresses = incomingAddresses.map(addr => ({
+                ...addr,
+                country: "India",
+                countryCode: "IN",
+            }));
+
+            if (!mappedAddresses.some((item) => item.isDefault)) mappedAddresses[0].isDefault = true;
+            setAddresses(mappedAddresses);
         } catch (error) {
             console.error(error);
         }
@@ -161,7 +190,7 @@ function Home() {
         e.preventDefault();
         const normalizedName = name.trim();
         const normalizedEmail = email.trim().toLowerCase();
-        const normalizedPhone = phone.replace(/\D/g, "").slice(0, 10);
+        const typedPhone = cleanPhone(phone);
 
         if (!normalizedName) {
             toast({ title: "Validation Error", description: "Name is required.", variant: "destructive" });
@@ -169,10 +198,6 @@ function Home() {
         }
         if (!normalizedEmail || !/\S+@\S+\.\S+/.test(normalizedEmail)) {
             toast({ title: "Validation Error", description: "Please enter a valid email address.", variant: "destructive" });
-            return;
-        }
-        if (normalizedPhone && !/^[6-9]\d{9}$/.test(normalizedPhone)) {
-            toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
             return;
         }
 
@@ -185,21 +210,59 @@ function Home() {
                 line2: (item.line2 || "").trim(),
                 city: (item.city || "").trim(),
                 state: (item.state || "").trim(),
-                country: (item.country || "").trim(),
+                country: "India",
+                countryCode: "IN",
                 postalCode: (item.postalCode || "").trim(),
-                phone: (item.phone || "").replace(/\D/g, "").slice(0, 10),
+                phone: cleanPhone(item.phone),
                 isDefault: Boolean(item.isDefault),
             }))
-            .filter((item) => item.line1 || item.city || item.state || item.country || item.postalCode);
+            .filter((item) => item.line1 || item.city || item.state || item.postalCode || item.phone);
 
         if (cleanedAddresses.length && !cleanedAddresses.some((item) => item.isDefault)) {
             cleanedAddresses[0].isDefault = true;
         }
 
+        for (const [index, address] of cleanedAddresses.entries()) {
+            const addressNumber = index + 1;
+            if (!address.fullName) {
+                toast({ title: "Validation Error", description: `Receiver name is required for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (!address.line1 || !address.city || !address.state || !address.postalCode) {
+                toast({ title: "Validation Error", description: `Complete address line, city, state, and pincode for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (!address.phone) {
+                toast({ title: "Validation Error", description: `Receiver phone number is required for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (!/^[6-9]\d{9}$/.test(address.phone)) {
+                toast({ title: "Validation Error", description: `Receiver phone must be a valid 10-digit Indian number for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+        }
+
+        // Contact phone falls back to the default address' receiver phone, so someone
+        // who only ever filled in an address is not blocked on a field they never saw.
+        const defaultAddress = cleanedAddresses.find((item) => item.isDefault) || cleanedAddresses[0];
+        const normalizedPhone = typedPhone || cleanPhone(defaultAddress?.phone);
+
+        if (!normalizedPhone) {
+            toast({ title: "Validation Error", description: "Please add your contact phone number.", variant: "destructive" });
+            phoneInputRef.current?.focus();
+            return;
+        }
+        if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+            toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
+            phoneInputRef.current?.focus();
+            return;
+        }
+        if (normalizedPhone !== phone) setPhone(normalizedPhone);
+
         try {
             const { data } = await api.patch(
                 "profile/update",
-                { name: normalizedName, fullName: fullName.trim(), email: normalizedEmail, phone: normalizedPhone || "", avatar, addresses: cleanedAddresses },
+                { name: normalizedName, fullName: fullName.trim(), email: normalizedEmail, phone: normalizedPhone, avatar, addresses: cleanedAddresses },
                 { meta: { auth: "user" } }
             );
 
@@ -213,12 +276,14 @@ function Home() {
                         </div>
                     ),
                 });
-                await fetchUserProfile();
+                setTimeout(() => {
+                    router.push("/my-profile");
+                }, 700);
             } else {
                 toast({ title: "Error", description: data.msg || "Profile change failed.", variant: "destructive" });
             }
-        } catch {
-            toast({ title: "Error", description: "An error occurred while saving profile.", variant: "destructive" });
+        } catch (error) {
+            toast({ title: "Error", description: getApiErrorMessage(error, "An error occurred while saving profile."), variant: "destructive" });
         }
     };
 
@@ -294,7 +359,7 @@ function Home() {
                                                 <Label className="text-neutral-300">Phone Number</Label>
                                                 <div className="flex items-center premium-input rounded-xl border border-white/[0.08] focus-within:border-red-500/70">
                                                     <span className="pl-3 pr-2 text-neutral-400 text-sm">+91</span>
-                                                    <Input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-11 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="10-digit phone number" />
+                                                    <Input ref={phoneInputRef} value={phone} onChange={(e) => setPhone(cleanPhone(e.target.value))} className="h-11 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="10-digit phone number" />
                                                 </div>
                                             </div>
                                         </div>
@@ -302,7 +367,7 @@ function Home() {
                                         <div className="space-y-3 pt-1">
                                             <div className="flex items-center justify-between flex-wrap gap-2">
                                                 <h4 className="text-white font-semibold flex items-center gap-2"><MapPin className="w-4 h-4 text-red-400" />Saved Addresses</h4>
-                                                <Button type="button" variant="outline" onClick={addAddress} className="h-9 rounded-lg border-white/[0.14] bg-white/[0.02] text-neutral-100 hover:bg-white/[0.08]">
+                                                <Button type="button" variant="outline" onClick={addAddress} className="h-9 w-full sm:w-auto rounded-lg border-white/[0.14] bg-white/[0.02] text-neutral-100 hover:bg-white/[0.08]">
                                                     <Plus className="w-4 h-4 mr-1" /> Add Address
                                                 </Button>
                                             </div>
@@ -314,16 +379,16 @@ function Home() {
                                                             ? "border-amber-400/35 bg-amber-500/5 shadow-[0_0_0_1px_rgba(251,191,36,0.12)]"
                                                             : "border-white/[0.08] bg-white/[0.02]"
                                                     }`}>
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="flex items-center gap-2 w-full max-w-[220px]">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                            <div className="flex items-center gap-2 w-full sm:max-w-[220px]">
                                                                 <Input value={address.label} onChange={(e) => updateAddressField(idx, "label", e.target.value)} className="premium-input h-10 text-white" placeholder="Label (Home)" />
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Button type="button" variant="outline" onClick={() => setDefaultAddress(idx)} className={`h-9 rounded-lg ${address.isDefault ? "border-amber-400/40 text-amber-300 bg-amber-500/10" : "border-white/[0.1] text-neutral-300 hover:bg-white/[0.06]"}`}>
+                                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                                                                <Button type="button" variant="outline" onClick={() => setDefaultAddress(idx)} className={`h-9 w-full sm:w-auto rounded-lg ${address.isDefault ? "border-amber-400/40 text-amber-300 bg-amber-500/10" : "border-white/[0.1] text-neutral-300 hover:bg-white/[0.06]"}`}>
                                                                     <Star className="w-4 h-4 mr-1" /> {address.isDefault ? "Default" : "Set Default"}
                                                                 </Button>
                                                                 {addresses.length > 1 ? (
-                                                                    <Button type="button" variant="outline" onClick={() => removeAddress(idx)} className="h-9 rounded-lg border-red-500/40 text-red-300 hover:bg-red-500/10">
+                                                                    <Button type="button" variant="outline" onClick={() => removeAddress(idx)} className="h-9 w-full sm:w-auto rounded-lg border-red-500/40 text-red-300 hover:bg-red-500/10">
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </Button>
                                                                 ) : null}
@@ -331,16 +396,23 @@ function Home() {
                                                         </div>
 
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                            <Input value={address.fullName} onChange={(e) => updateAddressField(idx, "fullName", e.target.value)} className="premium-input h-10 text-white" placeholder="Receiver name" />
-                                                            <Input value={address.phone} onChange={(e) => updateAddressField(idx, "phone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="premium-input h-10 text-white" placeholder="Receiver phone" />
+                                                            <Input value={address.fullName} onChange={(e) => updateAddressField(idx, "fullName", e.target.value)} className="premium-input h-10 text-white" placeholder="Receiver name *" />
+                                                            <div className="flex items-center premium-input rounded-xl border border-white/[0.08] focus-within:border-red-500/70">
+                                                                <span className="pl-3 pr-2 text-neutral-400 text-sm">+91</span>
+                                                                <Input value={address.phone} onChange={(e) => updateAddressField(idx, "phone", cleanPhone(e.target.value))} className="h-10 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="Receiver phone *" />
+                                                            </div>
                                                         </div>
-                                                        <Input value={address.line1} onChange={(e) => updateAddressField(idx, "line1", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 1" />
+                                                        <Input value={address.line1} onChange={(e) => updateAddressField(idx, "line1", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 1 *" />
                                                         <Input value={address.line2} onChange={(e) => updateAddressField(idx, "line2", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 2 (Optional)" />
-                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                                            <Input value={address.city} onChange={(e) => updateAddressField(idx, "city", e.target.value)} className="premium-input h-10 text-white" placeholder="City" />
-                                                            <Input value={address.state} onChange={(e) => updateAddressField(idx, "state", e.target.value)} className="premium-input h-10 text-white" placeholder="State" />
-                                                            <Input value={address.country} onChange={(e) => updateAddressField(idx, "country", e.target.value)} className="premium-input h-10 text-white" placeholder="Country" />
-                                                            <Input value={address.postalCode} onChange={(e) => updateAddressField(idx, "postalCode", e.target.value)} className="premium-input h-10 text-white" placeholder="Pincode" />
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                            <SearchableSelect
+                                                                value={address.state || ""}
+                                                                onChange={(val) => updateAddressField(idx, "state", val)}
+                                                                options={indianStates.map(s => ({ value: s.name, label: s.name }))}
+                                                                placeholder="State *"
+                                                            />
+                                                            <Input value={address.city} onChange={(e) => updateAddressField(idx, "city", e.target.value)} className="premium-input h-10 text-white" placeholder="City *" />
+                                                            <Input value={address.postalCode} onChange={(e) => updateAddressField(idx, "postalCode", e.target.value.replace(/\D/g, "").slice(0, 6))} className="premium-input h-10 text-white" placeholder="Pincode *" />
                                                         </div>
                                                     </div>
                                                 ))}

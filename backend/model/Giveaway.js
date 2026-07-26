@@ -36,6 +36,10 @@ const giveawaySchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    isPaused: {
+        type: Boolean,
+        default: false
+    },
     participants: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Users'
