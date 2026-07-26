@@ -18,7 +18,7 @@ const SERVER_URL = (process.env.SERVER_URL || 'http://localhost:9000').replace(/
 const MAX_IMAGE_SIZE_BYTES = (Number(process.env.MAX_IMAGE_SIZE_MB) || 5) * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = (Number(process.env.MAX_VIDEO_SIZE_MB) || 25) * 1024 * 1024;
 
-// Disk storage path — configurable, defaults to public/uploads/images
+// Disk storage path: configurable, defaults to public/uploads/images
 const MEDIA_DIR = process.env.MEDIA_DIR
     ? path.resolve(process.env.MEDIA_DIR)
     : path.join(__dirname, '../public/uploads/images');
@@ -63,22 +63,22 @@ const hasAllowedSignature = (buf, mimetype) => {
         return buf.length >= 6 && ['GIF87a', 'GIF89a'].includes(buf.subarray(0, 6).toString('ascii'));
     if (mimetype === 'image/webp')
         return buf.length >= 12 && buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP';
-    // MP4/MOV — ISO base media file format: bytes 4-8 are the 'ftyp' box marker
+    // MP4/MOV: ISO base media file format: bytes 4-8 are the 'ftyp' box marker
     if (mimetype === 'video/mp4' || mimetype === 'video/quicktime')
         return buf.length >= 12 && buf.subarray(4, 8).toString('ascii') === 'ftyp';
-    // WebM — EBML header
+    // WebM: EBML header
     if (mimetype === 'video/webm')
         return buf.length >= 4 && buf.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
-    // Ogg — "OggS" capture pattern
+    // Ogg: "OggS" capture pattern
     if (mimetype === 'video/ogg')
         return buf.length >= 4 && buf.subarray(0, 4).toString('ascii') === 'OggS';
-    // PDF — "%PDF" header
+    // PDF: "%PDF" header
     if (mimetype === 'application/pdf')
         return buf.length >= 4 && buf.subarray(0, 4).toString('ascii') === '%PDF';
     return false;
 };
 
-// ── Multer — always use memory storage so we can compress before saving ───────
+// ── Multer: always use memory storage so we can compress before saving ───────
 const fileFilter = (req, file, cb) => {
     if (!ALLOWED_IMAGE_TYPES.has(file.mimetype) && !ALLOWED_VIDEO_TYPES.has(file.mimetype) && !ALLOWED_DOC_TYPES.has(file.mimetype)) {
         return cb(new Error('Only JPG, PNG, WEBP, GIF images, MP4, WEBM, OGG, MOV videos, or PDF documents are allowed'));
@@ -136,7 +136,7 @@ async function saveToDisk(file) {
 
     console.log(`[Upload/disk] ${filename} | ${file.size}B → ${dataToWrite.length}B`);
 
-    // Always return a relative URL — in dev it proxies through Next.js (no CORP issue),
+    // Always return a relative URL: in dev it proxies through Next.js (no CORP issue),
     // in prod the same origin serves it. Only use SERVER_URL if explicitly set for external CDN.
     const isPublic = MEDIA_DIR.includes(path.join('public', 'uploads', 'images'));
     const url = isPublic
@@ -166,7 +166,7 @@ async function saveToMongo(file) {
 
     console.log(`[Upload/mongo] ${filename} | ${file.size}B → ${dataToWrite.length}B | id=${doc._id}`);
 
-    // Relative URL — proxied through Next.js in dev, same-origin in prod
+    // Relative URL: proxied through Next.js in dev, same-origin in prod
     // (the /image/:id route serves any stored file with its correct Content-Type)
     const url = isVid ? `/api/v1/upload/video/${doc._id}` : `/api/v1/upload/image/${doc._id}`;
     return { filename, url, size: dataToWrite.length, originalSize: file.size, id: doc._id, type: isVid ? 'video' : isDoc ? 'file' : 'image' };

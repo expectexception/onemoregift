@@ -41,7 +41,7 @@ async function cleanDB() {
 
         const db = mongoose.connection.db;
 
-        // Users — preserve root admin emails
+        // Users: preserve root admin emails
         const usersResult = await db.collection('users').deleteMany(
             ROOT_ADMIN_EMAILS.length > 0
                 ? { email: { $nin: ROOT_ADMIN_EMAILS } }
@@ -49,7 +49,7 @@ async function cleanDB() {
         );
         console.log(`✓ Deleted ${usersResult.deletedCount} users`);
 
-        // Pending registrations — all
+        // Pending registrations: all
         const pendingResult = await db.collection('pendingregistrations').deleteMany({});
         console.log(`✓ Deleted ${pendingResult.deletedCount} pending registrations`);
 

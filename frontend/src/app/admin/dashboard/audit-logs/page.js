@@ -98,9 +98,9 @@ function AuditLogsPage() {
                                         <td className="px-4 py-3">
                                             <span className="text-xs px-2 py-0.5 bg-white/[0.05] border border-white/10 rounded text-neutral-400 capitalize">{l.category}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-neutral-400">{l.adminEmail || "—"}</td>
-                                        <td className="px-4 py-3 text-xs text-neutral-500 max-w-[200px] truncate">{l.description || "—"}</td>
-                                        <td className="px-4 py-3 text-xs text-neutral-600 font-mono">{l.ipAddress || "—"}</td>
+                                        <td className="px-4 py-3 text-xs text-neutral-400">{l.adminEmail || "-"}</td>
+                                        <td className="px-4 py-3 text-xs text-neutral-500 max-w-[200px] truncate">{l.description || "-"}</td>
+                                        <td className="px-4 py-3 text-xs text-neutral-600 font-mono">{l.ipAddress || "-"}</td>
                                         <td className="px-4 py-3 text-xs text-neutral-500">{new Date(l.createdAt).toLocaleString("en-IN")}</td>
                                     </tr>
                                 ))}
@@ -133,12 +133,12 @@ function AuditLogsPage() {
                                     { label: "Admin", value: `${selected.adminEmail} (${selected.adminRole})` },
                                     { label: "Description", value: selected.description },
                                     { label: "IP Address", value: selected.ipAddress },
-                                    { label: "Entity", value: selected.entityType ? `${selected.entityType} — ${selected.entityId}` : "—" },
+                                    { label: "Entity", value: selected.entityType ? `${selected.entityType}: ${selected.entityId}` : "-" },
                                     { label: "Timestamp", value: new Date(selected.createdAt).toLocaleString("en-IN") },
                                 ].map(r => (
                                     <div key={r.label} className="flex justify-between gap-4">
                                         <span className="text-neutral-500 shrink-0">{r.label}</span>
-                                        <span className="text-white text-right break-all">{r.value || "—"}</span>
+                                        <span className="text-white text-right break-all">{r.value || "-"}</span>
                                     </div>
                                 ))}
                                 {selected.prevValue && (

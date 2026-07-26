@@ -85,7 +85,7 @@ const updateProduct = async (req, res) => {
     }
 };
 
-// DELETE /api/v1/admin/products/:id (soft delete — archive)
+// DELETE /api/v1/admin/products/:id (soft delete. Archive)
 const archiveProduct = async (req, res) => {
     try {
         const doc = await Product.findByIdAndUpdate(
@@ -111,7 +111,7 @@ const archiveProduct = async (req, res) => {
     }
 };
 
-// DELETE /api/v1/admin/products/:id/hard — permanent delete
+// DELETE /api/v1/admin/products/:id/hard: permanent delete
 const deleteProduct = async (req, res) => {
     try {
         const doc = await Product.findByIdAndDelete(req.params.id);
@@ -134,7 +134,7 @@ const deleteProduct = async (req, res) => {
     }
 };
 
-// PATCH /api/v1/admin/products/:id/stock — adjust stock
+// PATCH /api/v1/admin/products/:id/stock: adjust stock
 const adjustStock = async (req, res) => {
     try {
         const { adjustment, reason } = req.body; // positive or negative integer

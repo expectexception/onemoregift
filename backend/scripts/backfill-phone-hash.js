@@ -3,7 +3,7 @@
 // checks work (the encrypted phone field itself can never be queried).
 //
 // Usage: node scripts/backfill-phone-hash.js
-// Safe to re-run — only touches users that have a phone but no phoneHash.
+// Safe to re-run: only touches users that have a phone but no phoneHash.
 // Run this once on each environment (local + droplet) after deploying.
 
 require('dotenv').config();
@@ -12,7 +12,7 @@ const { decrypt, hmacHash } = require('../utils/crypto');
 
 (async () => {
     await mongoose.connect(process.env.MONGO_URI);
-    // Raw collection access — bypasses model hooks so we control exactly what changes
+    // Raw collection access: bypasses model hooks so we control exactly what changes
     const users = mongoose.connection.collection('users');
 
     const cursor = users.find(
@@ -29,7 +29,7 @@ const { decrypt, hmacHash } = require('../utils/crypto');
         const hash = hmacHash(plainPhone);
 
         if (seen.has(hash)) {
-            console.warn(`DUPLICATE PHONE: user ${doc._id} shares a phone with user ${seen.get(hash)} — skipping (fix manually, unique index will reject it)`);
+            console.warn(`DUPLICATE PHONE: user ${doc._id} shares a phone with user ${seen.get(hash)}, skipping (fix manually, unique index will reject it)`);
             continue;
         }
         seen.set(hash, doc._id);
@@ -37,7 +37,7 @@ const { decrypt, hmacHash } = require('../utils/crypto');
         // A pre-existing user may already own this hash from an earlier partial run
         const owner = await users.findOne({ phoneHash: hash }, { projection: { _id: 1 } });
         if (owner) {
-            console.warn(`DUPLICATE PHONE: user ${doc._id} shares a phone with user ${owner._id} — skipping`);
+            console.warn(`DUPLICATE PHONE: user ${doc._id} shares a phone with user ${owner._id}, skipping`);
             continue;
         }
 

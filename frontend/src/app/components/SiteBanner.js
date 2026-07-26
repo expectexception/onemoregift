@@ -40,7 +40,7 @@ export default function SiteBanner() {
                 <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-center gap-2.5 text-center">
                     <Wrench className="w-4 h-4 text-amber-400 shrink-0" />
                     <p className="text-xs sm:text-sm text-amber-100 font-medium">
-                        {config.maintenanceMessage || "We are doing a bit of maintenance — some actions are paused."}
+                        {config.maintenanceMessage || "We are doing a bit of maintenance, so some actions are paused."}
                     </p>
                 </div>
             </div>

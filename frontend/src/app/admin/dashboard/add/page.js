@@ -48,7 +48,7 @@ function AddGiveawayPage() {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [localPreviewUrl, setLocalPreviewUrl] = useState("");
     useEffect(() => {
-        // Only revoke on unmount, not on every change — avoids StrictMode double-invoke bug
+        // Only revoke on unmount, not on every change: avoids StrictMode double-invoke bug
         return () => {
             if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
         };
@@ -248,7 +248,7 @@ function AddGiveawayPage() {
                                 <div className="space-y-5">
                                     <div className="relative group rounded-lg overflow-hidden border border-white/[0.08] hover:border-red-600/40 transition-all aspect-video flex items-center justify-center bg-black/40">
                                         {localPreviewUrl ? (
-                                            // blob: URLs must use plain <img> — Next.js <Image> cannot load them
+                                            // blob: URLs must use plain <img>. Next.js <Image> cannot load them
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img
                                                 src={localPreviewUrl}

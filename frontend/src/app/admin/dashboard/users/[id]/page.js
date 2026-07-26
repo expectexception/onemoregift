@@ -109,7 +109,7 @@ const UserProfilePage = () => {
             });
             if (!data.error) setOrders(data.data || []);
         } catch (error) {
-            // non-fatal — order history is supplementary to the profile
+            // Non-fatal, order history is supplementary to the profile
         } finally {
             setOrdersLoading(false);
         }

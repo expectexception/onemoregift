@@ -5,7 +5,7 @@
  * Usage: node scripts/gen-keys.js
  *
  * Generates all required secrets for OneMoreGift production.
- * The APP_MASTER_KEY is printed ONCE. Store it safely — it's needed to decrypt .env.enc at startup.
+ * The APP_MASTER_KEY is printed ONCE. Store it safely. It's needed to decrypt .env.enc at startup.
  */
 
 const crypto = require('crypto');
@@ -34,7 +34,7 @@ console.log('');
 console.log('⚠️  IMPORTANT: Copy these values NOW. They are generated fresh each run.');
 console.log('');
 console.log('┌─────────────────────────────────────────────────────────────┐');
-console.log('│  APP_MASTER_KEY  (keep ONLY in PM2 env or shell — never .env file)');
+console.log('│  APP_MASTER_KEY  (keep ONLY in PM2 env or shell, never a .env file)');
 console.log('└─────────────────────────────────────────────────────────────┘');
 console.log(`APP_MASTER_KEY=${masterKey}`);
 console.log('');

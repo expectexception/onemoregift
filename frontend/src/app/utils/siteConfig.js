@@ -1,7 +1,7 @@
 import api from "./apiClient";
 
 // Shared, memoized site-config fetch. Several components (navbar, homepage
-// sections, shop pages, checkout) need the public config — without this each
+// sections, shop pages, checkout) need the public config, without this each
 // mounted component fired its own /config request on every page load.
 const TTL_MS = 30 * 1000;
 
@@ -47,7 +47,7 @@ export function parseDropDays(raw, fallback = []) {
     return days.length ? [...new Set(days)] : fallback;
 }
 
-// Human label for a phase, e.g. "Fri, Sat" — falls back to the stock schedule
+// Human label for a phase, e.g. "Fri, Sat": falls back to the stock schedule
 export function dropDaysLabel(config, phase) {
     const fallbacks = { pickup: "Mon, Tue", reveal: "Wed, Thu", sale: "Fri, Sat", prep: "Sun" };
     return config?.shopPhases?.[phase]?.days || fallbacks[phase] || "";

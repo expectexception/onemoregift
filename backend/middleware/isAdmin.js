@@ -40,7 +40,7 @@ const isAdmin = async (req, res, next) => {
         }
 
         // Load full admin doc for RBAC (req.adminDoc used by hasRole middleware)
-        // NOTE: must NOT use .lean() here — the `permissions` field is a schema
+        // NOTE: must NOT use .lean() here. The `permissions` field is a schema
         // virtual (role + extraPermissions), and .lean({ virtuals: true }) is a
         // no-op without the mongoose-lean-virtuals plugin, which silently strips
         // permissions and breaks every hasRole() check.
@@ -51,7 +51,7 @@ const isAdmin = async (req, res, next) => {
             }
             req.adminDoc = adminDoc;
         } catch (_) {
-            // Non-fatal — RBAC will fail if doc not loaded
+            // Non-fatal: RBAC will fail if doc not loaded
             req.adminDoc = null;
         }
 

@@ -72,11 +72,15 @@ const createOrder = async (req, res) => {
         const { items, pickupStoreId, scheduledPickupTime, customerNote, paymentMethod } = req.body;
         const cfg = await getConfigHelper();
 
-        // Weekly drop cycle: orders can only be placed during the Fri–Sat sale window
+        // Weekly drop cycle: orders can only be placed inside the configured sale
+        // window, so the message has to quote the admin's days, not fixed ones.
         if (cfg.weeklyDropEnabled && cfg.shopPhase !== 'sale') {
+            const days = cfg.shopPhases || {};
             return res.status(400).json({
                 error: true,
-                msg: 'Orders open only during the Friday–Saturday sale window. Products & prices reveal Wed–Thu, pickup happens Mon–Tue.',
+                msg: `Orders open only during the sale window (${days.sale?.days || 'Fri, Sat'}). `
+                    + `Products and prices reveal on ${days.reveal?.days || 'Wed, Thu'}, `
+                    + `and pickup happens on ${days.pickup?.days || 'Mon, Tue'}.`,
             });
         }
 
@@ -95,7 +99,7 @@ const createOrder = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Order items cannot be empty' });
         }
 
-        // Quantities come straight from the browser — a negative or fractional value
+        // Quantities come straight from the browser: a negative or fractional value
         // would flip the stock decrement into an increment and mis-price the order.
         const maxQty = Number(cfg.shopMaxQtyPerOrder) || 0;
         const qtyByLine = new Map(); // per product+variant, so split lines can't beat the cap
@@ -112,7 +116,7 @@ const createOrder = async (req, res) => {
             if (maxQty > 0 && running > maxQty) {
                 return res.status(400).json({
                     error: true,
-                    msg: `These are limited drops — you can order at most ${maxQty} of the same item per order.`,
+                    msg: `These are limited drops, so you can order at most ${maxQty} of the same item per order.`,
                 });
             }
         }
@@ -186,7 +190,7 @@ const createOrder = async (req, res) => {
                 unitPrice = variant.price;
                 variantName = variant.name;
 
-                // Atomic conditional decrement — only succeeds if stock is still sufficient
+                // Atomic conditional decrement: only succeeds if stock is still sufficient
                 const updated = await Product.findOneAndUpdate(
                     {
                         _id: item.productId,
@@ -277,7 +281,7 @@ const createOrder = async (req, res) => {
     }
 };
 
-// Submit UPI/QR payment proof for an order — admin verifies it manually
+// Submit UPI/QR payment proof for an order: admin verifies it manually
 const submitPaymentProof = async (req, res) => {
     try {
         const cfg = await getConfigHelper();
@@ -323,12 +327,12 @@ const submitPaymentProof = async (req, res) => {
     }
 };
 
-// Sandbox payment completion — DEVELOPMENT ONLY.
+// Sandbox payment completion: DEVELOPMENT ONLY.
 //
 // This endpoint marks an order paid on the caller's say-so, so it is gated three
 // ways: the gateway toggle must be on, the provider must still be the sandbox, and
 // `sandboxPaymentsAllowed` must be true (false whenever NODE_ENV=production). On the
-// live site it always refuses — an unpaid order can only become paid through QR proof
+// live site it always refuses. An unpaid order can only become paid through QR proof
 // verification by an admin, or by being collected as cash on pickup.
 const simulatePayment = async (req, res) => {
     try {
@@ -342,7 +346,7 @@ const simulatePayment = async (req, res) => {
             if (!cfg.realPaymentsEnabled) {
                 return res.status(503).json({ error: true, msg: `Payment provider '${provider}' is not yet enabled` });
             }
-            // Real gateway integration point — not implemented yet
+            // Real gateway integration point, not implemented yet
             return res.status(501).json({ error: true, msg: `Payment provider '${provider}' integration is not implemented` });
         }
         if (!cfg.sandboxPaymentsAllowed) {
@@ -419,8 +423,8 @@ const getMyOrder = async (req, res) => {
 // Cancel My Order
 //
 // Self-service cancellation is only for orders where no money has moved. Once the
-// customer has paid — or uploaded a payment proof that is sitting in the admin
-// verification queue — cancelling here would silently keep their money while
+// customer has paid, or uploaded a payment proof that is sitting in the admin
+// verification queue. Cancelling here would silently keep their money while
 // handing the stock back, so those orders have to go through the admin refund flow.
 const cancelMyOrder = async (req, res) => {
     try {
@@ -434,7 +438,7 @@ const cancelMyOrder = async (req, res) => {
         if (order.paymentStatus === 'paid') {
             return res.status(400).json({
                 error: true,
-                msg: 'This order is already paid. Please contact support to request a refund — we will process it for you.',
+                msg: 'This order is already paid. Please contact support to request a refund and we will process it for you.',
             });
         }
         if (order.paymentStatus === 'verification_pending') {

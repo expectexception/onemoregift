@@ -1,6 +1,6 @@
 'use strict';
 
-// Best-effort order lifecycle emails. Every send is fire-and-forget — an email
+// Best-effort order lifecycle emails. Every send is fire-and-forget, an email
 // failure must never fail the order flow itself.
 
 const Users = require('../model/Users');
@@ -30,7 +30,7 @@ const sendOrderEmail = async (userId, { subject, title, message, code = '' }) =>
     }
 };
 
-// Order placed — content depends on the chosen payment method
+// Order placed: content depends on the chosen payment method
 const emailOrderPlaced = (order, method) => {
     const base = `Your order <b>${order.orderNumber}</b> (${money(order.total)}) has been placed.`;
     let message;
@@ -39,12 +39,12 @@ const emailOrderPlaced = (order, method) => {
         message = `${base} Pay in cash when you collect your items. Show the pickup code below at the store.`;
         code = order.pickupCode || '';
     } else if (method === 'qr') {
-        message = `${base} Complete your UPI payment and upload the screenshot from My Orders — we verify it and confirm your order.`;
+        message = `${base} Complete your UPI payment and upload the screenshot from My Orders and we verify it and confirm your order.`;
     } else {
         message = `${base} Complete the payment to receive your pickup code.`;
     }
     return sendOrderEmail(order.userId, {
-        subject: `Order ${order.orderNumber} placed — OneMoreGift`,
+        subject: `Order ${order.orderNumber} placed | OneMoreGift`,
         title: 'Order Placed 🎁',
         message,
         code,
@@ -52,29 +52,29 @@ const emailOrderPlaced = (order, method) => {
 };
 
 const emailPaymentVerified = (order) => sendOrderEmail(order.userId, {
-    subject: `Payment confirmed for ${order.orderNumber} — OneMoreGift`,
+    subject: `Payment confirmed for ${order.orderNumber} | OneMoreGift`,
     title: 'Payment Confirmed ✅',
     message: `We verified your payment for order <b>${order.orderNumber}</b> (${money(order.total)}). Show the pickup code below at the store during the Mon–Tue pickup window.`,
     code: order.pickupCode || '',
 });
 
 const emailPaymentRejected = (order) => sendOrderEmail(order.userId, {
-    subject: `Payment proof issue for ${order.orderNumber} — OneMoreGift`,
+    subject: `Payment proof issue for ${order.orderNumber} | OneMoreGift`,
     title: 'Payment Proof Rejected ⚠️',
     message: `We couldn't verify the payment proof for order <b>${order.orderNumber}</b>.<br/><br/>Reason: ${order.paymentRejectedReason || 'Not specified'}.<br/><br/>You can re-submit the correct screenshot from My Orders.`,
 });
 
 const emailOrderReady = (order) => sendOrderEmail(order.userId, {
-    subject: `Order ${order.orderNumber} is ready for pickup — OneMoreGift`,
+    subject: `Order ${order.orderNumber} is ready for pickup | OneMoreGift`,
     title: 'Ready For Pickup 📦',
     message: `Your order <b>${order.orderNumber}</b> is packed and ready. Show the pickup code below at the store to collect it.`,
     code: order.pickupCode || '',
 });
 
 const emailOrderAutoCancelled = (order) => sendOrderEmail(order.userId, {
-    subject: `Order ${order.orderNumber} cancelled — OneMoreGift`,
+    subject: `Order ${order.orderNumber} cancelled | OneMoreGift`,
     title: 'Order Cancelled',
-    message: `Your order <b>${order.orderNumber}</b> was cancelled because the payment was not completed in time. The items are back in stock — you can order again any time.`,
+    message: `Your order <b>${order.orderNumber}</b> was cancelled because the payment was not completed in time. The items are back in stock, so you can order again any time.`,
 });
 
 module.exports = {

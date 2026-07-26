@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { logAction } = require('../utils/auditLogger');
 const { ROLES, ROLE_PERMISSIONS } = require('../model/Admin');
 
-// GET /api/v1/admin/roles/admins — list all admins with roles
+// GET /api/v1/admin/roles/admins: list all admins with roles
 const listAdmins = async (req, res) => {
     try {
         const admins = await Admin.find({}).select('-password -loginOtp').sort({ createdAt: -1 });
@@ -91,7 +91,7 @@ const updatePermissions = async (req, res) => {
     }
 };
 
-// GET /api/v1/admin/roles/matrix — permission matrix
+// GET /api/v1/admin/roles/matrix: permission matrix
 const getMatrix = async (req, res) => {
     return res.json({ error: false, data: { roles: ROLES, permissions: ROLE_PERMISSIONS } });
 };

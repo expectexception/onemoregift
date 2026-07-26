@@ -6,7 +6,7 @@ const Counter = require('./Counter');
 
 const ORDER_STATUSES = ['pending', 'paid', 'ready_for_pickup', 'collected', 'cancelled', 'refunded'];
 
-// Legal status transitions — prevents e.g. moving a collected order back to pending
+// Legal status transitions: prevents e.g. moving a collected order back to pending
 const ORDER_STATUS_TRANSITIONS = {
     pending: ['paid', 'cancelled'],
     paid: ['ready_for_pickup', 'refunded', 'cancelled'],
@@ -44,7 +44,7 @@ const orderSchema = new Schema({
     paymentId: { type: String }, // gateway transaction ID
     paidAt: { type: Date },
 
-    // Manual QR/UPI payment — user uploads proof, admin verifies
+    // Manual QR/UPI payment: user uploads proof, admin verifies
     paymentProofs: [{
         url: { type: String, required: true },
         uploadedAt: { type: Date, default: Date.now },

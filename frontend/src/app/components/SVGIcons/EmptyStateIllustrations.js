@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-// Generic empty list — an open, empty gift box with a few drifting sparkles.
+// Generic empty list: an open, empty gift box with a few drifting sparkles.
 export function EmptyBoxIllustration({ className = "w-32 h-32" }) {
     const gradientId = useId();
     return (
@@ -23,7 +23,7 @@ export function EmptyBoxIllustration({ className = "w-32 h-32" }) {
     );
 }
 
-// Empty happy-moments gallery — a photo frame with a soft sparkle, nothing inside yet.
+// Empty happy-moments gallery: a photo frame with a soft sparkle, nothing inside yet.
 export function EmptyGalleryIllustration({ className = "w-32 h-32" }) {
     const gradientId = useId();
     return (
@@ -44,7 +44,7 @@ export function EmptyGalleryIllustration({ className = "w-32 h-32" }) {
     );
 }
 
-// Empty cart — a shopping bag drifting with nothing inside.
+// Empty cart: a shopping bag drifting with nothing inside.
 export function EmptyCartIllustration({ className = "w-32 h-32" }) {
     const gradientId = useId();
     return (
@@ -67,7 +67,7 @@ export function EmptyCartIllustration({ className = "w-32 h-32" }) {
     );
 }
 
-// Empty surprise-requests / orders list — a gift box on a clock, "nothing pending yet".
+// Empty surprise-requests / orders list: a gift box on a clock, "nothing pending yet".
 export function EmptyTimelineIllustration({ className = "w-32 h-32" }) {
     const gradientId = useId();
     return (

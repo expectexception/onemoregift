@@ -172,7 +172,7 @@ function Home() {
                     ? [{ ...emptyAddress(), line1: profile.address, fullName: profile.fullName || profile.name || "", phone: profile.phone || "", isDefault: true }]
                     : [{ ...emptyAddress(), isDefault: true }];
 
-            // Country column removed — everything is India for now
+            // Country column removed: everything is India for now
             const mappedAddresses = incomingAddresses.map(addr => ({
                 ...addr,
                 country: "India",

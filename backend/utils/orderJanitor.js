@@ -1,7 +1,7 @@
 'use strict';
 
 // Auto-cancels stale unpaid orders and restores their reserved stock.
-// Without this, every abandoned "pending" order locked its stock forever —
+// Without this, every abandoned "pending" order locked its stock forever,
 // a real problem for the limited-quantity weekly drops.
 //
 // Orders with paymentStatus 'verification_pending' are NEVER auto-cancelled:

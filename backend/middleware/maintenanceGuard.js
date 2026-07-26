@@ -3,7 +3,7 @@
 const { getConfigHelper } = require('../controller/configController');
 
 // While maintenance mode is on, the public site stays readable but stops accepting
-// anything that changes data. Admin routes are exempt — otherwise turning the switch
+// anything that changes data. Admin routes are exempt. Otherwise turning the switch
 // on would lock the admin out of turning it back off.
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

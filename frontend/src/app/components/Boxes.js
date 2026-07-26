@@ -369,10 +369,10 @@ export default function Giveaways() {
                         <p className="text-neutral-500 mb-6">
                             {activeTab === "active"
                                 ? upcomingGiveaways.length > 0
-                                    ? `${upcomingGiveaways.length} upcoming giveaway${upcomingGiveaways.length > 1 ? "s" : ""} — check the Upcoming tab!`
+                                    ? `${upcomingGiveaways.length} upcoming giveaway${upcomingGiveaways.length > 1 ? "s" : ""}. Check the Upcoming tab!`
                                     : "Check back soon for new exciting contests!"
                                 : activeTab === "upcoming"
-                                ? "Stay tuned — new giveaways are being planned!"
+                                ? "Stay tuned, new giveaways are being planned!"
                                 : "History of all completed giveaways."}
                         </p>
                         {activeTab === "active" && upcomingGiveaways.length > 0 && config.showUpcoming && (

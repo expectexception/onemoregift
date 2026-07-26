@@ -33,7 +33,7 @@ const normalizeAddresses = (addresses = []) => {
             line2: (item.line2 || "").trim(),
             city: (item.city || "").trim(),
             state: (item.state || "").trim(),
-            // Country column removed from the UI — everything is India for now
+            // Country column removed from the UI, everything is India for now
             country: (item.country || "").trim() || "India",
             postalCode: (item.postalCode || "").trim(),
             phone: normalizePhone(item.phone),
@@ -161,7 +161,7 @@ const updateProfile = async (req, res) => {
         }
 
         // Email/phone are encrypted at rest with random IVs, so plaintext queries never
-        // match — duplicate checks must go through the deterministic hashes.
+        // match, so duplicate checks must go through the deterministic hashes.
         const emailHashVal = hmacHash(resolvedEmail);
         const duplicate = await User.findOne({
             _id: { $ne: userId },

@@ -106,7 +106,7 @@ const sendEmail = async ({ to, subject, html, template, data }) => {
     console.log(`[EmailService] Sending to: ${to} | Subject: ${subject}`);
 
     if (!EMAIL_SERVICE_ENABLED) {
-        console.warn('[EmailService] Disabled — skipping send');
+        console.warn('[EmailService] Disabled, skipping send');
         return !EMAIL_SERVICE_REQUIRED;
     }
     if (!EMAIL_SERVICE_URL || !EMAIL_SERVICE_API_KEY) {
@@ -242,7 +242,7 @@ const register = async (req, res) => {
         // If OTP verification is disabled globally, auto-verify all registrations
         const skipOtp = !OTP_VERIFICATION_ENABLED || isTest;
 
-        // Both lookups go through deterministic hashes — email/phone are encrypted
+        // Both lookups go through deterministic hashes: email/phone are encrypted
         // at rest with random IVs, so plaintext queries can never match.
         const emailHashVal = hmacHash(normalizedEmail);
         const existingUser = await Users.findOne({

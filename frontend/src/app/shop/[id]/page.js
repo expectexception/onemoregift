@@ -379,7 +379,7 @@ export default function ProductDetailPage() {
                             {/* Weekly drop notice */}
                             {saleClosed && (
                                 <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/20 text-blue-300 text-[11px] leading-relaxed">
-                                    <strong>Sale window closed.</strong> Orders open <strong>{dropDaysLabel(dropConfig, "sale")}</strong> only — pickup happens {dropDaysLabel(dropConfig, "pickup")}.
+                                    <strong>Sale window closed.</strong> Orders open <strong>{dropDaysLabel(dropConfig, "sale")}</strong> only. Pickup happens {dropDaysLabel(dropConfig, "pickup")}.
                                 </div>
                             )}
 

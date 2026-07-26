@@ -30,7 +30,7 @@ export default function PopularMoments() {
                     setMoments(sorted);
                 }
             } catch {
-                // Silent — section just won't render if it fails
+                // Silent: section just won't render if it fails
             } finally {
                 if (!cancelled) setLoading(false);
             }

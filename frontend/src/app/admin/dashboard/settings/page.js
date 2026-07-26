@@ -164,7 +164,7 @@ function DayWindowPicker({ label, hint, value, onChange, takenBy, accent = "ambe
             </div>
             {hint && <p className="text-[10px] text-neutral-600 pl-1">{hint}</p>}
             {!selected.length && (
-                <p className="text-[10px] text-amber-500 pl-1">Pick at least one day — this window is currently empty.</p>
+                <p className="text-[10px] text-amber-500 pl-1">Pick at least one day. This window is currently empty.</p>
             )}
         </div>
     );
@@ -223,7 +223,7 @@ function useConfigDraft() {
             const { data } = await api.post("admin/config", payload, { meta: { auth: "admin" } });
             if (!data.error) {
                 invalidateSiteConfig();
-                // Trust the server's echo — it normalises day lists and clamps numbers
+                // Trust the server's echo: it normalises day lists and clamps numbers
                 setSaved(data.config);
                 setDraft(data.config);
                 toast({
@@ -271,7 +271,7 @@ function AdminSettings() {
                     <div className="min-w-0">
                         <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight">Control Centre</h1>
                         <p className="text-neutral-500 font-medium text-sm">
-                            Everything on the live site — shop, payments, giveaways, surprises & moments
+                            Everything on the live site: shop, payments, giveaways, surprises & moments
                         </p>
                     </div>
                 </div>
@@ -311,7 +311,7 @@ function AdminSettings() {
                 )}
             </div>
 
-            {/* Sticky save bar — settings on this page apply to the live site, so an
+            {/* Sticky save bar. Settings on this page apply to the live site, so an
                 unsaved change must never be easy to walk away from. */}
             {changedKeys.length > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0b0b0b]/95 backdrop-blur-xl">
@@ -402,13 +402,13 @@ function ShopTab({ cfg }) {
                         {draft.shopPhases?.[draft.shopPhase]?.days
                             ? <span className="text-neutral-500"> ({draft.shopPhases[draft.shopPhase].days})</span>
                             : null}
-                        {draft.phaseIsForced && <span className="text-red-400 font-semibold"> — pinned manually</span>}
+                        {draft.phaseIsForced && <span className="text-red-400 font-semibold"> (pinned manually)</span>}
                     </p>
                 </div>
 
                 <Field
                     label="Override the current stage"
-                    hint="Pin the shop to one stage — useful to open a sale early or hold one back without touching the weekly schedule."
+                    hint="Pin the shop to one stage. Useful to open a sale early or hold one back without touching the weekly schedule."
                 >
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                         {[
@@ -442,14 +442,14 @@ function ShopTab({ cfg }) {
                 accent="blue"
             >
                 <DayWindowPicker
-                    label="Reveal — products & prices go public"
+                    label="Reveal: products & prices go public"
                     value={draft.dropRevealDays}
                     onChange={(v) => setField("dropRevealDays", v)}
                     takenBy={ownersExcept("Reveal")}
                     accent="blue"
                 />
                 <DayWindowPicker
-                    label="Sale — orders can be placed"
+                    label="Sale: orders can be placed"
                     value={draft.dropSaleDays}
                     onChange={(v) => setField("dropSaleDays", v)}
                     takenBy={ownersExcept("Sale")}
@@ -457,7 +457,7 @@ function ShopTab({ cfg }) {
                     hint="Outside these days the cart and checkout are locked."
                 />
                 <DayWindowPicker
-                    label="Pickup — customers collect from the store"
+                    label="Pickup: customers collect from the store"
                     value={draft.dropPickupDays}
                     onChange={(v) => setField("dropPickupDays", v)}
                     takenBy={ownersExcept("Pickup")}
@@ -574,7 +574,7 @@ function PaymentsTab({ cfg }) {
                     title="Online payment gateway"
                     desc={gatewayReady
                         ? "Card / UPI gateway checkout"
-                        : "No live gateway is connected yet — this stays hidden at checkout until one is wired up"}
+                        : "No live gateway is connected yet, so this stays hidden at checkout until one is wired up"}
                     value={draft.paymentGatewayEnabled}
                     onToggle={() => toggle("paymentGatewayEnabled")}
                     accent="emerald"
@@ -586,7 +586,7 @@ function PaymentsTab({ cfg }) {
                         <p className="text-xs text-neutral-300 leading-relaxed">
                             Provider is <span className="text-amber-400 font-semibold">{draft.paymentsProvider}</span>, which cannot
                             actually collect money. Customers will not see the &quot;Pay Online&quot; option and the server refuses to mark
-                            any order as paid through it — use UPI QR or cash on pickup until a real gateway is integrated.
+                            any order as paid through it. Use UPI QR or cash on pickup until a real gateway is integrated.
                         </p>
                     </div>
                 )}
@@ -595,7 +595,7 @@ function PaymentsTab({ cfg }) {
                     <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
                         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                         <p className="text-xs text-red-200 leading-relaxed">
-                            No usable payment method is enabled — customers cannot check out at all.
+                            No usable payment method is enabled, so customers cannot check out at all.
                         </p>
                     </div>
                 )}
@@ -608,13 +608,13 @@ function PaymentsTab({ cfg }) {
                 accent="amber"
             >
                 {/* With QR payment on but nothing to pay to, the payment screen is a
-                    dead end for the customer — make that impossible to miss. */}
+                    dead end for the customer, so make that impossible to miss. */}
                 {draft.qrPaymentEnabled && !draft.paymentUpiId && !draft.paymentQrImage && !draft.paymentWhatsapp && (
                     <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
                         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                         <p className="text-xs text-red-200 leading-relaxed">
                             UPI QR payment is switched on but you have not set a UPI ID, a QR image or a WhatsApp number.
-                            Customers who pick this method will have no way to pay you — fill at least one in below.
+                            Customers who pick this method will have no way to pay you, so fill at least one in below.
                         </p>
                     </div>
                 )}
@@ -635,7 +635,7 @@ function PaymentsTab({ cfg }) {
                             className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                         />
                     </Field>
-                    <Field label="WhatsApp number for payment screenshots" hint="With country code, digits only — e.g. 919876543210">
+                    <Field label="WhatsApp number for payment screenshots" hint="With country code, digits only. For example 919876543210">
                         <Input
                             value={draft.paymentWhatsapp}
                             onChange={(e) => setField("paymentWhatsapp", e.target.value.replace(/[^\d+]/g, ""))}
@@ -643,7 +643,7 @@ function PaymentsTab({ cfg }) {
                             className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                         />
                     </Field>
-                    <Field label="Payment QR image" hint="Optional — overrides the auto-generated UPI QR.">
+                    <Field label="Payment QR image" hint="Optional. Overrides the auto-generated UPI QR.">
                         <div className="flex items-center gap-3">
                             {draft.paymentQrImage ? (
                                 <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10 bg-white shrink-0">
@@ -726,7 +726,7 @@ function CustomerPaymentPreview({ draft }) {
                     </div>
                 ) : (
                     <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/20 text-amber-400 text-[11px] text-center">
-                        No QR to show — add a UPI ID or upload a QR image.
+                        No QR to show. Add a UPI ID or upload a QR image.
                     </div>
                 )}
 
@@ -747,7 +747,7 @@ function CustomerPaymentPreview({ draft }) {
                         Send screenshot on WhatsApp
                     </div>
                 ) : (
-                    <p className="text-[10px] text-neutral-600 text-center">No WhatsApp number set — the chat button stays hidden.</p>
+                    <p className="text-[10px] text-neutral-600 text-center">No WhatsApp number set, so the chat button stays hidden.</p>
                 )}
 
                 <div className="border border-dashed border-white/10 rounded-xl py-3 text-center text-[11px] text-neutral-500">
@@ -764,7 +764,7 @@ function FeaturesTab({ cfg }) {
         <>
             <Panel
                 title="Feature switches"
-                desc="Turn whole sections of the site on or off. Existing data is never touched — off simply stops new submissions and hides the nav link."
+                desc="Turn whole sections of the site on or off. Existing data is never touched. Off simply stops new submissions and hides the nav link."
                 icon={Sparkles}
                 accent="cyan"
             >
@@ -808,7 +808,7 @@ function SiteTab({ cfg }) {
                     value={draft.announcementEnabled}
                     onToggle={() => toggle("announcementEnabled")}
                 />
-                <Field label="Announcement text" hint="Keep it to one line — long text wraps awkwardly on mobile.">
+                <Field label="Announcement text" hint="Keep it to one line. Long text wraps awkwardly on mobile.">
                     <Input
                         value={draft.announcementText}
                         onChange={(e) => setField("announcementText", e.target.value)}
@@ -835,7 +835,7 @@ function SiteTab({ cfg }) {
 
             <Panel
                 title="Maintenance mode"
-                desc="Puts a notice on the site and stops customers submitting anything — orders, applications, moments. Browsing and the admin panel keep working."
+                desc="Puts a notice on the site and stops customers submitting anything: orders, applications, moments. Browsing and the admin panel keep working."
                 icon={Wrench}
                 accent="amber"
             >
@@ -858,7 +858,7 @@ function SiteTab({ cfg }) {
                     <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
                         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                         <p className="text-xs text-red-200 leading-relaxed">
-                            Maintenance mode is on — no customer can place an order or submit an application right now.
+                            Maintenance mode is on, so no customer can place an order or submit an application right now.
                         </p>
                     </div>
                 )}
@@ -935,7 +935,7 @@ function ContactTab({ cfg }) {
                         className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                     />
                 </Field>
-                <Field label="WhatsApp number" hint="Country code, digits only — used for the footer chat link.">
+                <Field label="WhatsApp number" hint="Country code, digits only. Used for the footer chat link.">
                     <Input
                         value={draft.contactWhatsapp}
                         onChange={(e) => setField("contactWhatsapp", e.target.value.replace(/[^\d+]/g, ""))}
@@ -1087,7 +1087,7 @@ function BackupPanel() {
                 />
                 <div>
                     <div className="text-sm font-semibold text-white">Include media blobs</div>
-                    <div className="text-xs text-neutral-500 mt-0.5">Adds DB-stored images/videos — makes the file much larger</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">Adds DB-stored images/videos, which makes the file much larger</div>
                 </div>
             </label>
             <Button
@@ -1203,7 +1203,7 @@ function MaintenancePanel() {
                 <AlertTriangle className="text-red-500 w-5 h-5 shrink-0 mt-0.5" />
                 <p className="text-xs text-neutral-400 leading-relaxed">
                     Wipes the <code className="text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">JoinedGiveaway</code> collection and
-                    resets participant lists on every giveaway. This cannot be undone — take a backup first.
+                    resets participant lists on every giveaway. This cannot be undone, so take a backup first.
                 </p>
             </div>
             <Button

@@ -82,7 +82,7 @@ export default function Winners() {
     const totalWinners = useMemo(() => giveaways.reduce((sum, g) => sum + (g.winners?.length || 0), 0), [giveaways]);
 
     // `giveaways` only holds draws that already have winners published, so it cannot
-    // answer "how many giveaways have closed" — that comes from the platform stats.
+    // answer "how many giveaways have closed". That comes from the platform stats.
     const closedCount = Math.max(stats.completedGiveaways, giveaways.length);
     const declaredRate = closedCount > 0
         ? Math.round((giveaways.length / closedCount) * 100)

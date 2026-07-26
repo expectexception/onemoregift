@@ -142,7 +142,7 @@ function MomentsAdminPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-white max-w-[140px] sm:max-w-[200px] truncate">{m.caption}</td>
-                                        <td className="px-4 py-3 text-sm text-neutral-400">{m.userId?.name || "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-neutral-400">{m.userId?.name || "-"}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{m.media?.length || 0} files</td>
                                         <td className="px-4 py-3">
                                             <span className={`text-xs px-2 py-1 rounded-full capitalize ${STATUS_COLORS[m.status] || "bg-neutral-800 text-neutral-400"}`}>

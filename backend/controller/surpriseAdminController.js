@@ -4,7 +4,7 @@ const SurpriseRequest = require('../model/SurpriseRequest');
 const Gift = require('../model/Gift');
 const { logAction } = require('../utils/auditLogger');
 
-// GET /api/v1/admin/surprise — list all requests with filters
+// GET /api/v1/admin/surprise: list all requests with filters
 const listRequests = async (req, res) => {
     try {
         const { status, eventType, page = 1, limit = 20, search } = req.query;

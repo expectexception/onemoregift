@@ -35,7 +35,7 @@ const productSchema = new Schema({
     hasVariants: { type: Boolean, default: false },
     variants: [variantSchema],
 
-    // Inventory — global stock (if no variants)
+    // Inventory: global stock (if no variants)
     stock: { type: Number, default: 0 },
     lowStockThreshold: { type: Number, default: 5 },
 

@@ -31,7 +31,7 @@ function createApp() {
     ? configuredOrigins
     : Array.from(new Set([...configuredOrigins, ...devOrigins]));
 
-  // Avatars are sent as base64 data URLs in profile updates — the express default
+  // Avatars are sent as base64 data URLs in profile updates. The express default
   // of 100kb made larger avatars fail with PayloadTooLargeError.
   app.use(express.json({ limit: '2mb' }));
   app.use(cors({
@@ -51,7 +51,7 @@ function createApp() {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(cookieParser());
 
-  // Static media is mounted BEFORE the rate limiter — a single gallery page loads
+  // Static media is mounted BEFORE the rate limiter, a single gallery page loads
   // dozens of images and was eating the per-IP API budget, causing surprise 429s.
   // Serve uploads from public/ with CORP header
   app.use('/uploads', (req, res, next) => {

@@ -280,7 +280,7 @@ function ProductsAdminPage() {
                                 <h2 className="text-lg font-bold text-white">Adjust Stock</h2>
                                 <button onClick={() => setStockModal(null)} className="text-neutral-500 hover:text-white">✕</button>
                             </div>
-                            <p className="text-sm text-neutral-400 mb-4">{stockModal.name} — Current: <span className="text-white font-bold">{stockModal.stock}</span></p>
+                            <p className="text-sm text-neutral-400 mb-4">{stockModal.name}, current: <span className="text-white font-bold">{stockModal.stock}</span></p>
                             <div className="space-y-3">
                                 <input type="number" placeholder="Adjustment (e.g. +10 or -5)"
                                     className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"

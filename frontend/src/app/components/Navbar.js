@@ -39,7 +39,7 @@ export default function Navbar() {
     let isUserLoggedIn = !loadingUser && userAuthenticated
     const router = useRouter()
     const [cartCount, setCartCount] = useState(0);
-    // Feature switches — links for disabled features are hidden
+    // Feature switches: links for disabled features are hidden
     const [features, setFeatures] = useState({ shopEnabled: true, giveawaysEnabled: true, momentsEnabled: true, surpriseEnabled: true });
     const showJoyHub = features.momentsEnabled || features.surpriseEnabled;
 

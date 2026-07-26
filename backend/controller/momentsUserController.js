@@ -101,7 +101,7 @@ const reactToMoment = async (req, res) => {
             );
         }
         if (!doc) {
-            // 3. No existing reaction from this user — push a new one
+            // 3. No existing reaction from this user, so push a new one
             doc = await HappyMoment.findOneAndUpdate(
                 { _id: req.params.id, isPublished: true },
                 { $push: { reactions: { userId, type } } },

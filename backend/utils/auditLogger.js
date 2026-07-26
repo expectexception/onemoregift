@@ -4,7 +4,7 @@ const AuditLog = require('../model/AuditLog');
 
 /**
  * Write an audit log entry.
- * Non-blocking — errors are logged but not thrown.
+ * Non-blocking: errors are logged but not thrown.
  *
  * @param {Object} opts
  * @param {string} opts.action - e.g. 'user.ban', 'product.create'

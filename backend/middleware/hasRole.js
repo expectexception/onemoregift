@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * RBAC middleware — checks if the authenticated admin has the required permission.
+ * RBAC middleware: checks if the authenticated admin has the required permission.
  * Usage: router.get('/route', isAdmin, hasRole('products:write'), controller)
  *
  * Permission format: 'resource:action' e.g. 'products:write', 'users:read'

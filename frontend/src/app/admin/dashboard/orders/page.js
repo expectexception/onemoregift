@@ -102,7 +102,7 @@ function OrdersAdminPage() {
             await api.patch(`admin/orders/${selected._id}/verify-payment`, { approve, note: verifyNote }, { meta: { auth: "admin" } });
             toast({
                 title: approve ? "Payment verified" : "Payment rejected",
-                description: approve ? "Order confirmed — pickup code generated." : "User will see the rejection reason.",
+                description: approve ? "Order confirmed. Pickup code generated." : "User will see the rejection reason.",
             });
             setSelected(null);
             fetchOrders(); fetchStats();
@@ -209,7 +209,7 @@ function OrdersAdminPage() {
                                 ) : orders.map(o => (
                                     <tr key={o._id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                                         <td className="px-4 py-3 text-sm text-white font-mono">{o.orderNumber}</td>
-                                        <td className="px-4 py-3 text-sm text-neutral-400">{o.userId?.name || "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-neutral-400">{o.userId?.name || "-"}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{o.items?.length || 0}</td>
                                         <td className="px-4 py-3 text-sm text-white">₹{o.total?.toLocaleString("en-IN")}</td>
                                         <td className="px-4 py-3">
@@ -263,12 +263,12 @@ function OrdersAdminPage() {
                                     { label: "Customer", value: selected.userId?.name },
                                     { label: "Total", value: `₹${selected.total?.toLocaleString("en-IN")}` },
                                     { label: "Payment", value: `${selected.paymentStatus?.replace(/_/g, " ")}${selected.paymentMethod ? ` (${selected.paymentMethod})` : ""}` },
-                                    { label: "Pickup Store", value: selected.pickupStoreId?.name || "—" },
-                                    { label: "Pickup Code", value: selected.pickupCode || "—" },
+                                    { label: "Pickup Store", value: selected.pickupStoreId?.name || "-" },
+                                    { label: "Pickup Code", value: selected.pickupCode || "-" },
                                 ].map(r => (
                                     <div key={r.label} className="flex justify-between text-sm">
                                         <span className="text-neutral-500">{r.label}</span>
-                                        <span className="text-white">{r.value || "—"}</span>
+                                        <span className="text-white">{r.value || "-"}</span>
                                     </div>
                                 ))}
                             </div>

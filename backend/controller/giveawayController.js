@@ -288,7 +288,7 @@ const getGiveaways = async (req, res) => {
 // };
 const getSingleGiveaway = async (req, res) => {
     try {
-        // participants stays as raw ObjectIds — populating names decrypted every
+        // participants stays as raw ObjectIds, because populating names decrypted every
         // participant's user doc on each page view and leaked names publicly.
         const giveaway = await Giveaway.findById(req.params.id)
             .populate("winners", "name")

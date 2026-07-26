@@ -15,7 +15,7 @@ const {
 const { listStores } = require('../controller/storeController');
 const { getConfigHelper } = require('../controller/configController');
 
-// Master switch — browsing stays available, but checkout/order actions are blocked
+// Master switch: browsing stays available, but checkout/order actions are blocked
 // when the shop is taken offline (admin panel toggle, env ENABLE_SHOP as default).
 const requireShopEnabled = async (req, res, next) => {
     try {

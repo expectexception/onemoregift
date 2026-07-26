@@ -199,7 +199,7 @@ export default function MyOrdersPage() {
                 ) : (
                     <div className="space-y-8">
                         {orders.map((order) => {
-                            // Matches the server rule — once paid or awaiting payment
+                            // Matches the server rule: once paid or awaiting payment
                             // verification, cancelling has to go through support so the
                             // refund is recorded.
                             const isCancelable = ["pending", "ready_for_pickup"].includes(order.status)
@@ -414,7 +414,7 @@ export default function MyOrdersPage() {
 
             <Footer />
 
-            {/* Payment Modal — QR proof upload + optional sandbox gateway */}
+            {/* Payment Modal: QR proof upload + optional sandbox gateway */}
             {retryOrder && (
                 <PayOrderModal
                     order={retryOrder}

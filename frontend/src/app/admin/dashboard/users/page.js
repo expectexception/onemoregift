@@ -337,7 +337,7 @@ const UsersPage = () => {
                                                     ? new Date(user.createdAt).toLocaleDateString("en-IN", {
                                                         day: "numeric", month: "short", year: "numeric"
                                                     })
-                                                    : "—"}
+                                                    : "-"}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center justify-end gap-1">

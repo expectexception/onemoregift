@@ -27,7 +27,7 @@ const createRequest = async (req, res) => {
             return res.status(503).json({ error: true, msg: 'Surprise applications are temporarily closed. Please check back later.' });
         }
 
-        // The proof requirement was only enforced in the form — the API accepted an
+        // The proof requirement was only enforced in the form. The API accepted an
         // application with no documents at all.
         const documentUrls = sanitizeUrlList(documents);
         if (cfg.requireSurpriseProof && !documentUrls.length) {
@@ -41,7 +41,7 @@ const createRequest = async (req, res) => {
             if (active) {
                 return res.status(400).json({
                     error: true,
-                    msg: 'You already have an active surprise application. For now only 1 application per user is allowed — please wait for it to complete or cancel it first.',
+                    msg: 'You already have an active surprise application. For now only 1 application per user is allowed, so please wait for it to complete or cancel it first.',
                 });
             }
         }

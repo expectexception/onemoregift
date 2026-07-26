@@ -4,12 +4,12 @@ import { PackageCheck, Eye, Flame, Wrench } from "lucide-react";
 
 const PHASES = [
     { key: "reveal", label: "Reveal", fallbackDays: "Wed, Thu", desc: "Products & prices revealed", icon: Eye },
-    { key: "sale", label: "Sale Live", fallbackDays: "Fri, Sat", desc: "Limited quantity — order now", icon: Flame },
+    { key: "sale", label: "Sale Live", fallbackDays: "Fri, Sat", desc: "Limited quantity, order now", icon: Flame },
     { key: "prep", label: "Preparing", fallbackDays: "Sun", desc: "We pack your orders", icon: Wrench },
     { key: "pickup", label: "Pickup", fallbackDays: "Mon, Tue", desc: "Collect from your store", icon: PackageCheck },
 ];
 
-// Weekly drop cycle strip — highlights the current phase. The days per phase are
+// Weekly drop cycle strip: highlights the current phase. The days per phase are
 // admin-configurable, so they come from the config's `shopPhases` map.
 export default function WeeklyDropStrip({ phase, shopPhases }) {
     const phases = PHASES.map((p) => ({

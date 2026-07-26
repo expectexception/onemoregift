@@ -22,7 +22,7 @@ export function useAdminPendingCounts(intervalMs = 60000) {
                 lowStock: productsRes?.data?.total || 0,
             });
         } catch (_) {
-            // Non-fatal — sidebar simply shows no badges if this fails.
+            // Non-fatal: sidebar simply shows no badges if this fails.
         }
     }, []);
 

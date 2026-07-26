@@ -16,7 +16,7 @@ import {
     ClipboardList, FileCheck2, PackageCheck, Camera, ShieldCheck, GalleryHorizontalEnd
 } from "lucide-react";
 
-// Same 3-step process strip as the homepage — surprise flow
+// Same 3-step process strip as the homepage: surprise flow
 const SURPRISE_STEPS = [
     {
         title: "Fill The Form",
@@ -38,7 +38,7 @@ const SURPRISE_STEPS = [
     },
 ];
 
-// Moments flow — share, approval, live
+// Moments flow: share, approval, live
 const MOMENT_STEPS = [
     {
         title: "Share Your Moment",
@@ -565,7 +565,7 @@ export default function JoyHubPage() {
         try {
             const { data } = await api.post(`happy-moment/${reportTarget}/report`, { reason: reportReason.trim() }, { meta: { auth: "user" } });
             if (!data.error) {
-                toast({ title: "Reported", description: "Thanks — our team will review this post." });
+                toast({ title: "Reported", description: "Thanks, our team will review this post." });
                 closeReportModal();
                 fetchGallery();
             } else {
@@ -655,7 +655,7 @@ export default function JoyHubPage() {
                 {/* ── SURPRISE TAB VIEW ────────────────────────────────────────── */}
                 {activeTab === "surprise" && (
                     <div className="space-y-6">
-                        {/* How it works — same steps style as the homepage */}
+                        {/* How it works, same steps style as the homepage */}
                         <ProcessSteps steps={SURPRISE_STEPS} note="For now: only 1 application per user" />
 
                         {/* Sub-tabs */}
@@ -675,7 +675,7 @@ export default function JoyHubPage() {
                         </div>
 
                         {!config.surpriseEnabled && surpriseSubTab === "apply" ? (
-                            renderFeatureClosed("New surprise applications are closed right now. Check back soon — you can still track your existing applications in the other tab.")
+                            renderFeatureClosed("New surprise applications are closed right now. Check back soon. You can still track your existing applications in the other tab.")
                         ) : !userAuthenticated ? (
                             renderAuthGuard("submit surprise requests and track status timeline")
                         ) : (
@@ -882,7 +882,7 @@ export default function JoyHubPage() {
                 {/* ── HAPPY MOMENTS TAB VIEW ───────────────────────────────────── */}
                 {activeTab === "moments" && (
                     <div className="space-y-6">
-                        {/* How it works — same steps style as the homepage */}
+                        {/* How it works, same steps style as the homepage */}
                         <ProcessSteps steps={MOMENT_STEPS} />
 
                         {/* Sub-tabs */}
@@ -972,7 +972,7 @@ export default function JoyHubPage() {
                         {momentsSubTab === "share" && (
                             <>
                                 {!config.momentsEnabled ? (
-                                    renderFeatureClosed("Sharing new moments is paused right now. The gallery is still open — check back soon to post yours.")
+                                    renderFeatureClosed("Sharing new moments is paused right now. The gallery is still open, so check back soon to post yours.")
                                 ) : !userAuthenticated ? (
                                     renderAuthGuard("share your winner experience with the community")
                                 ) : (
@@ -1078,7 +1078,7 @@ export default function JoyHubPage() {
 
             <Footer />
 
-            {/* Report Moment Modal — replaces window.prompt() */}
+            {/* Report Moment Modal, replaces window.prompt() */}
             {reportTarget && (
                 <div
                     className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md ${reportModalClosing ? "animate-fade-out" : "animate-fade-in"}`}
@@ -1094,7 +1094,7 @@ export default function JoyHubPage() {
                             </div>
                             <div>
                                 <h3 className="text-white font-bold text-sm">Report this post</h3>
-                                <p className="text-neutral-400 text-xs mt-1">Tell us what&apos;s wrong — our moderators will review it.</p>
+                                <p className="text-neutral-400 text-xs mt-1">Tell us what&apos;s wrong and our moderators will review it.</p>
                             </div>
                             <button onClick={closeReportModal} className="ml-auto text-neutral-500 hover:text-white">
                                 <X className="w-4 h-4" />

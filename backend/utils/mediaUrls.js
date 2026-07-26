@@ -2,7 +2,7 @@
 
 // User-submitted media arrives as URL strings that later get rendered into <img>,
 // <video> and <a href> on public pages. Anything that isn't a plain uploaded path
-// or an http(s) URL — `javascript:`, `data:`, protocol-relative `//evil.tld` — must
+// or an http(s) URL: `javascript:`, `data:`, protocol-relative `//evil.tld`, must
 // never reach the database, so every submit path funnels through here.
 
 const MAX_URL_LENGTH = 500;

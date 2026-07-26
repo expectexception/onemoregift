@@ -602,7 +602,7 @@ const getPublicStats = async (req, res) => {
                 endDate: { $gte: now }
             }),
             Giveaway.countDocuments({ startDate: { $gt: now } }),
-            // A stat, not a listing — how many giveaways have actually ended is true
+            // A stat, not a listing. How many giveaways have actually ended is true
             // regardless of whether ended giveaways are shown in public lists.
             Giveaway.countDocuments({ endDate: { $lt: now } }),
             Giveaway.aggregate([
@@ -637,7 +637,7 @@ const getPublicStats = async (req, res) => {
                     }
                 }
             ]),
-            // Platform-wide gifting activity — the site is no longer giveaway-only, so
+            // Platform-wide gifting activity: the site is no longer giveaway-only, so
             // the public counters would sit at 0 between draws without these.
             SurpriseRequest.countDocuments({ status: { $in: ['gift_assigned', 'completed'] } }),
             HappyMoment.countDocuments({ status: { $in: ['approved', 'gift_assigned', 'published'] } }),
@@ -710,7 +710,7 @@ const clearAllJoined = async (req, res) => {
     }
 }
 
-// GET /api/v1/admin/maintenance/backup — streams a gzipped JSON dump of every
+// GET /api/v1/admin/maintenance/backup: streams a gzipped JSON dump of every
 // collection. PII stays encrypted in the dump (we export raw stored values).
 // Binary media blobs (imagestores) are skipped unless ?includeMedia=1.
 const downloadBackup = async (req, res) => {

@@ -23,7 +23,7 @@ export default function FeaturedProducts() {
                     setProducts(sorted.slice(0, 4));
                 }
             } catch {
-                // Silent — section just won't render if it fails
+                // Silent: section just won't render if it fails
             } finally {
                 if (!cancelled) setLoading(false);
             }

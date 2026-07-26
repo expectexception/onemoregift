@@ -159,7 +159,7 @@ function SurpriseAdminPage() {
                                         <td className="px-4 py-3 text-sm text-white font-medium">{r.recipientName}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400 capitalize">{r.eventType}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{new Date(r.eventDate).toLocaleDateString("en-IN")}</td>
-                                        <td className="px-4 py-3 text-sm text-neutral-400">{r.userId?.name || "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-neutral-400">{r.userId?.name || "-"}</td>
                                         <td className="px-4 py-3">
                                             <span className={`text-xs px-2 py-1 rounded-full capitalize ${STATUS_COLORS[r.status] || "bg-neutral-800 text-neutral-400"}`}>
                                                 {r.status?.replace(/_/g, " ")}
@@ -200,7 +200,7 @@ function SurpriseAdminPage() {
                             <div className="flex justify-between items-start mb-6">
                                 <div>
                                     <h2 className="text-lg font-bold text-white">Review Request</h2>
-                                    <p className="text-sm text-neutral-500">{selected.recipientName} — {selected.eventType}</p>
+                                    <p className="text-sm text-neutral-500">{selected.recipientName} · {selected.eventType}</p>
                                 </div>
                                 <button onClick={() => setSelected(null)} className="text-neutral-500 hover:text-white">✕</button>
                             </div>
@@ -296,7 +296,7 @@ function InfoRow({ label, value }) {
     return (
         <div className="flex justify-between text-sm">
             <span className="text-neutral-500">{label}</span>
-            <span className="text-white text-right max-w-[60%]">{value || "—"}</span>
+            <span className="text-white text-right max-w-[60%]">{value || "-"}</span>
         </div>
     );
 }

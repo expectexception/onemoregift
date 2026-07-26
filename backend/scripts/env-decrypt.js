@@ -42,7 +42,7 @@ function main() {
     try {
         payload = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
     } catch {
-        console.error('❌  Failed to parse .env.enc — file may be corrupted.');
+        console.error('❌  Failed to parse .env.enc, file may be corrupted.');
         process.exit(1);
     }
 
@@ -64,7 +64,7 @@ function main() {
         console.log('✅  Decrypted content:\n');
         console.log(plaintext);
     } catch (err) {
-        console.error('❌  Decryption failed — wrong key or corrupted file.');
+        console.error('❌  Decryption failed, wrong key or corrupted file.');
         console.error(err.message);
         process.exit(1);
     }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Animates a numeric value from 0 → target once the element scrolls into view.
-// Returns { ref, value } — attach ref to the element you want to observe.
+// Returns { ref, value }: attach ref to the element you want to observe.
 export function useCountUp(target, { durationMs = 1400, decimals = 0 } = {}) {
     const ref = useRef(null);
     const [value, setValue] = useState(0);

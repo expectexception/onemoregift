@@ -15,7 +15,7 @@ const MONTHS = [
     "July", "August", "September", "October", "November", "December",
 ];
 
-// A yyyy-MM-dd string is a calendar date, not an instant — parsing it with `new
+// A yyyy-MM-dd string is a calendar date, not an instant. Parsing it with `new
 // Date()` would shift it by the UTC offset and land on the previous day for IST.
 const toKey = (date) => {
     if (!date) return "";

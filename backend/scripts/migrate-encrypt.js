@@ -10,7 +10,7 @@
  *   node scripts/migrate-encrypt.js --dry-run # preview only, no writes
  *
  * Run AFTER deploying the new code with the FIELD_ENCRYPTION_KEY set.
- * Safe to run multiple times — already-encrypted fields are skipped.
+ * Safe to run multiple times: already-encrypted fields are skipped.
  */
 
 require('../utils/loadEnv');
@@ -30,7 +30,7 @@ async function main() {
     console.log(`[migrate-encrypt] Connecting to MongoDB...`);
     await mongoose.connect(MONGO_URI);
     console.log(`[migrate-encrypt] Connected.`);
-    if (DRY_RUN) console.log(`[migrate-encrypt] DRY RUN — no writes will be made.\n`);
+    if (DRY_RUN) console.log(`[migrate-encrypt] DRY RUN, no writes will be made.\n`);
 
     const db = mongoose.connection.db;
     const users = db.collection('users');
@@ -119,7 +119,7 @@ async function main() {
 
     console.log(`\n[migrate-encrypt] Done.`);
     console.log(`  Total: ${total} | Updated: ${updated} | Skipped (already encrypted): ${skipped} | Errors: ${errors}`);
-    if (DRY_RUN) console.log(`  DRY RUN — run without --dry-run to apply changes.`);
+    if (DRY_RUN) console.log(`  DRY RUN, run without --dry-run to apply changes.`);
 
     await mongoose.disconnect();
     process.exit(errors > 0 ? 1 : 0);

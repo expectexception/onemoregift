@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * loadEnv — Decrypts .env.enc into process.env at startup.
+ * loadEnv: Decrypts .env.enc into process.env at startup.
  *
  * Requires APP_MASTER_KEY to be set in the process environment BEFORE
  * this module is loaded (e.g. via PM2 ecosystem config env block or shell).
@@ -30,7 +30,7 @@ function decryptEnvFile(encPath, masterKey) {
     try {
         payload = JSON.parse(fs.readFileSync(encPath, 'utf8'));
     } catch {
-        throw new Error(`Failed to parse ${encPath} — file may be corrupted.`);
+        throw new Error(`Failed to parse ${encPath}, file may be corrupted.`);
     }
 
     if (payload.v !== 1) {
@@ -73,7 +73,7 @@ function parseEnvString(str) {
 function loadEnv() {
     const env = process.env.NODE_ENV || 'development';
 
-    // Test mode — use .env.testing
+    // Test mode: use .env.testing
     if (env === 'test') {
         const testEnvPath = path.join(ROOT, '.env.testing');
         if (fs.existsSync(testEnvPath)) {
@@ -114,7 +114,7 @@ function loadEnv() {
         process.exit(1);
     }
 
-    // Development fallback — plain .env
+    // Development fallback: plain .env
     if (fs.existsSync(plainPath)) {
         dotenv.config({ path: plainPath });
         if (env === 'production') {

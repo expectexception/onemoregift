@@ -2,7 +2,7 @@
 
 const SystemConfig = require('../model/SystemConfig');
 
-// Env default helpers — env acts as the default; a SystemConfig row (set from the
+// Env default helpers: env acts as the default; a SystemConfig row (set from the
 // admin panel) overrides it live without a server restart.
 const envBool = (name, fallback) => {
     const raw = process.env[name];
@@ -15,7 +15,7 @@ const envStr = (name, fallback = '') => {
 };
 
 // Weekly drop cycle phases. Which weekday belongs to which phase is admin-editable
-// (dropRevealDays / dropSaleDays / dropPickupDays) — any day left unassigned falls
+// (dropRevealDays / dropSaleDays / dropPickupDays). Any day left unassigned falls
 // through to "prep".
 const SHOP_PHASES = {
     pickup: { key: 'pickup', label: 'Order Pickup' },
@@ -36,7 +36,7 @@ const parseDays = (raw, fallback) => {
 };
 
 const formatDays = (days) => {
-    if (!days.length) return '—';
+    if (!days.length) return '-';
     return days.map(d => DAY_NAMES[d]).join(', ');
 };
 
@@ -94,7 +94,7 @@ const NUMBER_KEYS = {
         const n = Number(process.env.PAYMENT_PROOF_WINDOW_HOURS);
         return Number.isFinite(n) && n >= 0 ? n : 6;
     },
-    // Cap on units of a single product in one order — keeps a limited drop from being
+    // Cap on units of a single product in one order: keeps a limited drop from being
     // cleared out by one buyer. 0 = no cap.
     shopMaxQtyPerOrder: () => {
         const n = Number(process.env.SHOP_MAX_QTY_PER_ORDER);
@@ -112,7 +112,7 @@ const STRING_KEYS = {
         'PAYMENT_INSTRUCTIONS',
         'Pay on the QR, then send your order number with the payment screenshot on WhatsApp and upload the proof here. We verify and confirm your order.'
     ),
-    // Weekly drop schedule — CSV weekday numbers (0=Sun … 6=Sat)
+    // Weekly drop schedule: CSV weekday numbers (0=Sun … 6=Sat)
     dropPickupDays: () => envStr('DROP_PICKUP_DAYS', '1,2'),
     dropRevealDays: () => envStr('DROP_REVEAL_DAYS', '3,4'),
     dropSaleDays: () => envStr('DROP_SALE_DAYS', '5,6'),
@@ -137,7 +137,7 @@ const STRING_KEYS = {
     heroSubtitle: () => '',
 };
 
-// In-process cache — config is read on every hot request (public config endpoint,
+// In-process cache: config is read on every hot request (public config endpoint,
 // requireShopEnabled middleware, order creation, giveaway listing). Without it every
 // read was a full DB roundtrip (500-1800ms against Atlas in the logs).
 const CONFIG_CACHE_TTL_MS = 15 * 1000;
@@ -155,7 +155,7 @@ const withDerived = (config) => {
     const pickup = parseDays(config.dropPickupDays, [1, 2]);
     const reveal = parseDays(config.dropRevealDays, [3, 4]);
     const sale = parseDays(config.dropSaleDays, [5, 6]);
-    // Prep isn't configured directly — it's whatever the other three windows leave over
+    // Prep isn't configured directly. It is whatever the other three windows leave over
     const claimed = new Set([...pickup, ...reveal, ...sale]);
     const prep = [0, 1, 2, 3, 4, 5, 6].filter(day => !claimed.has(day));
 
@@ -201,7 +201,7 @@ const getConfigHelper = async () => {
     // switched on in env. Until then the online-payment toggle can be turned on in
     // the admin panel but checkout must not treat it as a way to complete a payment.
     config.onlinePaymentReady = config.paymentsProvider !== 'sandbox' && config.realPaymentsEnabled;
-    // Sandbox "mark as paid" shortcut — a developer convenience that must never be
+    // Sandbox "mark as paid" shortcut: a developer convenience that must never be
     // reachable on the live site, where it would hand out free orders.
     config.sandboxPaymentsAllowed = process.env.NODE_ENV !== 'production'
         && config.paymentsProvider === 'sandbox'
@@ -233,7 +233,7 @@ const getAdminConfig = async (req, res) => {
 };
 
 // Day-map settings are stored as strings but must stay parseable, and the three
-// windows must not overlap — otherwise a day would resolve to two phases at once.
+// windows must not overlap. Otherwise a day would resolve to two phases at once.
 const DAY_KEYS = ['dropPickupDays', 'dropRevealDays', 'dropSaleDays'];
 
 const validateDayWindows = (updates, current) => {

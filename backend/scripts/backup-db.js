@@ -58,7 +58,7 @@ const includeMedia = process.argv.includes('--include-media');
     await new Promise((resolve) => { gzip.end(); out.on('finish', resolve); });
 
     const sizeKb = Math.round(fs.statSync(file).size / 1024);
-    console.log(`[Backup] ${path.basename(file)} — ${collections.length} collections, ${total} docs, ${sizeKb} KB`);
+    console.log(`[Backup] ${path.basename(file)}: ${collections.length} collections, ${total} docs, ${sizeKb} KB`);
 
     // Retention: keep newest N backups
     const backups = fs.readdirSync(BACKUP_DIR)

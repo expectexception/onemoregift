@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-// Immutable audit log — never updated, only appended
+// Immutable audit log: never updated, only appended
 const auditLogSchema = new Schema({
     action: { type: String, required: true }, // e.g. 'user.ban', 'product.create'
     category: {
@@ -28,7 +28,7 @@ const auditLogSchema = new Schema({
     versionKey: false,
 });
 
-// Make immutable — block all updates
+// Make immutable: block all updates
 auditLogSchema.pre(['updateOne', 'findOneAndUpdate', 'updateMany'], function (next) {
     next(new Error('AuditLog is immutable'));
 });

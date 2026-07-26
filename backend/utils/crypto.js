@@ -44,7 +44,7 @@ function hmacHash(value) {
  */
 function encrypt(plaintext) {
     if (plaintext === null || plaintext === undefined || plaintext === '') return plaintext;
-    // Already encrypted — don't double-encrypt
+    // Already encrypted: don't double-encrypt
     if (isEncrypted(String(plaintext))) return plaintext;
 
     const key = getKey();
@@ -95,7 +95,7 @@ function decrypt(ciphertext) {
 
         return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
     } catch {
-        // Auth tag mismatch or bad data — return raw to avoid data loss on legacy rows
+        // Auth tag mismatch or bad data: return raw to avoid data loss on legacy rows
         return ciphertext;
     }
 }

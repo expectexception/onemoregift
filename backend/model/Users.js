@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
         unique: true,
         sparse: true,
     },
-    // Deterministic HMAC hash of phone for duplicate checks — the phone field itself
+    // Deterministic HMAC hash of phone for duplicate checks. The phone field itself
     // is encrypted with random IVs, so its unique index can never catch duplicates.
     phoneHash: {
         type: String,
@@ -100,7 +100,7 @@ const userSchema = new mongoose.Schema({
 // ── Encryption: pre-save ──────────────────────────────────────────────────────
 userSchema.pre('save', function (next) {
     try {
-        // Phone hash for duplicate lookups — derived from the plain value before encryption
+        // Phone hash for duplicate lookups: derived from the plain value before encryption
         if (this.isModified('phone')) {
             this.phoneHash = this.phone ? hmacHash(decrypt(this.phone)) : undefined;
         }
@@ -121,7 +121,7 @@ userSchema.pre('save', function (next) {
 
         // Encrypt email explicitly and set hash before encryption
         if (this.isModified('email') && this.email) {
-            const plain = decrypt(this.email); // safe — returns plain if not yet encrypted
+            const plain = decrypt(this.email); // safe, returns plain if not yet encrypted
             this.emailHash = hmacHash(plain);
             this.email = encrypt(plain);
         }
@@ -131,7 +131,7 @@ userSchema.pre('save', function (next) {
             this.legalConsent.ipAddress = encrypt(this.legalConsent.ipAddress);
         }
 
-        // addresses array — encrypt all sensitive fields
+        // addresses array: encrypt all sensitive fields
         if (this.isModified('addresses') && Array.isArray(this.addresses)) {
             this.addresses.forEach((addr) => {
                 for (const f of ENCRYPTED_ADDRESS_FIELDS) {
@@ -146,11 +146,11 @@ userSchema.pre('save', function (next) {
     }
 });
 
-// Handle findOneAndUpdate — encrypt fields in the update.
+// Handle findOneAndUpdate: encrypt fields in the update.
 // IMPORTANT: the timestamps plugin injects `$set: { updatedAt }` into the update
 // BEFORE this hook runs, while the app's fields stay top-level. The old
 // `update.$set || update` logic then only saw `{ updatedAt }` and silently
-// skipped encryption for every profile update — so BOTH containers must be
+// skipped encryption for every profile update: so BOTH containers must be
 // processed here.
 userSchema.pre('findOneAndUpdate', function (next) {
     try {

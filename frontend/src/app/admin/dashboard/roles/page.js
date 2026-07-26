@@ -80,7 +80,7 @@ function RolesAdminPage() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-bold text-white">Roles & Access</h1>
-                        <p className="text-sm text-neutral-500">RBAC — manage admin roles and permissions</p>
+                        <p className="text-sm text-neutral-500">RBAC: manage admin roles and permissions</p>
                     </div>
                 </div>
 
@@ -103,7 +103,7 @@ function RolesAdminPage() {
                                     <tr><td colSpan={6} className="text-center py-8 text-neutral-500">Loading...</td></tr>
                                 ) : admins.map(a => (
                                     <tr key={a._id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                                        <td className="px-4 py-3 text-sm text-white font-medium">{a.username || "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-white font-medium">{a.username || "-"}</td>
                                         <td className="px-4 py-3 text-sm text-neutral-400">{a.email}</td>
                                         <td className="px-4 py-3">
                                             {editingId === a._id ? (

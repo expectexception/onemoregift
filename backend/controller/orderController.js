@@ -92,12 +92,12 @@ const updateOrderStatus = async (req, res) => {
         }
         if (status === 'cancelled' && prev !== 'cancelled') {
             // Cancelling an order the customer already paid for is a refund in
-            // everything but name — say so on the record, or revenue keeps counting
+            // everything but name. Record it as one, or revenue keeps counting
             // money that has to go back.
             if (doc.paymentStatus === 'paid') {
                 return res.status(400).json({
                     error: true,
-                    msg: 'This order is already paid — use Refund instead of Cancel so the payment is recorded correctly.',
+                    msg: 'This order is already paid. Use Refund instead of Cancel so the payment is recorded correctly.',
                 });
             }
             await restoreStock(doc);
@@ -115,7 +115,7 @@ const updateOrderStatus = async (req, res) => {
             doc.paymentVerifiedAt = new Date();
         }
         if (status === 'cancelled' && doc.paymentStatus === 'verification_pending') {
-            // The proof is moot once the order is gone — don't leave it in the queue
+            // The proof is moot once the order is gone. Don't leave it in the queue
             doc.paymentStatus = 'failed';
         }
 
@@ -180,7 +180,7 @@ const verifyPickup = async (req, res) => {
 
         await doc.save();
 
-        return res.json({ error: false, msg: 'Pickup verified — order collected', data: doc });
+        return res.json({ error: false, msg: 'Pickup verified, order collected', data: doc });
     } catch (err) {
         return res.status(500).json({ error: true, msg: 'Failed to verify pickup' });
     }
@@ -227,7 +227,7 @@ const refundOrder = async (req, res) => {
     }
 };
 
-// PATCH /api/v1/admin/orders/:id/verify-payment — approve/reject a QR payment proof
+// PATCH /api/v1/admin/orders/:id/verify-payment: approve/reject a QR payment proof
 const verifyPayment = async (req, res) => {
     try {
         const { approve, note } = req.body;
@@ -274,7 +274,7 @@ const verifyPayment = async (req, res) => {
 
         return res.json({
             error: false,
-            msg: approve === true ? 'Payment verified — order confirmed' : 'Payment proof rejected',
+            msg: approve === true ? 'Payment verified, order confirmed' : 'Payment proof rejected',
             data: doc,
         });
     } catch (err) {

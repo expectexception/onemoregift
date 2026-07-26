@@ -180,7 +180,7 @@ export default function PayOrderModal({ order, config, onClose, onDone }) {
                                     </div>
                                 ) : (
                                     <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/20 text-amber-400 text-[11px] text-center">
-                                        Payment QR is not configured yet — please pay via the WhatsApp number below and upload your proof.
+                                        Payment QR is not configured yet. Please pay via the WhatsApp number below and upload your proof.
                                     </div>
                                 )}
 
@@ -239,7 +239,7 @@ export default function PayOrderModal({ order, config, onClose, onDone }) {
                                         disabled={submitting || uploading || !proofs.length}
                                         className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                        {submitting ? "Submitting..." : "I Have Paid — Submit Proof"}
+                                        {submitting ? "Submitting..." : "I Have Paid, Submit Proof"}
                                     </button>
                                 </div>
                             </div>
@@ -269,7 +269,7 @@ export default function PayOrderModal({ order, config, onClose, onDone }) {
 
                         {!qrEnabled && !gatewayEnabled && (
                             <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 text-amber-400 text-xs text-center">
-                                Online payments are currently disabled. Your order will stay pending — please contact support.
+                                Online payments are currently disabled. Your order will stay pending. Please contact support.
                             </div>
                         )}
                     </>

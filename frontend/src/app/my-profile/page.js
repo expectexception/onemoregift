@@ -680,7 +680,7 @@ function InfoRow({ icon, label, value }) {
             <div className="text-red-500 text-lg">{icon}</div>
             <div>
                 <p className="text-neutral-500 text-xs uppercase tracking-wider">{label}</p>
-                <p className="text-white text-sm font-medium">{value || "—"}</p>
+                <p className="text-white text-sm font-medium">{value || "-"}</p>
             </div>
         </div>
     );

@@ -160,7 +160,7 @@ export default function CheckoutPage() {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
-    // Cart editing — keeps localStorage + navbar badge in sync
+    // Cart editing: keeps localStorage + navbar badge in sync
     const persistCart = (next) => {
         setCart(next);
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
@@ -189,7 +189,7 @@ export default function CheckoutPage() {
     const saleDays = config.shopPhases?.sale?.days || "Fri, Sat";
     const pickupDates = getNextPickupDates(config.dropPickupDays);
     // "Pay Online" is only a real option when a gateway can actually settle the
-    // payment — a sandbox provider on the live site cannot, so it stays hidden
+    // payment. A sandbox provider on the live site cannot, so it stays hidden
     // instead of handing out orders that were never paid for.
     const onlinePayUsable = config.paymentGatewayEnabled
         && (config.onlinePaymentReady || config.sandboxPaymentsAllowed);
@@ -256,11 +256,11 @@ export default function CheckoutPage() {
 
             if (!data.error && data.data) {
                 setCreatedOrder(data.data);
-                // Stock is reserved and the order exists — clear the cart for every method
+                // Stock is reserved and the order exists. Clear the cart for every method
                 localStorage.removeItem("omg_cart");
                 setCart([]);
                 if (paymentMethod === "cod") {
-                    // COD order is confirmed immediately — no online payment step.
+                    // COD order is confirmed immediately. No online payment step.
                     router.push("/shop/orders");
                 } else {
                     setPaymentModalOpen(true);
@@ -557,7 +557,7 @@ export default function CheckoutPage() {
 
                                 <div className="flex justify-center items-center gap-1.5 text-[10px] text-neutral-500">
                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                    Secure checkout — payments verified by our team
+                                    Secure checkout, payments verified by our team
                                 </div>
                             </div>
                         </div>
@@ -567,7 +567,7 @@ export default function CheckoutPage() {
 
             <Footer />
 
-            {/* Payment Modal — QR proof upload + optional sandbox gateway */}
+            {/* Payment Modal: QR proof upload + optional sandbox gateway */}
             {paymentModalOpen && createdOrder && (
                 <PayOrderModal
                     order={createdOrder}

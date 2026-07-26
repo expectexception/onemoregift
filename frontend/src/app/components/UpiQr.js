@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 
 // Renders a UPI QR locally. This used to point at api.qrserver.com, which meant the
 // payee's UPI ID, the order number and the amount were sent to a third party on every
-// payment screen — and no QR at all if that host was slow or blocked. Generating it in
+// payment screen, and showed no QR at all if that host was slow or blocked. Generating it in
 // the browser keeps payment details private and works offline.
 export default function UpiQr({ value, size = 220, className = "" }) {
     const [svg, setSvg] = useState("");
