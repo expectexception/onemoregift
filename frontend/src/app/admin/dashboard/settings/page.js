@@ -5,19 +5,23 @@ import { useToast } from "@/hooks/use-toast";
 import {
     Database, Trash2, AlertTriangle, RefreshCw, Shield, CheckCircle, ShoppingBag,
     LayoutTemplate, QrCode, Upload, CreditCard, Banknote, CalendarDays, Phone,
-    Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info,
+    Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info, Megaphone, Wrench, Type, Eye,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import api, { mediaUrl } from "@/app/utils/apiClient";
 import { invalidateSiteConfig } from "@/app/utils/siteConfig";
 import withAdminAuth from "../../../components/withAdminAuth";
+import UpiQr from "@/app/components/UpiQr";
 
 // Every key this page owns. The draft is diffed against the last saved config so
 // only genuinely changed keys are sent, and the "unsaved" badge can be accurate.
 const EDITABLE_KEYS = [
     // shop & drop
     "shopEnabled", "weeklyDropEnabled", "dropRevealDays", "dropSaleDays", "dropPickupDays",
-    "orderAutoCancelHours", "paymentProofWindowHours",
+    "orderAutoCancelHours", "paymentProofWindowHours", "forcedShopPhase", "shopMaxQtyPerOrder",
+    // site-wide
+    "announcementEnabled", "announcementText", "announcementLink",
+    "maintenanceMode", "maintenanceMessage", "heroTitle", "heroSubtitle",
     // payments
     "qrPaymentEnabled", "codEnabled", "paymentGatewayEnabled",
     "paymentUpiId", "paymentPayeeName", "paymentWhatsapp", "paymentInstructions", "paymentQrImage",
@@ -34,6 +38,7 @@ const TABS = [
     { key: "shop", label: "Shop & Drop", icon: Store },
     { key: "payments", label: "Payments", icon: CreditCard },
     { key: "features", label: "Features", icon: Sparkles },
+    { key: "site", label: "Site & Content", icon: Megaphone },
     { key: "homepage", label: "Homepage", icon: LayoutTemplate },
     { key: "contact", label: "Contact", icon: Phone },
     { key: "system", label: "Data & Security", icon: Shield },
@@ -67,6 +72,7 @@ function ToggleRow({ title, desc, value, onToggle, accent = "red", disabled = fa
                 disabled={disabled}
                 onClick={onToggle}
                 aria-pressed={!!value}
+                aria-label={title}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 disabled:cursor-not-allowed ${value ? on : "bg-neutral-800"}`}
             >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
@@ -297,6 +303,7 @@ function AdminSettings() {
                         {tab === "shop" && <ShopTab cfg={cfg} />}
                         {tab === "payments" && <PaymentsTab cfg={cfg} />}
                         {tab === "features" && <FeaturesTab cfg={cfg} />}
+                        {tab === "site" && <SiteTab cfg={cfg} />}
                         {tab === "homepage" && <HomepageTab cfg={cfg} />}
                         {tab === "contact" && <ContactTab cfg={cfg} />}
                         {tab === "system" && <SystemTab />}
@@ -395,8 +402,37 @@ function ShopTab({ cfg }) {
                         {draft.shopPhases?.[draft.shopPhase]?.days
                             ? <span className="text-neutral-500"> ({draft.shopPhases[draft.shopPhase].days})</span>
                             : null}
+                        {draft.phaseIsForced && <span className="text-red-400 font-semibold"> — pinned manually</span>}
                     </p>
                 </div>
+
+                <Field
+                    label="Override the current stage"
+                    hint="Pin the shop to one stage — useful to open a sale early or hold one back without touching the weekly schedule."
+                >
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {[
+                            { value: "", label: "Follow schedule" },
+                            { value: "reveal", label: "Reveal" },
+                            { value: "sale", label: "Sale" },
+                            { value: "prep", label: "Preparing" },
+                            { value: "pickup", label: "Pickup" },
+                        ].map((option) => (
+                            <button
+                                key={option.value || "auto"}
+                                type="button"
+                                onClick={() => setField("forcedShopPhase", option.value)}
+                                className={`h-10 rounded-lg border text-[11px] font-bold transition-all ${
+                                    (draft.forcedShopPhase || "") === option.value
+                                        ? "bg-amber-600 border-amber-500 text-white"
+                                        : "bg-white/[0.02] border-white/[0.06] text-neutral-400 hover:border-white/20 hover:text-white"
+                                }`}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </Field>
             </Panel>
 
             <Panel
@@ -456,6 +492,17 @@ function ShopTab({ cfg }) {
                             type="number" min="0"
                             value={draft.paymentProofWindowHours}
                             onChange={(e) => setField("paymentProofWindowHours", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field
+                        label="Max units of one item per order"
+                        hint="0 = no limit. Stops one buyer clearing out a limited drop."
+                    >
+                        <Input
+                            type="number" min="0"
+                            value={draft.shopMaxQtyPerOrder}
+                            onChange={(e) => setField("shopMaxQtyPerOrder", e.target.value)}
                             className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
                         />
                     </Field>
@@ -632,7 +679,82 @@ function PaymentsTab({ cfg }) {
                     />
                 </Field>
             </Panel>
+
+            <CustomerPaymentPreview draft={draft} />
         </>
+    );
+}
+
+// Mirrors the customer's payment screen using the unsaved draft, so the QR and UPI
+// details can be checked before they go live rather than by placing a test order.
+function CustomerPaymentPreview({ draft }) {
+    const upiId = String(draft.paymentUpiId || "").trim();
+    const payeeName = String(draft.paymentPayeeName || "OneMoreGift").trim();
+    const whatsapp = String(draft.paymentWhatsapp || "").replace(/\D/g, "");
+    const uploadedQr = draft.paymentQrImage ? mediaUrl(draft.paymentQrImage) : "";
+    const sampleTotal = 499;
+
+    const upiLink = upiId
+        ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${sampleTotal}&cu=INR&tn=${encodeURIComponent("Order OMG-SAMPLE")}`
+        : "";
+
+    return (
+        <Panel
+            title="Customer preview"
+            desc="Exactly what a customer sees after placing an order, using the values above (sample amount ₹499)."
+            icon={Eye}
+            accent="blue"
+        >
+            <div className="max-w-sm mx-auto w-full rounded-2xl border border-white/10 bg-black/50 p-5 space-y-4">
+                <div className="text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Amount to pay</p>
+                    <p className="text-2xl font-extrabold text-white mt-0.5">₹{sampleTotal}</p>
+                </div>
+
+                {uploadedQr || upiLink ? (
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="bg-white p-2.5 rounded-2xl">
+                            {uploadedQr ? (
+                                <img src={uploadedQr} alt="Payment QR" className="w-40 h-40 object-contain" />
+                            ) : (
+                                <UpiQr value={upiLink} size={160} className="w-40 h-40" />
+                            )}
+                        </div>
+                        <p className="text-[10px] text-neutral-500">
+                            {uploadedQr ? "Your uploaded QR image" : "Generated from your UPI ID"}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/20 text-amber-400 text-[11px] text-center">
+                        No QR to show — add a UPI ID or upload a QR image.
+                    </div>
+                )}
+
+                {upiId && (
+                    <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/10">
+                        <span className="text-xs text-neutral-300 font-mono truncate">{upiId}</span>
+                        <span className="text-[10px] font-bold text-red-400 uppercase shrink-0 ml-2">Copy</span>
+                    </div>
+                )}
+
+                <p className="text-[11px] text-neutral-400 leading-relaxed text-center">
+                    {draft.paymentInstructions || "Pay on the QR, then upload your payment screenshot below."}
+                </p>
+
+                {whatsapp ? (
+                    <div className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                        <Phone className="w-3.5 h-3.5" />
+                        Send screenshot on WhatsApp
+                    </div>
+                ) : (
+                    <p className="text-[10px] text-neutral-600 text-center">No WhatsApp number set — the chat button stays hidden.</p>
+                )}
+
+                <div className="border border-dashed border-white/10 rounded-xl py-3 text-center text-[11px] text-neutral-500">
+                    Upload payment screenshot
+                </div>
+            </div>
+        </Panel>
     );
 }
 
@@ -665,6 +787,106 @@ function FeaturesTab({ cfg }) {
                 <ToggleRow title="Require surprise proof" desc="Applicants must upload supporting documents" value={draft.requireSurpriseProof} onToggle={() => toggle("requireSurpriseProof")} accent="fuchsia" />
                 <ToggleRow title="Require moment proof" desc="Users must attach verification proof with a shared moment" value={draft.requireMomentProof} onToggle={() => toggle("requireMomentProof")} accent="fuchsia" />
                 <ToggleRow title="One application per user" desc="A user can only have one surprise application in flight at a time" value={draft.surpriseOneActivePerUser} onToggle={() => toggle("surpriseOneActivePerUser")} accent="fuchsia" />
+            </Panel>
+        </>
+    );
+}
+
+function SiteTab({ cfg }) {
+    const { draft, setField, toggle } = cfg;
+    return (
+        <>
+            <Panel
+                title="Announcement bar"
+                desc="A strip across the top of every public page. Use it for drop times, delays or offers."
+                icon={Megaphone}
+                accent="red"
+            >
+                <ToggleRow
+                    title="Show announcement"
+                    desc="Visitors can dismiss it; changing the text shows it again"
+                    value={draft.announcementEnabled}
+                    onToggle={() => toggle("announcementEnabled")}
+                />
+                <Field label="Announcement text" hint="Keep it to one line — long text wraps awkwardly on mobile.">
+                    <Input
+                        value={draft.announcementText}
+                        onChange={(e) => setField("announcementText", e.target.value)}
+                        placeholder="This week's drop goes live Friday 8 PM!"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Link (optional)" hint="Internal path like /shop, or a full https:// URL.">
+                    <Input
+                        value={draft.announcementLink}
+                        onChange={(e) => setField("announcementLink", e.target.value)}
+                        placeholder="/shop"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+
+                {draft.announcementEnabled && !String(draft.announcementText || "").trim() && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-neutral-300">The bar is switched on but has no text, so nothing will show.</p>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel
+                title="Maintenance mode"
+                desc="Puts a notice on the site and stops customers submitting anything — orders, applications, moments. Browsing and the admin panel keep working."
+                icon={Wrench}
+                accent="amber"
+            >
+                <ToggleRow
+                    title="Maintenance mode"
+                    desc="On = customers can look around but cannot place orders or submit forms"
+                    value={draft.maintenanceMode}
+                    onToggle={() => toggle("maintenanceMode")}
+                    accent="amber"
+                />
+                <Field label="Message shown to visitors">
+                    <textarea
+                        value={draft.maintenanceMessage}
+                        onChange={(e) => setField("maintenanceMessage", e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-amber-500/50 resize-none"
+                    />
+                </Field>
+                {draft.maintenanceMode && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/20">
+                        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-200 leading-relaxed">
+                            Maintenance mode is on — no customer can place an order or submit an application right now.
+                        </p>
+                    </div>
+                )}
+            </Panel>
+
+            <Panel
+                title="Homepage hero text"
+                desc="Leave blank to keep the built-in wording."
+                icon={Type}
+                accent="fuchsia"
+            >
+                <Field label="Headline">
+                    <Input
+                        value={draft.heroTitle}
+                        onChange={(e) => setField("heroTitle", e.target.value)}
+                        placeholder="Win Free Rewards Daily"
+                        className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                    />
+                </Field>
+                <Field label="Sub-headline">
+                    <textarea
+                        value={draft.heroSubtitle}
+                        onChange={(e) => setField("heroSubtitle", e.target.value)}
+                        rows={2}
+                        placeholder="Join exclusive giveaway contests, complete simple tasks…"
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-fuchsia-500/50 resize-none"
+                    />
+                </Field>
             </Panel>
         </>
     );

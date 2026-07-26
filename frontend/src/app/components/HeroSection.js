@@ -20,7 +20,7 @@ const heroImages = [
     "/images/gift-8.png",
 ];
 
-export default function HeroSection({ showStats = true }) {
+export default function HeroSection({ showStats = true, heroTitle = "", heroSubtitle = "" }) {
     const router = useRouter();
     const sectionRef = useRef(null);
     const cursorRef = useRef(null);
@@ -130,19 +130,29 @@ export default function HeroSection({ showStats = true }) {
                 {/* Main Heading */}
                 <RevealOnScroll delayMs={60}>
                     <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold mb-4 sm:mb-6 leading-tight sm:leading-[1.1]">
-                        <span className="text-white">Win </span>
-                        <span className="text-gradient">Free</span>
-                        <br className="hidden sm:block" />
-                        <span className="text-white"> Rewards Daily</span>
+                        {heroTitle ? (
+                            <span className="text-white">{heroTitle}</span>
+                        ) : (
+                            <>
+                                <span className="text-white">Win </span>
+                                <span className="text-gradient">Free</span>
+                                <br className="hidden sm:block" />
+                                <span className="text-white"> Rewards Daily</span>
+                            </>
+                        )}
                     </h1>
                 </RevealOnScroll>
 
                 {/* Subtitle */}
                 <RevealOnScroll delayMs={140}>
                     <p className="text-sm sm:text-lg md:text-xl text-neutral-300 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed font-medium drop-shadow-lg">
-                        Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
-                        <span className="text-red-400 font-semibold"> real prizes </span>
-                        delivered straight to your doorstep.
+                        {heroSubtitle || (
+                            <>
+                                Join exclusive giveaway contests, complete simple tasks, and stand a chance to win
+                                <span className="text-red-400 font-semibold"> real prizes </span>
+                                delivered straight to your doorstep.
+                            </>
+                        )}
                     </p>
                 </RevealOnScroll>
 

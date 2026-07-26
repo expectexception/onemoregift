@@ -96,7 +96,11 @@ export default function MyOrdersPage() {
             }
         } catch (err) {
             console.error(err);
-            toast({ title: "Error", description: "Something went wrong cancelling the order.", variant: "destructive" });
+            toast({
+                title: "Cancellation failed",
+                description: err?.response?.data?.msg || "Something went wrong cancelling the order.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -195,7 +199,11 @@ export default function MyOrdersPage() {
                 ) : (
                     <div className="space-y-8">
                         {orders.map((order) => {
-                            const isCancelable = ["pending", "paid"].includes(order.status);
+                            // Matches the server rule — once paid or awaiting payment
+                            // verification, cancelling has to go through support so the
+                            // refund is recorded.
+                            const isCancelable = ["pending", "ready_for_pickup"].includes(order.status)
+                                && !["paid", "verification_pending"].includes(order.paymentStatus);
                             const hasQR = ["paid", "ready_for_pickup"].includes(order.status) && order.pickupCode;
 
                             return (

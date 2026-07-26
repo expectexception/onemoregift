@@ -15,6 +15,7 @@ import { UserIcon, LockIcon } from "./SVGIcons";
 import { ShoppingCart } from "lucide-react";
 import { readCartCount, CART_UPDATED_EVENT } from "../utils/cart";
 import { fetchSiteConfig } from "../utils/siteConfig";
+import SiteBanner from "./SiteBanner";
 
 function CartButton({ count, onClick, className = "" }) {
     return (
@@ -70,6 +71,8 @@ export default function Navbar() {
     };
 
     return (
+        <>
+        <SiteBanner />
         <nav className="premium-nav">
             <div className="relative flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 max-w-7xl mx-auto w-full">
                 {/* Logo */}
@@ -198,6 +201,7 @@ export default function Navbar() {
                 </div>
             </div>
         </nav>
+        </>
     );
 }
 

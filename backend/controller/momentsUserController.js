@@ -2,6 +2,7 @@
 
 const HappyMoment = require('../model/HappyMoment');
 const { getConfigHelper } = require('./configController');
+const { sanitizeUrlList, sanitizeMediaList } = require('../utils/mediaUrls');
 
 // POST /api/v1/happy-moment
 const createMoment = async (req, res) => {
@@ -12,16 +13,26 @@ const createMoment = async (req, res) => {
         }
 
         const { caption, description, media, proofs, publishNow } = req.body;
-        if (!caption) {
+        if (!caption || !String(caption).trim()) {
             return res.status(400).json({ error: true, msg: 'Caption is required' });
+        }
+
+        // Media URLs end up in <img>/<video>/<a> on the public gallery, so only
+        // uploaded paths and http(s) URLs are stored.
+        const mediaList = sanitizeMediaList(media);
+        const proofList = sanitizeUrlList(proofs);
+
+        // Same as surprise requests: the proof rule was only enforced by the form.
+        if (cfg.requireMomentProof && publishNow && !proofList.length) {
+            return res.status(400).json({ error: true, msg: 'Please attach at least one verification proof before submitting' });
         }
 
         const doc = await HappyMoment.create({
             userId: req.user.data._id,
-            caption,
-            description,
-            media: media || [],
-            proofs: proofs || [],
+            caption: String(caption).trim().slice(0, 300),
+            description: description ? String(description).trim().slice(0, 3000) : undefined,
+            media: mediaList,
+            proofs: proofList,
             status: publishNow ? 'submitted' : 'draft',
         });
 
@@ -77,14 +88,14 @@ const reactToMoment = async (req, res) => {
         // Atomic ops to avoid read-modify-write races producing duplicate/lost reactions
         // 1. Toggle off if the same reaction already exists
         let doc = await HappyMoment.findOneAndUpdate(
-            { _id: req.params.id, reactions: { $elemMatch: { userId, type } } },
+            { _id: req.params.id, isPublished: true, reactions: { $elemMatch: { userId, type } } },
             { $pull: { reactions: { userId } } },
             { new: true }
         );
         if (!doc) {
             // 2. Update type if a different reaction from this user exists
             doc = await HappyMoment.findOneAndUpdate(
-                { _id: req.params.id, 'reactions.userId': userId },
+                { _id: req.params.id, isPublished: true, 'reactions.userId': userId },
                 { $set: { 'reactions.$[r].type': type } },
                 { new: true, arrayFilters: [{ 'r.userId': userId }] }
             );
@@ -92,7 +103,7 @@ const reactToMoment = async (req, res) => {
         if (!doc) {
             // 3. No existing reaction from this user — push a new one
             doc = await HappyMoment.findOneAndUpdate(
-                { _id: req.params.id },
+                { _id: req.params.id, isPublished: true },
                 { $push: { reactions: { userId, type } } },
                 { new: true }
             );
@@ -109,9 +120,9 @@ const reactToMoment = async (req, res) => {
 const reportMoment = async (req, res) => {
     try {
         const { reason } = req.body;
-        if (!reason) return res.status(400).json({ error: true, msg: 'Reason is required' });
+        if (!reason || !String(reason).trim()) return res.status(400).json({ error: true, msg: 'Reason is required' });
 
-        const doc = await HappyMoment.findById(req.params.id);
+        const doc = await HappyMoment.findOne({ _id: req.params.id, isPublished: true });
         if (!doc) return res.status(404).json({ error: true, msg: 'Moment not found' });
 
         const alreadyReported = doc.reports.some(r => r.userId?.toString() === req.user.data._id);
@@ -119,7 +130,7 @@ const reportMoment = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'You have already reported this moment' });
         }
 
-        doc.reports.push({ userId: req.user.data._id, reason });
+        doc.reports.push({ userId: req.user.data._id, reason: String(reason).trim().slice(0, 500) });
         // Automatically hide or flag if reports count exceeds threshold
         const reportThreshold = Number(process.env.MOMENT_REPORT_AUTOHIDE_THRESHOLD) || 5;
         if (doc.reports.length >= reportThreshold) {
@@ -142,14 +153,15 @@ const addComment = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Comment text is required' });
         }
 
-        const doc = await HappyMoment.findById(req.params.id);
+        // Comments only belong on moments the public can actually see
+        const doc = await HappyMoment.findOne({ _id: req.params.id, isPublished: true });
         if (!doc) {
             return res.status(404).json({ error: true, msg: 'Moment not found' });
         }
 
         doc.comments.push({
             userId: req.user.data._id,
-            text: text.trim()
+            text: text.trim().slice(0, 1000)
         });
 
         await doc.save();
@@ -186,7 +198,7 @@ const editComment = async (req, res) => {
             return res.status(403).json({ error: true, msg: 'Unauthorized to edit this comment' });
         }
 
-        comment.text = text.trim();
+        comment.text = text.trim().slice(0, 1000);
         comment.editedAt = new Date();
         await doc.save();
 
@@ -213,7 +225,10 @@ const deleteComment = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'Comment not found' });
         }
 
-        if (comment.userId.toString() !== req.user.data._id) {
+        // The comment's author or the owner of the moment may remove it
+        const isCommentAuthor = comment.userId.toString() === req.user.data._id;
+        const isMomentOwner = doc.userId.toString() === req.user.data._id;
+        if (!isCommentAuthor && !isMomentOwner) {
             return res.status(403).json({ error: true, msg: 'Unauthorized to delete this comment' });
         }
 

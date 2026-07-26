@@ -40,7 +40,11 @@ export default function Home() {
       </div>
 
       {/* Main Content */}
-      <HeroSection showStats={config.homeShowStats} />
+      <HeroSection
+        showStats={config.homeShowStats}
+        heroTitle={config.heroTitle}
+        heroSubtitle={config.heroSubtitle}
+      />
       {config.homeShowSteps && <HowItWorks />}
       <Boxes />
       {config.homeShowMoments && <PopularMoments />}

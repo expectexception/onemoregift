@@ -2,6 +2,7 @@
 
 const SurpriseRequest = require('../model/SurpriseRequest');
 const { getConfigHelper } = require('./configController');
+const { sanitizeUrlList } = require('../utils/mediaUrls');
 
 // Statuses that count as an "active" application for the 1-per-user rule
 const ACTIVE_STATUSES = ['submitted', 'under_review', 'verification_pending', 'approved', 'gift_assigned'];
@@ -14,9 +15,23 @@ const createRequest = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Required fields missing: eventName, eventType, eventDate, recipientName' });
         }
 
+        // An unparseable date would otherwise surface as a Mongoose cast error and a
+        // confusing 500 rather than a field-level message.
+        const parsedEventDate = new Date(eventDate);
+        if (Number.isNaN(parsedEventDate.getTime())) {
+            return res.status(400).json({ error: true, msg: 'Please choose a valid event date' });
+        }
+
         const cfg = await getConfigHelper();
         if (!cfg.surpriseEnabled) {
             return res.status(503).json({ error: true, msg: 'Surprise applications are temporarily closed. Please check back later.' });
+        }
+
+        // The proof requirement was only enforced in the form — the API accepted an
+        // application with no documents at all.
+        const documentUrls = sanitizeUrlList(documents);
+        if (cfg.requireSurpriseProof && !documentUrls.length) {
+            return res.status(400).json({ error: true, msg: 'Please upload at least one supporting document for verification' });
         }
         if (cfg.surpriseOneActivePerUser) {
             const active = await SurpriseRequest.findOne({
@@ -33,19 +48,37 @@ const createRequest = async (req, res) => {
 
         const doc = await SurpriseRequest.create({
             userId: req.user.data._id,
-            eventName,
+            eventName: String(eventName).trim().slice(0, 200),
             eventType,
-            eventDate,
-            description,
-            recipientName,
-            recipientContact,
-            documents: documents || [],
+            eventDate: parsedEventDate,
+            description: description ? String(description).trim().slice(0, 2000) : undefined,
+            recipientName: String(recipientName).trim().slice(0, 120),
+            recipientContact: recipientContact ? String(recipientContact).trim().slice(0, 120) : undefined,
+            documents: documentUrls,
             status: 'submitted',
             verificationTimeline: [{
                 status: 'submitted',
                 note: 'Request created and submitted by user',
             }],
         });
+
+        // The one-per-user check above can be raced by two simultaneous submits.
+        // Re-check after the write and roll back the loser rather than leaving the
+        // user with two live applications.
+        if (cfg.surpriseOneActivePerUser) {
+            const duplicate = await SurpriseRequest.findOne({
+                _id: { $ne: doc._id },
+                userId: req.user.data._id,
+                status: { $in: ACTIVE_STATUSES },
+            }).select('_id');
+            if (duplicate) {
+                await SurpriseRequest.deleteOne({ _id: doc._id });
+                return res.status(400).json({
+                    error: true,
+                    msg: 'You already have an active surprise application. For now only 1 application per user is allowed.',
+                });
+            }
+        }
 
         return res.status(201).json({ error: false, data: doc });
     } catch (err) {

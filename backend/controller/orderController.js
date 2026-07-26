@@ -91,9 +91,32 @@ const updateOrderStatus = async (req, res) => {
             doc.refundedBy = req.adminDoc?._id;
         }
         if (status === 'cancelled' && prev !== 'cancelled') {
+            // Cancelling an order the customer already paid for is a refund in
+            // everything but name — say so on the record, or revenue keeps counting
+            // money that has to go back.
+            if (doc.paymentStatus === 'paid') {
+                return res.status(400).json({
+                    error: true,
+                    msg: 'This order is already paid — use Refund instead of Cancel so the payment is recorded correctly.',
+                });
+            }
             await restoreStock(doc);
             doc.cancelledAt = new Date();
             doc.cancelledBy = req.adminDoc?._id;
+        }
+
+        // Marking an order 'paid' by hand has to move paymentStatus too, otherwise the
+        // order reads as paid in the list while revenue (which sums paymentStatus:
+        // 'paid') silently ignores it.
+        if (status === 'paid' && doc.paymentStatus !== 'paid') {
+            doc.paymentStatus = 'paid';
+            doc.paidAt = doc.paidAt || new Date();
+            doc.paymentVerifiedBy = req.adminDoc?._id;
+            doc.paymentVerifiedAt = new Date();
+        }
+        if (status === 'cancelled' && doc.paymentStatus === 'verification_pending') {
+            // The proof is moot once the order is gone — don't leave it in the queue
+            doc.paymentStatus = 'failed';
         }
 
         doc.status = status;
@@ -144,6 +167,17 @@ const verifyPickup = async (req, res) => {
         doc.status = 'collected';
         doc.pickupVerifiedAt = new Date();
         doc.pickupVerifiedBy = req.adminDoc?._id;
+
+        // Cash-on-pickup orders are only actually paid at this moment. Without this
+        // they stayed paymentStatus 'pending' forever and every cash sale was missing
+        // from the revenue figures.
+        if (doc.paymentStatus === 'pending') {
+            doc.paymentStatus = 'paid';
+            doc.paidAt = new Date();
+            doc.paymentVerifiedBy = req.adminDoc?._id;
+            doc.paymentVerifiedAt = new Date();
+        }
+
         await doc.save();
 
         return res.json({ error: false, msg: 'Pickup verified — order collected', data: doc });

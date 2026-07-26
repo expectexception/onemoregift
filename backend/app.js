@@ -82,6 +82,9 @@ function createApp() {
     skip: (req) => req.method === 'GET' && req.path.startsWith('/api/v1/upload/'),
   }));
   app.use(mongoSanitize());
+  // Maintenance mode: blocks public writes, leaves reads and the admin panel alive
+  app.use(require('./middleware/maintenanceGuard'));
+
   app.use('/api/v1/auth', auth);
   app.use('/api/v1/admin', admin);
   app.use('/api/v1/giveaway', giveaway);

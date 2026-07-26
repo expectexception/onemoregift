@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api, { mediaUrl } from "@/app/utils/apiClient";
+import UpiQr from "./UpiQr";
 import { useToast } from "@/hooks/use-toast";
 import {
     QrCode,
@@ -43,11 +44,8 @@ export default function PayOrderModal({ order, config, onClose, onDone }) {
         ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${order.total}&cu=INR&tn=${encodeURIComponent(`Order ${orderRef}`)}`
         : "";
 
-    const qrSrc = config?.paymentQrImage
-        ? mediaUrl(config.paymentQrImage)
-        : upiId
-            ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}`
-            : "";
+    const uploadedQr = config?.paymentQrImage ? mediaUrl(config.paymentQrImage) : "";
+    const hasQr = Boolean(uploadedQr || upiLink);
 
     const waLink = whatsapp
         ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hi! I placed order ${orderRef} (₹${order.total}). Sharing my payment screenshot.`)}`
@@ -169,10 +167,14 @@ export default function PayOrderModal({ order, config, onClose, onDone }) {
                         {qrEnabled && (
                             <div className="space-y-4">
                                 {/* QR code */}
-                                {qrSrc ? (
+                                {hasQr ? (
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="bg-white p-2.5 rounded-2xl">
-                                            <img src={qrSrc} alt="Payment QR code" className="w-48 h-48 object-contain" />
+                                            {uploadedQr ? (
+                                                <img src={uploadedQr} alt="Payment QR code" className="w-48 h-48 object-contain" />
+                                            ) : (
+                                                <UpiQr value={upiLink} size={192} className="w-48 h-48" />
+                                            )}
                                         </div>
                                         <p className="text-[10px] text-neutral-500">Scan with any UPI app (GPay / PhonePe / Paytm)</p>
                                     </div>

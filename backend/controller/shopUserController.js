@@ -6,6 +6,7 @@ const Store = require('../model/Store');
 const crypto = require('crypto');
 const { getConfigHelper, getISTDay, parseDays } = require('./configController');
 const { emailOrderPlaced } = require('../utils/orderEmails');
+const { restoreStock } = require('./orderController');
 
 // Get active categories
 const getCategories = async (req, res) => {
@@ -90,8 +91,30 @@ const createOrder = async (req, res) => {
         }
         const method = allowedMethods.includes(requested) ? requested : allowedMethods[0];
 
-        if (!items || !items.length) {
+        if (!Array.isArray(items) || !items.length) {
             return res.status(400).json({ error: true, msg: 'Order items cannot be empty' });
+        }
+
+        // Quantities come straight from the browser — a negative or fractional value
+        // would flip the stock decrement into an increment and mis-price the order.
+        const maxQty = Number(cfg.shopMaxQtyPerOrder) || 0;
+        const qtyByLine = new Map(); // per product+variant, so split lines can't beat the cap
+        for (const item of items) {
+            const qty = Number(item?.quantity);
+            if (!Number.isInteger(qty) || qty < 1) {
+                return res.status(400).json({ error: true, msg: 'Each item needs a whole quantity of at least 1' });
+            }
+            item.quantity = qty;
+
+            const lineKey = `${item.productId}:${item.variantId || ''}`;
+            const running = (qtyByLine.get(lineKey) || 0) + qty;
+            qtyByLine.set(lineKey, running);
+            if (maxQty > 0 && running > maxQty) {
+                return res.status(400).json({
+                    error: true,
+                    msg: `These are limited drops — you can order at most ${maxQty} of the same item per order.`,
+                });
+            }
         }
         if (!pickupStoreId) {
             return res.status(400).json({ error: true, msg: 'Please select a pickup store' });
@@ -394,6 +417,11 @@ const getMyOrder = async (req, res) => {
 };
 
 // Cancel My Order
+//
+// Self-service cancellation is only for orders where no money has moved. Once the
+// customer has paid — or uploaded a payment proof that is sitting in the admin
+// verification queue — cancelling here would silently keep their money while
+// handing the stock back, so those orders have to go through the admin refund flow.
 const cancelMyOrder = async (req, res) => {
     try {
         const order = await Order.findOne({ _id: req.params.id, userId: req.user.data._id });
@@ -401,25 +429,25 @@ const cancelMyOrder = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'Order not found' });
         }
 
-        if (!['pending', 'paid'].includes(order.status)) {
-            return res.status(400).json({ error: true, msg: 'Cannot cancel order in current status' });
+        // Payment state is checked first so a paid order gets the "contact us for a
+        // refund" message rather than a flat "cannot be cancelled".
+        if (order.paymentStatus === 'paid') {
+            return res.status(400).json({
+                error: true,
+                msg: 'This order is already paid. Please contact support to request a refund — we will process it for you.',
+            });
+        }
+        if (order.paymentStatus === 'verification_pending') {
+            return res.status(400).json({
+                error: true,
+                msg: 'Your payment proof is being verified. Please contact support if you want to cancel this order.',
+            });
+        }
+        if (!['pending', 'ready_for_pickup'].includes(order.status)) {
+            return res.status(400).json({ error: true, msg: 'This order can no longer be cancelled' });
         }
 
-        // Return stock
-        for (const item of order.items) {
-            const product = await Product.findById(item.productId);
-            if (product) {
-                if (product.hasVariants && item.variantId) {
-                    const variant = product.variants.id(item.variantId);
-                    if (variant) {
-                        variant.stock += item.quantity;
-                    }
-                } else {
-                    product.stock += item.quantity;
-                }
-                await product.save();
-            }
-        }
+        await restoreStock(order);
 
         order.status = 'cancelled';
         order.cancelledAt = new Date();
@@ -428,6 +456,7 @@ const cancelMyOrder = async (req, res) => {
 
         return res.json({ error: false, msg: 'Order cancelled successfully', data: order });
     } catch (err) {
+        console.error(err);
         return res.status(500).json({ error: true, msg: 'Failed to cancel order' });
     }
 };

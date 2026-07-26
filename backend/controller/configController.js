@@ -43,8 +43,13 @@ const formatDays = (days) => {
 const getISTDay = (date = new Date()) =>
     new Date(date.getTime() + 5.5 * 60 * 60 * 1000).getUTCDay(); // 0=Sun … 6=Sat
 
-// Phase for a given day, using the admin-configured day map.
+// Phase for a given day, using the admin-configured day map. An admin can pin the
+// phase (`forcedShopPhase`) to open a sale early or hold one back without having to
+// rewrite the weekly schedule.
 const resolvePhase = (config, date = new Date()) => {
+    const forced = String(config.forcedShopPhase || '').trim();
+    if (SHOP_PHASES[forced]) return forced;
+
     const day = getISTDay(date);
     if (parseDays(config.dropSaleDays, [5, 6]).includes(day)) return 'sale';
     if (parseDays(config.dropRevealDays, [3, 4]).includes(day)) return 'reveal';
@@ -72,6 +77,9 @@ const BOOL_KEYS = {
     giveawaysEnabled: () => envBool('ENABLE_GIVEAWAYS', true),
     momentsEnabled: () => envBool('ENABLE_MOMENTS', true),
     surpriseEnabled: () => envBool('ENABLE_SURPRISE', true),
+    // Site-wide announcement bar and maintenance mode
+    announcementEnabled: () => false,
+    maintenanceMode: () => envBool('MAINTENANCE_MODE', false),
 };
 
 // Numeric settings: DB value ?? env default
@@ -85,6 +93,12 @@ const NUMBER_KEYS = {
     paymentProofWindowHours: () => {
         const n = Number(process.env.PAYMENT_PROOF_WINDOW_HOURS);
         return Number.isFinite(n) && n >= 0 ? n : 6;
+    },
+    // Cap on units of a single product in one order — keeps a limited drop from being
+    // cleared out by one buyer. 0 = no cap.
+    shopMaxQtyPerOrder: () => {
+        const n = Number(process.env.SHOP_MAX_QTY_PER_ORDER);
+        return Number.isFinite(n) && n >= 0 ? n : 5;
     },
 };
 
@@ -108,6 +122,19 @@ const STRING_KEYS = {
     contactWhatsapp: () => envStr('CONTACT_WHATSAPP'),
     businessAddress: () => envStr('BUSINESS_ADDRESS'),
     instagramUrl: () => envStr('INSTAGRAM_URL'),
+    // Pin the drop cycle to one phase; '' follows the weekday schedule
+    forcedShopPhase: () => '',
+    // Site-wide announcement bar
+    announcementText: () => '',
+    announcementLink: () => '',
+    // Shown while maintenance mode is on
+    maintenanceMessage: () => envStr(
+        'MAINTENANCE_MESSAGE',
+        'We are doing a quick bit of maintenance and will be back shortly. Thanks for your patience!'
+    ),
+    // Homepage hero copy
+    heroTitle: () => '',
+    heroSubtitle: () => '',
 };
 
 // In-process cache — config is read on every hot request (public config endpoint,
@@ -135,6 +162,7 @@ const withDerived = (config) => {
     return {
         ...config,
         shopPhase: resolvePhase(config),
+        phaseIsForced: !!SHOP_PHASES[String(config.forcedShopPhase || '').trim()],
         shopPhases: {
             pickup: { ...SHOP_PHASES.pickup, days: formatDays(pickup) },
             reveal: { ...SHOP_PHASES.reveal, days: formatDays(reveal) },
@@ -234,6 +262,18 @@ const validateDayWindows = (updates, current) => {
 const updateConfig = async (req, res) => {
     try {
         const updates = req.body || {};
+
+        // A typo here would pin the shop into a phase that resolves to nothing
+        if (updates.forcedShopPhase !== undefined) {
+            const forced = String(updates.forcedShopPhase || '').trim();
+            if (forced && !SHOP_PHASES[forced]) {
+                return res.status(400).json({
+                    error: true,
+                    msg: `forcedShopPhase must be empty (follow the schedule) or one of: ${Object.keys(SHOP_PHASES).join(', ')}`,
+                });
+            }
+            updates.forcedShopPhase = forced;
+        }
 
         if (DAY_KEYS.some(key => updates[key] !== undefined)) {
             const current = await getConfigHelper();
