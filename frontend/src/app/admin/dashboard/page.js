@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    Ticket,
     Activity,
     ArrowRight,
     BarChart3,
@@ -103,6 +104,7 @@ function DashboardPage() {
         { label: "Surprise Requests", detail: "Verify & assign gifts", href: "/admin/dashboard/surprise", icon: Gift, badge: pendingCounts.surprise },
         { label: "Happy Moments", detail: "Moderate shared moments", href: "/admin/dashboard/moments", icon: Heart, badge: pendingCounts.moments },
         { label: "Gift Catalog", detail: "Manage reward gifts", href: "/admin/dashboard/gifts", icon: Star },
+        { label: "Coupons", detail: "Discount codes for checkout", href: "/admin/dashboard/coupons", icon: Ticket },
         { label: "Giveaways", detail: "Manage active campaigns", href: "/admin/dashboard/giveaways", icon: Gift },
         { label: "Winners", detail: "Review winner selections", href: "/admin/dashboard/winners", icon: UserCheck },
         { label: "Settings", detail: "Platform configuration", href: "/admin/dashboard/settings", icon: Database },

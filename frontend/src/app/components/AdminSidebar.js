@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Nav } from "@/components/ui/nav";
-import { ChevronRight, ChevronLeft, Gift, ShoppingBag, Heart, Package, Store, Star, ClipboardList, Shield, BarChart3, FileText } from "lucide-react";
+import { ChevronRight, ChevronLeft, Gift, ShoppingBag, Heart, Package, Store, Star, ClipboardList, Shield, BarChart3, FileText, Ticket } from "lucide-react";
 import { DashboardIcon, UsersIcon, GiveawayIcon, AddIcon, LogoutIcon } from "./SVGIcons";
 import TrophyIcon from "./SVGIcons/TrophyIcon";
 import SettingsIcon from "./SVGIcons/SettingsIcon";
@@ -89,6 +89,12 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen, isCollapse
         },
 
         // ── Shop ─────────────────────────────────────────────────────────────
+        {
+            title: "Coupons",
+            href: "/admin/dashboard/coupons",
+            icon: Ticket,
+            variant: "ghost"
+        },
         {
             title: "Products",
             href: "/admin/dashboard/products",

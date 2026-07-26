@@ -9,6 +9,7 @@
 
 const Order = require('../model/Order');
 const { restoreStock } = require('../controller/orderController');
+const { releaseRedemption } = require('../controller/couponController');
 const { getConfigHelper } = require('../controller/configController');
 const { emailOrderAutoCancelled } = require('./orderEmails');
 
@@ -30,6 +31,7 @@ const cancelStaleOrders = async () => {
     for (const order of stale) {
         try {
             await restoreStock(order);
+            await releaseRedemption(order.couponCode);
             order.status = 'cancelled';
             order.cancelledAt = new Date();
             order.cancelledReason = `Auto-cancelled: payment not completed within ${hours}h`;

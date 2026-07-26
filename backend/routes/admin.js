@@ -36,6 +36,13 @@ router.get('/winners', isAdmin, getWinnersForAdmin)
 router.get('/giveaway/:id', isAdmin, singleGiveaway)
 
 // Config management
+// Coupons
+const { listCoupons, createCoupon, updateCoupon, deleteCoupon } = require('../controller/couponController');
+router.get('/coupons', isAdmin, listCoupons);
+router.post('/coupons', isAdmin, createCoupon);
+router.patch('/coupons/:id', isAdmin, updateCoupon);
+router.delete('/coupons/:id', isAdmin, deleteCoupon);
+
 // CSV exports
 const { exportOrders, exportUsers, exportSubscribers } = require('../controller/exportController');
 router.get('/export/orders', isAdmin, exportOrders);

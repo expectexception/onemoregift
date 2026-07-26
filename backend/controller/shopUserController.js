@@ -7,6 +7,9 @@ const crypto = require('crypto');
 const { getConfigHelper, getISTDay, parseDays } = require('./configController');
 const { emailOrderPlaced } = require('../utils/orderEmails');
 const { restoreStock } = require('./orderController');
+const Coupon = require('../model/Coupon');
+const { evaluateCoupon } = require('../utils/couponEngine');
+const { claimRedemption, releaseRedemption, countUserUses, normalizeCode } = require('./couponController');
 
 // Get active categories
 const getCategories = async (req, res) => {
@@ -69,7 +72,7 @@ const getProduct = async (req, res) => {
 // Create Order
 const createOrder = async (req, res) => {
     try {
-        const { items, pickupStoreId, scheduledPickupTime, customerNote, paymentMethod } = req.body;
+        const { items, pickupStoreId, scheduledPickupTime, customerNote, paymentMethod, couponCode } = req.body;
         const cfg = await getConfigHelper();
 
         // Weekly drop cycle: orders can only be placed inside the configured sale
@@ -155,6 +158,7 @@ const createOrder = async (req, res) => {
 
         let subtotal = 0;
         const processedItems = [];
+        const productCategories = new Map(); // used by category-limited coupons
         const decremented = []; // for rollback on partial failure
 
         const rollback = async () => {
@@ -222,6 +226,7 @@ const createOrder = async (req, res) => {
                 decremented.push({ productId: item.productId, variantId: null, quantity: item.quantity });
             }
 
+            productCategories.set(String(baseProduct._id), baseProduct.category);
             const itemTotal = unitPrice * item.quantity;
             subtotal += itemTotal;
 
@@ -236,13 +241,49 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const total = subtotal; // can implement coupons later
+        // Coupon: the discount is recomputed here from the priced lines, so a client
+        // that posts its own "discount" cannot decide what it pays. The redemption is
+        // claimed atomically and released again if anything below fails.
+        let discount = 0;
+        let appliedCoupon = null;
+        if (couponCode) {
+            const code = normalizeCode(couponCode);
+            const coupon = await Coupon.findOne({ code });
+            if (!coupon) {
+                await rollback();
+                return res.status(400).json({ error: true, msg: 'That coupon code is not valid' });
+            }
+
+            const lines = processedItems.map(i => ({
+                productId: String(i.productId),
+                category: productCategories.get(String(i.productId)) || '',
+                totalPrice: i.totalPrice,
+            }));
+            const userUses = await countUserUses(code, req.user.data._id);
+            const verdict = evaluateCoupon(coupon, { lines, subtotal, userUses });
+            if (!verdict.ok) {
+                await rollback();
+                return res.status(400).json({ error: true, msg: verdict.reason });
+            }
+
+            const claimed = await claimRedemption(coupon._id);
+            if (!claimed) {
+                await rollback();
+                return res.status(400).json({ error: true, msg: 'This coupon has just been fully redeemed' });
+            }
+            discount = verdict.discount;
+            appliedCoupon = code;
+        }
+
+        const total = Math.max(0, subtotal - discount);
 
         try {
             const orderData = {
                 userId: req.user.data._id,
                 items: processedItems,
                 subtotal,
+                discount,
+                couponCode: appliedCoupon || undefined,
                 total,
                 pickupStoreId,
                 scheduledPickupTime: scheduledPickupTime ? new Date(scheduledPickupTime) : null,
@@ -276,6 +317,7 @@ const createOrder = async (req, res) => {
             return res.status(201).json({ error: false, data: order });
         } catch (createErr) {
             await rollback();
+            await releaseRedemption(appliedCoupon);
             throw createErr;
         }
     } catch (err) {
@@ -455,6 +497,7 @@ const cancelMyOrder = async (req, res) => {
         }
 
         await restoreStock(order);
+        await releaseRedemption(order.couponCode);
 
         order.status = 'cancelled';
         order.cancelledAt = new Date();

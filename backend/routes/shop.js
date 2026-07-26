@@ -14,6 +14,7 @@ const {
 } = require('../controller/shopUserController');
 const { listStores } = require('../controller/storeController');
 const { subscribe } = require('../controller/dropSubscriberController');
+const { validateCoupon } = require('../controller/couponController');
 const { getConfigHelper } = require('../controller/configController');
 
 // Master switch: browsing stays available, but checkout/order actions are blocked
@@ -39,6 +40,7 @@ router.get('/products/:id', getProduct);
 router.get('/stores', listStores);
 
 // Auth protected endpoints
+router.post('/coupons/validate', isAuth, validateCoupon);
 router.post('/orders', isAuth, requireShopEnabled, createOrder);
 router.post('/orders/simulate-payment', isAuth, requireShopEnabled, simulatePayment);
 router.post('/orders/:id/payment-proof', isAuth, requireShopEnabled, submitPaymentProof);

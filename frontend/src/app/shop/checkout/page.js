@@ -6,6 +6,7 @@ import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import PayOrderModal from "@/app/components/PayOrderModal";
+import CouponField from "@/app/components/CouponField";
 import { fetchSiteConfig, parseDropDays, nextDatesForDays, dropDaysLabel } from "@/app/utils/siteConfig";
 import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
 import { useAuth } from "@/app/context/AuthContext";
@@ -73,6 +74,7 @@ export default function CheckoutPage() {
     const [errorMsg, setErrorMsg] = useState("");
     const [createdOrder, setCreatedOrder] = useState(null);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [coupon, setCoupon] = useState(null);
 
     // Load Cart and Stores
     useEffect(() => {
@@ -158,6 +160,14 @@ export default function CheckoutPage() {
     }
 
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    // The server recomputes this discount when the order is placed; the value here
+    // is only for display.
+    const orderTotal = Math.max(0, subtotal - Number(coupon?.discount || 0));
+    const couponItems = cart.map((item) => ({
+        productId: item.productId,
+        variantId: item.variant ? item.variant._id : undefined,
+        quantity: item.quantity,
+    }));
     const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
     // Cart editing: keeps localStorage + navbar badge in sync
@@ -247,7 +257,8 @@ export default function CheckoutPage() {
                 pickupStoreId: selectedStoreId,
                 scheduledPickupTime: chosenDateTime.toISOString(),
                 customerNote,
-                paymentMethod
+                paymentMethod,
+                couponCode: coupon?.code || undefined,
             };
 
             const { data } = await api.post("shop/orders", payload, {
@@ -508,12 +519,33 @@ export default function CheckoutPage() {
                                         <span>{cartCount} units</span>
                                     </div>
                                     <div className="flex justify-between text-xs text-neutral-400">
+                                        <span>Subtotal</span>
+                                        <span>₹{subtotal.toLocaleString("en-IN")}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-neutral-400">
                                         <span>Tax & Coordination</span>
                                         <span className="text-emerald-500">FREE</span>
                                     </div>
+
+                                    <CouponField
+                                        items={couponItems}
+                                        applied={coupon}
+                                        onApplied={setCoupon}
+                                        disabled={!shopEnabled || saleClosed || cart.length === 0}
+                                    />
+
+                                    {coupon && (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-emerald-400">Coupon {coupon.code}</span>
+                                            <span className="text-emerald-400 font-semibold">
+                                                -₹{Number(coupon.discount).toLocaleString("en-IN")}
+                                            </span>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-between items-baseline pt-2 border-t border-neutral-900">
                                         <span className="text-sm font-bold text-white">Total Amount</span>
-                                        <span className="text-xl font-extrabold text-red-500">₹{subtotal.toLocaleString("en-IN")}</span>
+                                        <span className="text-xl font-extrabold text-red-500">₹{orderTotal.toLocaleString("en-IN")}</span>
                                     </div>
                                 </div>
 

@@ -6,6 +6,7 @@ const { ORDER_STATUSES, ORDER_STATUS_TRANSITIONS } = require('../model/Order');
 const { logAction } = require('../utils/auditLogger');
 const { emailPaymentVerified, emailPaymentRejected, emailOrderReady } = require('../utils/orderEmails');
 const crypto = require('crypto');
+const { releaseRedemption } = require('./couponController');
 
 // Restore stock for an order's items (used on refund/cancel)
 const restoreStock = async (order) => {
@@ -86,6 +87,7 @@ const updateOrderStatus = async (req, res) => {
         // Refund/cancel via this endpoint should also restore stock, same as the dedicated refund flow
         if (status === 'refunded' && prev !== 'refunded') {
             await restoreStock(doc);
+            await releaseRedemption(doc.couponCode);
             doc.paymentStatus = 'refunded';
             doc.refundedAt = new Date();
             doc.refundedBy = req.adminDoc?._id;
@@ -101,6 +103,9 @@ const updateOrderStatus = async (req, res) => {
                 });
             }
             await restoreStock(doc);
+            // Hand the coupon use back so the customer is not charged a redemption
+            // for an order that never happened
+            await releaseRedemption(doc.couponCode);
             doc.cancelledAt = new Date();
             doc.cancelledBy = req.adminDoc?._id;
         }
@@ -202,6 +207,7 @@ const refundOrder = async (req, res) => {
         }
 
         await restoreStock(doc);
+        await releaseRedemption(doc.couponCode);
 
         doc.status = 'refunded';
         doc.paymentStatus = 'refunded';
