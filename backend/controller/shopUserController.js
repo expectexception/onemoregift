@@ -73,14 +73,17 @@ const createOrder = async (req, res) => {
         const cfg = await getConfigHelper();
 
         // Weekly drop cycle: orders can only be placed inside the configured sale
-        // window, so the message has to quote the admin's days, not fixed ones.
+        // window, which is a set of weekdays plus a time of day. The message quotes
+        // the admin's own schedule and, where possible, when it next opens.
         if (cfg.weeklyDropEnabled && cfg.shopPhase !== 'sale') {
-            const days = cfg.shopPhases || {};
+            const opensAt = cfg.saleOpensAt
+                ? new Date(cfg.saleOpensAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
+                : null;
             return res.status(400).json({
                 error: true,
-                msg: `Orders open only during the sale window (${days.sale?.days || 'Fri, Sat'}). `
-                    + `Products and prices reveal on ${days.reveal?.days || 'Wed, Thu'}, `
-                    + `and pickup happens on ${days.pickup?.days || 'Mon, Tue'}.`,
+                msg: `The sale is closed right now. Orders open ${cfg.saleWindowLabel || 'on the scheduled days'}.`
+                    + (opensAt ? ` Next opening: ${opensAt} IST.` : ''),
+                saleOpensAt: cfg.saleOpensAt || null,
             });
         }
 

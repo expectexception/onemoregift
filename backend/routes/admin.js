@@ -36,6 +36,18 @@ router.get('/winners', isAdmin, getWinnersForAdmin)
 router.get('/giveaway/:id', isAdmin, singleGiveaway)
 
 // Config management
+// CSV exports
+const { exportOrders, exportUsers, exportSubscribers } = require('../controller/exportController');
+router.get('/export/orders', isAdmin, exportOrders);
+router.get('/export/users', isAdmin, exportUsers);
+router.get('/export/subscribers', isAdmin, exportSubscribers);
+
+// Drop notify list
+const { listSubscribers, notifySubscribers, removeSubscriber } = require('../controller/dropSubscriberController');
+router.get('/drop-subscribers', isAdmin, listSubscribers);
+router.post('/drop-subscribers/notify', isAdmin, notifySubscribers);
+router.delete('/drop-subscribers/:id', isAdmin, removeSubscriber);
+
 router.get('/config', isAdmin, getAdminConfig);
 router.post('/config', isAdmin, updateConfig);
 

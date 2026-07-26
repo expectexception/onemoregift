@@ -5,7 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
     Database, Trash2, AlertTriangle, RefreshCw, Shield, CheckCircle, ShoppingBag,
     LayoutTemplate, QrCode, Upload, CreditCard, Banknote, CalendarDays, Phone,
-    Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info, Megaphone, Wrench, Type, Eye,
+    Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info, Megaphone, Wrench, Type, Eye, Clock,
+    Bell, FileDown,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import api, { mediaUrl } from "@/app/utils/apiClient";
@@ -19,6 +20,7 @@ const EDITABLE_KEYS = [
     // shop & drop
     "shopEnabled", "weeklyDropEnabled", "dropRevealDays", "dropSaleDays", "dropPickupDays",
     "orderAutoCancelHours", "paymentProofWindowHours", "forcedShopPhase", "shopMaxQtyPerOrder",
+    "saleStartTime", "saleEndTime", "shopClosedDates", "shopOpenDates",
     // site-wide
     "announcementEnabled", "announcementText", "announcementLink",
     "maintenanceMode", "maintenanceMessage", "heroTitle", "heroSubtitle",
@@ -52,6 +54,20 @@ const PHASE_LABELS = {
 };
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// The schedule is defined in IST, so show it back in IST whatever the admin's own
+// timezone happens to be.
+const formatIst = (iso) => {
+    if (!iso) return "";
+    try {
+        return new Date(iso).toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata", weekday: "short", day: "numeric",
+            month: "short", hour: "numeric", minute: "2-digit",
+        }) + " IST";
+    } catch {
+        return "";
+    }
+};
 
 // ---------------------------------------------------------------- primitives
 
@@ -465,6 +481,82 @@ function ShopTab({ cfg }) {
                     hint="Customers can only schedule a pickup slot on these days."
                 />
             </Panel>
+
+            <Panel
+                title="Shopping hours"
+                desc="On a sale day, customers can only order between these times. Leave 00:00 to 23:59 to keep the whole day open."
+                icon={Clock}
+                accent="emerald"
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Ordering opens at" hint="24 hour time, IST.">
+                        <Input
+                            type="time"
+                            value={draft.saleStartTime || "00:00"}
+                            onChange={(e) => setField("saleStartTime", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                    <Field label="Ordering closes at" hint="Must be later than the opening time.">
+                        <Input
+                            type="time"
+                            value={draft.saleEndTime || "23:59"}
+                            onChange={(e) => setField("saleEndTime", e.target.value)}
+                            className="h-11 rounded-lg bg-white/[0.03] border-white/[0.08] text-white"
+                        />
+                    </Field>
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15">
+                    <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-neutral-300 leading-relaxed">
+                        Customers can order: <span className="text-emerald-400 font-bold">{draft.saleWindowLabel || "not set"}</span>
+                        <span className="block mt-1 text-neutral-500">
+                            {draft.shopOpen
+                                ? `Open right now${draft.saleClosesAt ? `, closes ${formatIst(draft.saleClosesAt)}` : ""}.`
+                                : draft.saleOpensAt
+                                    ? `Closed right now. Next opens ${formatIst(draft.saleOpensAt)}.`
+                                    : draft.phaseIsForced
+                                        ? "The stage is pinned by hand, so the schedule is being ignored."
+                                        : "Closed, and no upcoming opening is scheduled."}
+                        </span>
+                    </div>
+                </div>
+            </Panel>
+
+            <Panel
+                title="Special dates"
+                desc="Exceptions to the weekly pattern. One date per line, in YYYY-MM-DD form."
+                icon={CalendarDays}
+                accent="red"
+            >
+                <Field
+                    label="Closed on these dates"
+                    hint="Holidays or breaks. Beats everything except a manual stage pin."
+                >
+                    <textarea
+                        value={(draft.shopClosedDates || "").split(",").filter(Boolean).join("\n")}
+                        onChange={(e) => setField("shopClosedDates", e.target.value.split("\n").map(v => v.trim()).filter(Boolean).join(","))}
+                        rows={3}
+                        placeholder={"2026-08-15\n2026-10-02"}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 font-mono focus:outline-none focus:border-red-500/50 resize-none"
+                    />
+                </Field>
+                <Field
+                    label="Open on these dates"
+                    hint="One-off drops on a day that is not normally a sale day. The shopping hours above still apply."
+                >
+                    <textarea
+                        value={(draft.shopOpenDates || "").split(",").filter(Boolean).join("\n")}
+                        onChange={(e) => setField("shopOpenDates", e.target.value.split("\n").map(v => v.trim()).filter(Boolean).join(","))}
+                        rows={3}
+                        placeholder={"2026-08-20"}
+                        className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 font-mono focus:outline-none focus:border-emerald-500/50 resize-none"
+                    />
+                </Field>
+            </Panel>
+
+            <NotifyListPanel />
 
             <Panel
                 title="Order housekeeping"
@@ -968,9 +1060,186 @@ function ContactTab({ cfg }) {
 
 // ---------------------------------------------------------------- system tab
 
+// The people who asked to be told when the next drop opens, plus the one button
+// that emails all of them.
+function NotifyListPanel() {
+    const { toast } = useToast();
+    const [state, setState] = useState({ loading: true, data: [], total: 0, waiting: 0 });
+    const [sending, setSending] = useState(false);
+    const [message, setMessage] = useState("");
+
+    const load = useCallback(async () => {
+        setState((p) => ({ ...p, loading: true }));
+        try {
+            const { data } = await api.get("admin/drop-subscribers", { params: { limit: 20 }, meta: { auth: "admin" } });
+            if (!data.error) {
+                setState({ loading: false, data: data.data || [], total: data.total || 0, waiting: data.waiting || 0 });
+                return;
+            }
+        } catch (error) { /* fall through to the empty state */ }
+        setState((p) => ({ ...p, loading: false }));
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const notifyAll = async () => {
+        if (!confirm(`Email ${state.waiting} subscriber(s) that the drop is opening?`)) return;
+        setSending(true);
+        try {
+            const { data } = await api.post("admin/drop-subscribers/notify", { message }, { meta: { auth: "admin" } });
+            if (!data.error) {
+                toast({ title: "Notifications sent", description: data.msg });
+                setMessage("");
+                load();
+            } else {
+                toast({ title: "Failed", description: data.msg, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Failed", description: error?.response?.data?.msg || "Could not send notifications", variant: "destructive" });
+        } finally {
+            setSending(false);
+        }
+    };
+
+    return (
+        <Panel
+            title="Drop notify list"
+            desc="Visitors who asked to be told when the next drop opens. Signing up does not need an account, so this is your warm list for the reveal window."
+            icon={Bell}
+            accent="amber"
+        >
+            <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">On the list</div>
+                    <div className="text-2xl font-extrabold text-white mt-1">{state.total}</div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Not yet emailed</div>
+                    <div className="text-2xl font-extrabold text-amber-400 mt-1">{state.waiting}</div>
+                </div>
+            </div>
+
+            {state.loading ? (
+                <div className="text-neutral-500 text-sm animate-pulse py-6 text-center">Loading the list...</div>
+            ) : state.data.length ? (
+                <div className="rounded-xl border border-white/[0.05] overflow-hidden max-h-64 overflow-y-auto">
+                    {state.data.map((s) => (
+                        <div key={s._id} className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-white/[0.04] last:border-0">
+                            <span className="text-xs text-neutral-300 font-mono truncate">{s.email}</span>
+                            <span className="text-[10px] text-neutral-600 shrink-0">
+                                {s.productId?.name || "Any drop"}
+                                {s.notifiedAt ? " · emailed" : ""}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <p className="text-xs text-neutral-600 text-center py-6">
+                    Nobody has signed up yet. The form appears on the shop page whenever the sale is closed.
+                </p>
+            )}
+
+            <Field label="Custom message (optional)" hint="Leave blank to send the default note with the next opening time.">
+                <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={2}
+                    placeholder="This week's drop is live now, limited stock!"
+                    className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-amber-500/50 resize-none"
+                />
+            </Field>
+
+            <div className="flex gap-2">
+                <Button
+                    onClick={notifyAll}
+                    disabled={sending || !state.waiting}
+                    className="flex-1 h-11 rounded-lg bg-white text-black hover:bg-neutral-200 font-semibold text-sm disabled:opacity-40 active:scale-[0.98] transition-all"
+                >
+                    {sending ? <RefreshCw className="animate-spin w-4 h-4" /> : `Email ${state.waiting} waiting subscriber(s)`}
+                </Button>
+                <Button
+                    onClick={load}
+                    className="h-11 px-4 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08]"
+                >
+                    <RefreshCw className="w-4 h-4" />
+                </Button>
+            </div>
+        </Panel>
+    );
+}
+
+// Downloads go through the authenticated api client, so the admin token travels
+// with them rather than relying on a cookie in a plain link.
+function ExportPanel() {
+    const { toast } = useToast();
+    const [busy, setBusy] = useState("");
+
+    const download = async (kind, label) => {
+        setBusy(kind);
+        try {
+            const response = await api.get(`admin/export/${kind}`, {
+                responseType: "blob", timeout: 120000, meta: { auth: "admin" },
+            });
+            const disposition = response.headers["content-disposition"] || "";
+            const match = disposition.match(/filename="(.+)"/);
+            const filename = match ? match[1] : `omg-${kind}.csv`;
+
+            const url = window.URL.createObjectURL(response.data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: `${label} exported`, description: filename });
+        } catch (error) {
+            toast({
+                title: "Export failed",
+                description: error?.response?.data?.msg || "Could not generate the file.",
+                variant: "destructive",
+            });
+        } finally {
+            setBusy("");
+        }
+    };
+
+    const items = [
+        { kind: "orders", label: "Orders", desc: "Every order with items, totals, payment and pickup details" },
+        { kind: "users", label: "Customers", desc: "Accounts with contact details and join dates" },
+        { kind: "subscribers", label: "Notify list", desc: "Everyone waiting to hear about the next drop" },
+    ];
+
+    return (
+        <Panel
+            title="Export to CSV"
+            desc="Opens in Excel or Google Sheets. Values that could be read as formulas are escaped."
+            icon={FileDown}
+            accent="blue"
+        >
+            {items.map(({ kind, label, desc }) => (
+                <div key={kind} className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                    <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white">{label}</div>
+                        <div className="text-xs text-neutral-500 mt-0.5">{desc}</div>
+                    </div>
+                    <Button
+                        onClick={() => download(kind, label)}
+                        disabled={!!busy}
+                        className="h-9 px-4 rounded-lg bg-white/[0.05] border border-white/[0.08] text-neutral-200 hover:bg-white/[0.1] text-xs font-semibold shrink-0"
+                    >
+                        {busy === kind ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "Download"}
+                    </Button>
+                </div>
+            ))}
+        </Panel>
+    );
+}
+
 function SystemTab() {
     return (
         <>
+            <ExportPanel />
             <DbStatusPanel />
             <BackupPanel />
             <SecurityPanel />

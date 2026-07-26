@@ -13,6 +13,7 @@ const {
     cancelMyOrder
 } = require('../controller/shopUserController');
 const { listStores } = require('../controller/storeController');
+const { subscribe } = require('../controller/dropSubscriberController');
 const { getConfigHelper } = require('../controller/configController');
 
 // Master switch: browsing stays available, but checkout/order actions are blocked
@@ -31,6 +32,8 @@ const requireShopEnabled = async (req, res, next) => {
 
 // Public endpoints
 router.get('/products', listProducts);
+// Open to signed-out visitors: capturing interest during the reveal window is the point
+router.post('/notify-me', subscribe);
 router.get('/products/categories', getCategories);
 router.get('/products/:id', getProduct);
 router.get('/stores', listStores);

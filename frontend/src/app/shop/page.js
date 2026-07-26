@@ -6,10 +6,12 @@ import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import WeeklyDropStrip from "@/app/components/WeeklyDropStrip";
+import SaleCountdown from "@/app/components/SaleCountdown";
+import NotifyMeForm from "@/app/components/NotifyMeForm";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyBoxIllustration, EmptyCartIllustration } from "@/app/components/SVGIcons";
 import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
-import { fetchSiteConfig, dropDaysLabel } from "@/app/utils/siteConfig";
+import { fetchSiteConfig, invalidateSiteConfig, dropDaysLabel } from "@/app/utils/siteConfig";
 import {
     ShoppingBag,
     Search,
@@ -51,10 +53,18 @@ export default function ShopPage() {
     const [config, setConfig] = useState({ weeklyDropEnabled: false, shopPhase: "sale", shopPhases: null });
     const saleClosed = config.weeklyDropEnabled && config.shopPhase !== "sale";
 
+    const refreshConfig = useCallback(() => {
+        invalidateSiteConfig();
+        fetchSiteConfig()
+            .then((cfg) => setConfig((prev) => ({ ...prev, ...cfg })))
+            .catch(() => {});
+    }, []);
+
     useEffect(() => {
         fetchSiteConfig()
             .then((cfg) => {
                 setConfig({
+                    ...cfg,
                     weeklyDropEnabled: cfg.weeklyDropEnabled === true,
                     shopPhase: cfg.shopPhase || "sale",
                     shopPhases: cfg.shopPhases || null,
@@ -223,6 +233,14 @@ export default function ShopPage() {
                 </div>
 
                 {/* Weekly drop cycle strip */}
+                <SaleCountdown config={config} onElapsed={refreshConfig} />
+
+                {saleClosed && (
+                    <div className="mb-10 max-w-xl mx-auto p-5 rounded-2xl border border-white/[0.08] bg-white/[0.02]">
+                        <NotifyMeForm label="Tell me when the drop opens" />
+                    </div>
+                )}
+
                 {config.weeklyDropEnabled && <WeeklyDropStrip phase={config.shopPhase} shopPhases={config.shopPhases} />}
 
                 {/* Search & Main Action Controls */}

@@ -1,6 +1,7 @@
 'use strict';
 
 const SystemConfig = require('../model/SystemConfig');
+const schedule = require('../utils/shopSchedule');
 
 // Env default helpers: env acts as the default; a SystemConfig row (set from the
 // admin panel) overrides it live without a server restart.
@@ -15,47 +16,11 @@ const envStr = (name, fallback = '') => {
 };
 
 // Weekly drop cycle phases. Which weekday belongs to which phase is admin-editable
-// (dropRevealDays / dropSaleDays / dropPickupDays). Any day left unassigned falls
-// through to "prep".
-const SHOP_PHASES = {
-    pickup: { key: 'pickup', label: 'Order Pickup' },
-    reveal: { key: 'reveal', label: 'Product & Price Reveal' },
-    sale: { key: 'sale', label: 'Sale Live' },
-    prep: { key: 'prep', label: 'Preparing Orders' },
-};
+// (dropRevealDays / dropSaleDays / dropPickupDays), plus a time-of-day window and
+// one-off open/closed dates. All of the maths lives in utils/shopSchedule.
+const { SHOP_PHASES, DAY_NAMES, parseDays, formatDays, resolvePhase } = schedule;
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// "3,4" -> [3,4]; junk and out-of-range values are dropped
-const parseDays = (raw, fallback) => {
-    const days = String(raw ?? '')
-        .split(',')
-        .map(part => Number(String(part).trim()))
-        .filter(n => Number.isInteger(n) && n >= 0 && n <= 6);
-    return days.length ? [...new Set(days)] : fallback;
-};
-
-const formatDays = (days) => {
-    if (!days.length) return '-';
-    return days.map(d => DAY_NAMES[d]).join(', ');
-};
-
-const getISTDay = (date = new Date()) =>
-    new Date(date.getTime() + 5.5 * 60 * 60 * 1000).getUTCDay(); // 0=Sun … 6=Sat
-
-// Phase for a given day, using the admin-configured day map. An admin can pin the
-// phase (`forcedShopPhase`) to open a sale early or hold one back without having to
-// rewrite the weekly schedule.
-const resolvePhase = (config, date = new Date()) => {
-    const forced = String(config.forcedShopPhase || '').trim();
-    if (SHOP_PHASES[forced]) return forced;
-
-    const day = getISTDay(date);
-    if (parseDays(config.dropSaleDays, [5, 6]).includes(day)) return 'sale';
-    if (parseDays(config.dropRevealDays, [3, 4]).includes(day)) return 'reveal';
-    if (parseDays(config.dropPickupDays, [1, 2]).includes(day)) return 'pickup';
-    return 'prep';
-};
+const getISTDay = (date = new Date()) => schedule.istParts(date).weekday;
 
 // Boolean toggles: DB value ?? env default
 const BOOL_KEYS = {
@@ -116,6 +81,12 @@ const STRING_KEYS = {
     dropPickupDays: () => envStr('DROP_PICKUP_DAYS', '1,2'),
     dropRevealDays: () => envStr('DROP_REVEAL_DAYS', '3,4'),
     dropSaleDays: () => envStr('DROP_SALE_DAYS', '5,6'),
+    // Time of day the sale window opens and closes on a sale day (IST, 24h)
+    saleStartTime: () => envStr('SALE_START_TIME', '00:00'),
+    saleEndTime: () => envStr('SALE_END_TIME', '23:59'),
+    // One-off exceptions, YYYY-MM-DD, comma or newline separated
+    shopClosedDates: () => '',
+    shopOpenDates: () => '',
     // Public contact details (footer, order emails, help sections)
     contactEmail: () => envStr('CONTACT_EMAIL', 'contact@onemoregift.in'),
     contactPhone: () => envStr('CONTACT_PHONE'),
@@ -159,10 +130,18 @@ const withDerived = (config) => {
     const claimed = new Set([...pickup, ...reveal, ...sale]);
     const prep = [0, 1, 2, 3, 4, 5, 6].filter(day => !claimed.has(day));
 
+    const nextOpen = schedule.nextSaleOpen(config);
+    const closesAt = schedule.currentSaleClose(config);
+
     return {
         ...config,
         shopPhase: resolvePhase(config),
         phaseIsForced: !!SHOP_PHASES[String(config.forcedShopPhase || '').trim()],
+        shopOpen: schedule.isShopOpen(config),
+        // Countdown targets for the storefront
+        saleOpensAt: nextOpen ? nextOpen.toISOString() : null,
+        saleClosesAt: closesAt ? closesAt.toISOString() : null,
+        saleWindowLabel: schedule.describeSaleWindow(config),
         shopPhases: {
             pickup: { ...SHOP_PHASES.pickup, days: formatDays(pickup) },
             reveal: { ...SHOP_PHASES.reveal, days: formatDays(reveal) },
@@ -273,6 +252,45 @@ const updateConfig = async (req, res) => {
                 });
             }
             updates.forcedShopPhase = forced;
+        }
+
+        // Opening hours: reject anything that is not HH:mm, and refuse a window that
+        // ends before it starts, which would close the shop permanently.
+        for (const key of ['saleStartTime', 'saleEndTime']) {
+            if (updates[key] !== undefined) {
+                const value = String(updates[key] || '').trim();
+                if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(value)) {
+                    return res.status(400).json({ error: true, msg: `${key} must be a time in HH:mm (24 hour) format` });
+                }
+                updates[key] = value.padStart(5, '0');
+            }
+        }
+        if (updates.saleStartTime !== undefined || updates.saleEndTime !== undefined) {
+            const current = await getConfigHelper();
+            const start = schedule.parseTime(updates.saleStartTime ?? current.saleStartTime, 0);
+            const end = schedule.parseTime(updates.saleEndTime ?? current.saleEndTime, 1439);
+            if (end <= start) {
+                return res.status(400).json({
+                    error: true,
+                    msg: 'The sale closing time must be after the opening time. For an overnight window, run the sale across two days instead.',
+                });
+            }
+        }
+
+        // Exception dates: store only well-formed YYYY-MM-DD values, de-duplicated
+        for (const key of ['shopClosedDates', 'shopOpenDates']) {
+            if (updates[key] !== undefined) {
+                const raw = String(updates[key] || '').trim();
+                const parsed = schedule.parseDates(raw);
+                const supplied = raw.split(/[,\n]/).map(s => s.trim()).filter(Boolean);
+                if (supplied.length && parsed.length !== supplied.length) {
+                    return res.status(400).json({
+                        error: true,
+                        msg: `${key} must be dates in YYYY-MM-DD form, separated by commas or new lines`,
+                    });
+                }
+                updates[key] = parsed.join(',');
+            }
         }
 
         if (DAY_KEYS.some(key => updates[key] !== undefined)) {
