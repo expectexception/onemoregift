@@ -160,10 +160,14 @@ function MomentsAdminPage() {
                                         <td className="px-4 py-3">
                                             <div className="flex gap-2">
                                                 <button onClick={() => { setSelected(m); setNewStatus(m.status); setAdminNotes(m.adminNotes || ""); }}
+                                                    aria-label={`Review moment: ${m.caption || "untitled"}`}
+                                                    title="Review this moment"
                                                     className="text-xs px-2 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-lg text-white transition-colors">
                                                     <Eye className="w-3 h-3" />
                                                 </button>
                                                 <button onClick={() => handleDelete(m._id)}
+                                                    aria-label={`Delete moment: ${m.caption || "untitled"}`}
+                                                    title="Delete this moment"
                                                     className="text-xs px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-400 transition-colors">
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
