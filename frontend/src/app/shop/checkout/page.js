@@ -498,6 +498,7 @@ export default function CheckoutPage() {
                                                                 className="px-2 py-0.5 text-neutral-400 hover:text-white hover:bg-neutral-800 text-xs cursor-pointer">+</button>
                                                         </div>
                                                         <button type="button" onClick={() => removeItem(item.cartKey)}
+                                                            aria-label={`Remove ${item.name} from cart`}
                                                             className="text-[10px] text-neutral-600 hover:text-red-400 uppercase font-bold tracking-wider transition-colors cursor-pointer">
                                                             Remove
                                                         </button>

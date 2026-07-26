@@ -59,6 +59,7 @@ export default function CouponField({ items, applied, onApplied, disabled = fals
                 <button
                     type="button"
                     onClick={() => onApplied(null)}
+                    aria-label="Remove coupon"
                     className="text-[11px] font-bold text-neutral-400 hover:text-red-400 transition-colors flex items-center gap-1 shrink-0"
                 >
                     <X className="w-3.5 h-3.5" />
