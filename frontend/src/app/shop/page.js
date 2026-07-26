@@ -53,6 +53,10 @@ export default function ShopPage() {
     // Weekly drop cycle config
     const [config, setConfig] = useState({ weeklyDropEnabled: false, shopPhase: "sale", shopPhases: null });
     const saleClosed = config.weeklyDropEnabled && config.shopPhase !== "sale";
+    // Quote the admin's real schedule rather than a hardcoded day
+    const closedHint = config.saleWindowLabel
+        ? `Ordering opens ${config.saleWindowLabel}`
+        : "The sale is closed right now";
 
     const refreshConfig = useCallback(() => {
         invalidateSiteConfig();
@@ -149,7 +153,7 @@ export default function ShopPage() {
         if (saleClosed) {
             toast({
                 title: "Sale window closed",
-                description: `Orders open on ${dropDaysLabel(config, "sale")} only. Products & prices reveal ${dropDaysLabel(config, "reveal")}.`,
+                description: `${closedHint}. Products and prices reveal ${dropDaysLabel(config, "reveal")}.`,
                 variant: "destructive",
             });
             return;
@@ -495,10 +499,11 @@ export default function ShopPage() {
                                                     {prod.stock > 0 && (
                                                         <button
                                                             onClick={() => addToCart(prod)}
-                                                            className={`px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer ${saleClosed
+                                                            className={`px-3.5 py-2.5 rounded-xl transition-all cursor-pointer active:scale-95 ${saleClosed
                                                                 ? "bg-neutral-900 border border-neutral-800 text-neutral-600"
                                                                 : "bg-red-600 hover:bg-red-700 text-white"}`}
-                                                            title={saleClosed ? "Sale opens Friday" : "Add to Cart"}
+                                                            aria-label={`Add ${prod.name} to cart`}
+                                                            title={saleClosed ? closedHint : "Add to cart"}
                                                         >
                                                             <ShoppingCart className="w-4 h-4" />
                                                         </button>
