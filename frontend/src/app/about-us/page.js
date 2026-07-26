@@ -29,6 +29,15 @@ export default function AboutUs() {
     const [statsVisible, setStatsVisible] = useState(false);
     const { stats: platformStats } = usePlatformStats({ refreshMs: 10000 });
 
+    // Counters the admin hid are left out rather than rendered as a zero
+    const hiddenStats = platformStats.statsHidden || {};
+    const visibleStats = [
+        { key: "registeredUsers", icon: <UsersMetricSvg className="w-5 h-5" />, target: platformStats.registeredUsers, label: "Registered Users", color: "from-blue-400 to-cyan-400" },
+        { key: "totalGiveaways", icon: <GiveawayMetricSvg className="w-5 h-5" />, target: platformStats.totalGiveaways, label: "Giveaways Hosted", color: "from-purple-400 to-fuchsia-400" },
+        { key: "totalWinners", icon: <WinnerMetricSvg className="w-5 h-5" />, target: platformStats.totalWinners, label: "Gifts & Wins Delivered", color: "from-amber-400 to-orange-400" },
+        { key: "totalPrizeValue", icon: <TrustMetricSvg className="w-5 h-5" />, target: platformStats.totalPrizeValue, prefix: "₹", suffix: "+", label: "Total Prize Value", color: "from-emerald-400 to-teal-400" },
+    ].filter((s) => !hiddenStats[s.key]);
+
     useEffect(() => {
         const observer = new IntersectionObserver(
             ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
@@ -72,11 +81,14 @@ export default function AboutUs() {
                         <h3 className="text-2xl md:text-3xl font-bold text-white">Platform Highlights</h3>
                         <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing gifting community.</p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.registeredUsers} suffix="" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
-                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.totalGiveaways} suffix="" label="Giveaways Hosted" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
-                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.totalWinners} suffix="" label="Gifts & Wins Delivered" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
-                        <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.totalPrizeValue} prefix="₹" suffix="+" label="Total Prize Value" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
+                    <div className={`grid gap-4 ${
+                        visibleStats.length >= 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                            : visibleStats.length === 3 ? "grid-cols-1 sm:grid-cols-3"
+                                : visibleStats.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 max-w-xs mx-auto"
+                    }`}>
+                        {visibleStats.map((s) => (
+                            <StatCounter key={s.key} icon={s.icon} target={s.target} prefix={s.prefix || ""} suffix={s.suffix || ""} label={s.label} color={s.color} startWhen={statsVisible} />
+                        ))}
                     </div>
                 </div>
             </section>

@@ -63,6 +63,8 @@ export default function Winners() {
     const [giveaways, setGiveaways] = useState([]);
     const [loading, setLoading] = useState(true);
     const { stats } = usePlatformStats({ refreshMs: 30000 });
+    const hidden = stats.statsHidden || {};
+    const metricCount = ['completedGiveaways', 'giveawayWinners', 'verifiedDrawRate'].filter((k) => !hidden[k]).length;
 
     const fetchData = async () => {
         try {
@@ -108,10 +110,10 @@ export default function Winners() {
                     <p className="text-neutral-400 mt-4 max-w-2xl mx-auto text-base md:text-lg">
                         Celebrating real winners and delivered prizes with transparent, structured results.
                     </p>
-                    <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto">
-                        <Metric label="Giveaways Closed" value={closedCount} />
-                        <Metric label="Total Winners" value={Math.max(totalWinners, stats.giveawayWinners)} />
-                        <Metric label="Results Declared" value={`${declaredRate}%`} />
+                    <div className={`mt-8 grid grid-cols-1 gap-3 max-w-3xl mx-auto ${metricCount === 3 ? "sm:grid-cols-3" : metricCount === 2 ? "sm:grid-cols-2" : "max-w-xs"}`}>
+                        {!hidden.completedGiveaways && <Metric label="Giveaways Closed" value={closedCount} />}
+                        {!hidden.giveawayWinners && <Metric label="Total Winners" value={Math.max(totalWinners, stats.giveawayWinners)} />}
+                        {!hidden.verifiedDrawRate && <Metric label="Results Declared" value={`${declaredRate}%`} />}
                     </div>
                 </div>
             </section>

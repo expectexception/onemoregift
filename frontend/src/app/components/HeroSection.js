@@ -33,6 +33,15 @@ export default function HeroSection({ showStats = true, heroTitle = "", heroSubt
         ? { count: stats.activeGiveaways, label: "Active" }
         : { count: stats.upcomingGiveaways, label: "Upcoming" };
 
+    // Counters the admin hid are dropped, and the grid re-columns to suit whatever is left
+    const hidden = stats.statsHidden || {};
+    const visibleTiles = [
+        { key: "activeGiveaways", Icon: CheckIcon, target: liveGiveaways.count, format: formatCompactNumber, label: liveGiveaways.label },
+        { key: "totalWinners", Icon: TrophyIcon, target: stats.totalWinners, format: formatCompactNumber, label: "Winners" },
+        { key: "totalPrizeValue", Icon: VerificationIcon, target: stats.totalPrizeValue, format: formatIndianCurrency, label: "Prizes" },
+        { key: "registeredUsers", Icon: UsersIcon, target: stats.registeredUsers, format: formatCompactNumber, label: "Users" },
+    ].filter((tile) => !hidden[tile.key]);
+
     // Auto-change background images
     useEffect(() => {
         const interval = setInterval(() => {
@@ -180,11 +189,14 @@ export default function HeroSection({ showStats = true, heroTitle = "", heroSubt
                 {/* Stats */}
                 {showStats && (
                     <RevealOnScroll delayMs={290}>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
-                            <StatCard Icon={CheckIcon} target={liveGiveaways.count} format={formatCompactNumber} loading={statsLoading} label={liveGiveaways.label} />
-                            <StatCard Icon={TrophyIcon} target={stats.totalWinners} format={formatCompactNumber} loading={statsLoading} label="Winners" />
-                            <StatCard Icon={VerificationIcon} target={stats.totalPrizeValue} format={formatIndianCurrency} loading={statsLoading} label="Prizes" />
-                            <StatCard Icon={UsersIcon} target={stats.registeredUsers} format={formatCompactNumber} loading={statsLoading} label="Users" />
+                        <div className={`grid gap-3 sm:gap-6 max-w-3xl mx-auto ${
+                            visibleTiles.length >= 4 ? "grid-cols-2 lg:grid-cols-4"
+                                : visibleTiles.length === 3 ? "grid-cols-3"
+                                    : visibleTiles.length === 2 ? "grid-cols-2" : "grid-cols-1 max-w-xs"
+                        }`}>
+                            {visibleTiles.map(({ key, Icon, target, format, label }) => (
+                                <StatCard key={key} Icon={Icon} target={target} format={format} loading={statsLoading} label={label} />
+                            ))}
                         </div>
                     </RevealOnScroll>
                 )}

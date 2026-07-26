@@ -8,6 +8,7 @@ import Footer from "@/app/components/Footer";
 import WeeklyDropStrip from "@/app/components/WeeklyDropStrip";
 import SaleCountdown from "@/app/components/SaleCountdown";
 import NotifyMeForm from "@/app/components/NotifyMeForm";
+import CartDrawer from "@/app/components/CartDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyBoxIllustration, EmptyCartIllustration } from "@/app/components/SVGIcons";
 import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
@@ -178,6 +179,7 @@ export default function ShopPage() {
                 name: product.name,
                 image: product.images?.[0] || "",
                 price: product.discountedPrice || product.basePrice,
+                originalPrice: product.basePrice,
                 variant: variant ? { _id: variant._id, name: variant.name } : null,
                 quantity: 1,
                 maxStock: limitStock
@@ -203,6 +205,13 @@ export default function ShopPage() {
             updated[itemIndex].quantity = newQty;
         }
         updateCart(updated);
+    };
+
+    const removeFromCart = (cartKey) => updateCart(cart.filter((item) => item.cartKey !== cartKey));
+
+    const clearCart = () => {
+        updateCart([]);
+        toast({ title: "Cart cleared" });
     };
 
     const cartSubtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -373,14 +382,15 @@ export default function ShopPage() {
                 {loading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                            <div key={n} className="rounded-2xl border border-neutral-900 bg-neutral-950/50 p-4 animate-pulse h-96 flex flex-col justify-between">
-                                <div className="bg-neutral-900 rounded-xl h-48 w-full" />
+                            <div key={n} className="rounded-2xl border border-white/[0.05] bg-white/[0.015] p-4 h-96 flex flex-col justify-between animate-rise-in"
+                                style={{ animationDelay: `${n * 45}ms` }}>
+                                <div className="skeleton rounded-xl h-48 w-full" />
                                 <div className="space-y-3 mt-4">
-                                    <div className="h-4 bg-neutral-900 rounded w-1/3" />
-                                    <div className="h-6 bg-neutral-900 rounded w-3/4" />
-                                    <div className="h-4 bg-neutral-900 rounded w-1/2" />
+                                    <div className="skeleton h-4 rounded w-1/3" />
+                                    <div className="skeleton h-6 rounded w-3/4" />
+                                    <div className="skeleton h-4 rounded w-1/2" />
                                 </div>
-                                <div className="h-10 bg-neutral-900 rounded-xl mt-4 w-full" />
+                                <div className="skeleton h-10 rounded-xl mt-4 w-full" />
                             </div>
                         ))}
                     </div>
@@ -393,14 +403,18 @@ export default function ShopPage() {
                 ) : (
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {products.map((prod) => {
+                            {products.map((prod, idx) => {
                                 const hasDiscount = prod.discountedPrice && prod.discountedPrice < prod.basePrice;
                                 const originalPrice = prod.basePrice;
                                 const currentPrice = hasDiscount ? prod.discountedPrice : prod.basePrice;
                                 const isLowStock = prod.stock > 0 && prod.stock <= prod.lowStockThreshold;
 
                                 return (
-                                    <div key={prod._id} className="premium-card rounded-2xl flex flex-col h-full overflow-hidden border border-neutral-900 bg-neutral-950">
+                                    <div
+                                        key={prod._id}
+                                        style={{ animationDelay: `${Math.min(idx, 11) * 55}ms` }}
+                                        className="premium-card rounded-2xl flex flex-col h-full overflow-hidden border border-neutral-900 bg-neutral-950 animate-rise-in transition-[transform,border-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-red-500/25 hover:shadow-[0_18px_40px_-18px_rgba(239,68,68,0.35)]"
+                                    >
                                         {/* Image Frame */}
                                         <div className="relative group/img aspect-square bg-neutral-950 overflow-hidden cursor-pointer" onClick={() => router.push(`/shop/${prod._id}`)}>
                                             {prod.images?.[0] && !brokenImages.has(prod._id) ? (
@@ -523,125 +537,18 @@ export default function ShopPage() {
 
             <Footer />
 
-            {/* Cart Slide-over Drawer */}
-            {cartOpen && (
-                <div className="fixed inset-0 z-50 overflow-hidden">
-                    {/* Backdrop */}
-                    <div 
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
-                        onClick={() => setCartOpen(false)}
-                    />
-
-                    <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-                        <div className="w-screen max-w-md bg-neutral-950 border-l border-neutral-800 shadow-2xl flex flex-col">
-                            {/* Header */}
-                            <div className="px-6 py-5 border-b border-neutral-900 flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <ShoppingCart className="w-5 h-5 text-red-500" />
-                                    Shopping Cart
-                                </h2>
-                                <button 
-                                    onClick={() => setCartOpen(false)}
-                                    className="text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            {/* Cart List */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                                {cart.length === 0 ? (
-                                    <div className="text-center py-16 text-neutral-500 space-y-4">
-                                        <EmptyCartIllustration className="w-24 h-24 mx-auto" />
-                                        <p className="text-sm font-medium">Your cart is empty</p>
-                                        <button 
-                                            onClick={() => setCartOpen(false)}
-                                            className="text-xs text-red-500 hover:underline tracking-wider font-bold"
-                                        >
-                                            BROWSE PRODUCTS
-                                        </button>
-                                    </div>
-                                ) : (
-                                    cart.map((item) => (
-                                        <div key={item.cartKey} className="flex gap-4 p-3 rounded-xl bg-neutral-900/40 border border-neutral-900">
-                                            {/* Thumbnail */}
-                                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-neutral-950 border border-neutral-850 flex-shrink-0">
-                                                {item.image ? (
-                                                    <img 
-                                                        src={mediaUrl(item.image)} 
-                                                        alt={item.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-neutral-800 bg-neutral-900">
-                                                        <ShoppingBag className="w-6 h-6" />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Details */}
-                                            <div className="flex-grow flex flex-col justify-between">
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-white line-clamp-1">{item.name}</h4>
-                                                    {item.variant && (
-                                                        <span className="text-[10px] text-red-400 font-semibold bg-red-950/20 px-1.5 py-0.5 rounded border border-red-900/30">
-                                                            {item.variant.name}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center justify-between mt-2">
-                                                    <span className="text-sm font-extrabold text-neutral-300">₹{item.price.toLocaleString("en-IN")}</span>
-                                                    
-                                                    {/* Qty controls */}
-                                                    <div className="flex items-center border border-neutral-800 rounded-lg overflow-hidden bg-neutral-950">
-                                                        <button 
-                                                            onClick={() => updateQuantity(item.cartKey, -1)}
-                                                            className="p-1.5 hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                                                        >
-                                                            <Minus className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <span className="px-2.5 text-xs font-bold text-white select-none">{item.quantity}</span>
-                                                        <button 
-                                                            onClick={() => updateQuantity(item.cartKey, 1)}
-                                                            className="p-1.5 hover:bg-neutral-900 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                                                        >
-                                                            <Plus className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            {/* Footer */}
-                            {cart.length > 0 && (
-                                <div className="p-6 border-t border-neutral-900 bg-neutral-950 space-y-4">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-neutral-400">Subtotal</span>
-                                        <span className="text-lg font-bold text-white">₹{cartSubtotal.toLocaleString("en-IN")}</span>
-                                    </div>
-                                    <p className="text-[10px] text-neutral-500 leading-normal">
-                                        * Taxes and pickup coordination are included. Claim and pick up from selected stores only.
-                                    </p>
-                                    <button
-                                        onClick={() => {
-                                            setCartOpen(false);
-                                            router.push("/shop/checkout");
-                                        }}
-                                        className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                                    >
-                                        Proceed to Checkout
-                                        <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CartDrawer
+                open={cartOpen}
+                onClose={() => setCartOpen(false)}
+                items={cart}
+                onQuantityChange={updateQuantity}
+                onRemove={removeFromCart}
+                onClear={clearCart}
+                onCheckout={() => { setCartOpen(false); router.push("/shop/checkout"); }}
+                saleClosed={saleClosed}
+                saleWindowLabel={config.saleWindowLabel}
+                maxQtyPerOrder={config.shopMaxQtyPerOrder}
+            />
         </div>
     );
 }

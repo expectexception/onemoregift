@@ -10,6 +10,7 @@ const SurpriseRequest = require('../model/SurpriseRequest')
 const HappyMoment = require('../model/HappyMoment')
 const Order = require('../model/Order')
 const { getConfigHelper } = require('./configController')
+const { applyOverrides } = require('../utils/statOverrides')
 // env is loaded by utils/loadEnv at startup
 
 const JWT_SECRET = process.env.JWT_SECRET
@@ -654,8 +655,8 @@ const getPublicStats = async (req, res) => {
             ? Math.round((giveawaysWithWinners / completedGiveaways) * 100)
             : 0;
 
-        return res.status(200).json({
-            error: false,
+        // The admin can pin any counter to a fixed number or hide it entirely
+        const payload = applyOverrides({
             registeredUsers,
             totalUsers,
             totalGiveaways,
@@ -671,6 +672,11 @@ const getPublicStats = async (req, res) => {
             giveawaysWithWinners,
             verifiedDrawRate,
             verifiedLegit: verifiedDrawRate,
+        }, config.statOverrides);
+
+        return res.status(200).json({
+            error: false,
+            ...payload,
             updatedAt: new Date().toISOString(),
         });
     } catch (error) {

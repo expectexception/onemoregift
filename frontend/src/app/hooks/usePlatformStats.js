@@ -17,6 +17,7 @@ const DEFAULT_STATS = {
     ordersCompleted: 0,
     totalPrizeValue: 0,
     verifiedDrawRate: 0,
+    statsHidden: {},
     updatedAt: null,
 };
 
@@ -34,6 +35,8 @@ const normalizeStats = (data = {}) => ({
     ordersCompleted: Number(data.ordersCompleted || 0),
     totalPrizeValue: Number(data.totalPrizeValue || 0),
     verifiedDrawRate: Number(data.verifiedDrawRate ?? data.verifiedLegit ?? 0),
+    // Counters the admin chose to hide; components skip those tiles entirely
+    statsHidden: data.statsHidden && typeof data.statsHidden === "object" ? data.statsHidden : {},
     updatedAt: data.updatedAt || null,
 });
 

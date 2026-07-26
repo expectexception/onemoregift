@@ -6,7 +6,7 @@ import {
     Database, Trash2, AlertTriangle, RefreshCw, Shield, CheckCircle, ShoppingBag,
     LayoutTemplate, QrCode, Upload, CreditCard, Banknote, CalendarDays, Phone,
     Settings2, Save, Sparkles, Gift, Camera, Lock, Store, Info, Megaphone, Wrench, Type, Eye, Clock,
-    Bell, FileDown,
+    Bell, FileDown, BarChart3,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import api, { mediaUrl } from "@/app/utils/apiClient";
@@ -34,6 +34,8 @@ const EDITABLE_KEYS = [
     "homeShowStats", "homeShowSteps", "homeShowMoments", "homeShowShop",
     // contact
     "contactEmail", "contactPhone", "contactWhatsapp", "businessAddress", "instagramUrl",
+    // counters
+    "statOverrides",
 ];
 
 const TABS = [
@@ -41,6 +43,7 @@ const TABS = [
     { key: "payments", label: "Payments", icon: CreditCard },
     { key: "features", label: "Features", icon: Sparkles },
     { key: "site", label: "Site & Content", icon: Megaphone },
+    { key: "stats", label: "Counters", icon: BarChart3 },
     { key: "homepage", label: "Homepage", icon: LayoutTemplate },
     { key: "contact", label: "Contact", icon: Phone },
     { key: "system", label: "Data & Security", icon: Shield },
@@ -228,7 +231,15 @@ function useConfigDraft() {
 
     const changedKeys = useMemo(() => {
         if (!draft || !saved) return [];
-        return EDITABLE_KEYS.filter((key) => String(draft[key] ?? "") !== String(saved[key] ?? ""));
+        return EDITABLE_KEYS.filter((key) => {
+            const a = draft[key];
+            const b = saved[key];
+            // statOverrides is an object, so compare structurally rather than as a string
+            if (typeof a === "object" || typeof b === "object") {
+                return JSON.stringify(a ?? null) !== JSON.stringify(b ?? null);
+            }
+            return String(a ?? "") !== String(b ?? "");
+        });
     }, [draft, saved]);
 
     const save = useCallback(async () => {
@@ -320,6 +331,7 @@ function AdminSettings() {
                         {tab === "payments" && <PaymentsTab cfg={cfg} />}
                         {tab === "features" && <FeaturesTab cfg={cfg} />}
                         {tab === "site" && <SiteTab cfg={cfg} />}
+                        {tab === "stats" && <StatsTab cfg={cfg} />}
                         {tab === "homepage" && <HomepageTab cfg={cfg} />}
                         {tab === "contact" && <ContactTab cfg={cfg} />}
                         {tab === "system" && <SystemTab />}
@@ -979,6 +991,153 @@ function SiteTab({ cfg }) {
                         className="w-full rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm p-3 focus:outline-none focus:border-fuchsia-500/50 resize-none"
                     />
                 </Field>
+            </Panel>
+        </>
+    );
+}
+
+const STAT_ROWS = [
+    { key: "registeredUsers", label: "Registered users", where: "Home hero, About" },
+    { key: "totalGiveaways", label: "Giveaways hosted", where: "About" },
+    { key: "activeGiveaways", label: "Active giveaways", where: "Home hero" },
+    { key: "completedGiveaways", label: "Giveaways closed", where: "Winners" },
+    { key: "totalWinners", label: "Gifts and wins delivered", where: "Home hero, About" },
+    { key: "giveawayWinners", label: "Giveaway winners", where: "Winners" },
+    { key: "giftsDelivered", label: "Surprise gifts delivered", where: "Counts toward wins" },
+    { key: "momentsShared", label: "Happy moments shared", where: "Counts toward wins" },
+    { key: "ordersCompleted", label: "Shop orders collected", where: "Reports" },
+    { key: "totalPrizeValue", label: "Total prize value in ₹", where: "Home hero, About" },
+    { key: "verifiedDrawRate", label: "Results declared %", where: "Winners" },
+];
+
+const MODES = [
+    { value: "auto", label: "Live" },
+    { value: "manual", label: "Manual" },
+    { value: "hidden", label: "Hidden" },
+];
+
+// One counter's control row. The real figure is always shown beside the control so
+// a pinned number can be compared against the truth at a glance.
+function StatRow({ row, entry, liveValue, onChange }) {
+    const mode = entry?.mode || "auto";
+
+    return (
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-3">
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white">{row.label}</div>
+                    <div className="text-xs text-neutral-600 mt-0.5">Shown on: {row.where}</div>
+                </div>
+                <div className="text-right shrink-0">
+                    <div className="text-[10px] uppercase tracking-wider text-neutral-600 font-bold">Live now</div>
+                    <div className="text-sm font-mono text-neutral-300">
+                        {liveValue === undefined ? "-" : Number(liveValue).toLocaleString("en-IN")}
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-lg border border-white/[0.08] overflow-hidden">
+                    {MODES.map((m) => (
+                        <button
+                            key={m.value}
+                            type="button"
+                            onClick={() => onChange(row.key, m.value, entry?.value)}
+                            className={`px-3 h-9 text-[11px] font-bold transition-colors ${
+                                mode === m.value
+                                    ? m.value === "hidden" ? "bg-neutral-700 text-white"
+                                        : m.value === "manual" ? "bg-amber-600 text-white"
+                                            : "bg-emerald-600 text-white"
+                                    : "bg-transparent text-neutral-500 hover:text-white"
+                            }`}
+                        >
+                            {m.label}
+                        </button>
+                    ))}
+                </div>
+
+                {mode === "manual" && (
+                    <Input
+                        type="number"
+                        min="0"
+                        value={entry?.value ?? ""}
+                        onChange={(e) => onChange(row.key, "manual", e.target.value)}
+                        placeholder="Enter the number to show"
+                        className="h-9 w-44 rounded-lg bg-white/[0.03] border-white/[0.08] text-white text-sm"
+                    />
+                )}
+                {mode === "hidden" && (
+                    <span className="text-[11px] text-neutral-500">This tile is removed from the page.</span>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function StatsTab({ cfg }) {
+    const { draft, setField } = cfg;
+    const [live, setLive] = useState(null);
+
+    useEffect(() => {
+        api.get("admin/stats")
+            .then(({ data }) => { if (!data.error) setLive(data); })
+            .catch(() => {});
+    }, []);
+
+    const overrides = draft.statOverrides && typeof draft.statOverrides === "object" ? draft.statOverrides : {};
+
+    const change = (key, mode, value) => {
+        const next = { ...overrides };
+        if (mode === "auto") {
+            delete next[key];
+        } else if (mode === "manual") {
+            next[key] = { mode: "manual", value: value === "" ? "" : Number(value) };
+        } else {
+            next[key] = { mode: "hidden" };
+        }
+        setField("statOverrides", next);
+    };
+
+    const pinned = Object.values(overrides).filter(e => e?.mode === "manual").length;
+    const hiddenCount = Object.values(overrides).filter(e => e?.mode === "hidden").length;
+
+    return (
+        <>
+            <Panel
+                title="Public counters"
+                desc="Every number shown to visitors. Leave a counter on Live to read the real database figure, pin it to a fixed number, or hide the tile completely."
+                icon={BarChart3}
+                accent="blue"
+            >
+                {(pinned > 0 || hiddenCount > 0) && (
+                    <div className="flex gap-3 p-4 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-neutral-300 leading-relaxed">
+                            {pinned > 0 && <>{pinned} counter{pinned === 1 ? " is" : "s are"} pinned to a manual number. </>}
+                            {hiddenCount > 0 && <>{hiddenCount} {hiddenCount === 1 ? "is" : "are"} hidden. </>}
+                            A pinned number stops reflecting reality, so it is worth revisiting when the real figures catch up.
+                        </p>
+                    </div>
+                )}
+
+                <div className="space-y-3">
+                    {STAT_ROWS.map((row) => (
+                        <StatRow
+                            key={row.key}
+                            row={row}
+                            entry={overrides[row.key]}
+                            liveValue={live?.[row.key]}
+                            onChange={change}
+                        />
+                    ))}
+                </div>
+
+                <Button
+                    onClick={() => setField("statOverrides", {})}
+                    className="w-full h-10 rounded-lg bg-white/[0.04] border border-white/[0.08] text-neutral-300 hover:bg-white/[0.08] text-xs font-semibold"
+                >
+                    Reset every counter to Live
+                </Button>
             </Panel>
         </>
     );

@@ -2,6 +2,7 @@
 
 const SystemConfig = require('../model/SystemConfig');
 const schedule = require('../utils/shopSchedule');
+const { normalizeOverrides } = require('../utils/statOverrides');
 
 // Env default helpers: env acts as the default; a SystemConfig row (set from the
 // admin panel) overrides it live without a server restart.
@@ -108,6 +109,12 @@ const STRING_KEYS = {
     heroSubtitle: () => '',
 };
 
+// Object settings: stored whole, validated on write
+const OBJECT_KEYS = {
+    // Per-counter display mode, see utils/statOverrides
+    statOverrides: () => ({}),
+};
+
 // In-process cache: config is read on every hot request (public config endpoint,
 // requireShopEnabled middleware, order creation, giveaway listing). Without it every
 // read was a full DB roundtrip (500-1800ms against Atlas in the logs).
@@ -171,6 +178,10 @@ const getConfigHelper = async () => {
     for (const [key, getDefault] of Object.entries(NUMBER_KEYS)) {
         const stored = Number(byKey.get(key));
         config[key] = Number.isFinite(stored) && stored >= 0 ? stored : getDefault();
+    }
+    for (const [key, getDefault] of Object.entries(OBJECT_KEYS)) {
+        const stored = byKey.get(key);
+        config[key] = stored && typeof stored === 'object' ? stored : getDefault();
     }
 
     // Read-only / computed values
@@ -337,6 +348,14 @@ const updateConfig = async (req, res) => {
                     );
                 }
             }
+        }
+
+        if (updates.statOverrides !== undefined) {
+            await SystemConfig.findOneAndUpdate(
+                { key: 'statOverrides' },
+                { value: normalizeOverrides(updates.statOverrides) },
+                { upsert: true, new: true }
+            );
         }
 
         invalidateConfigCache();
