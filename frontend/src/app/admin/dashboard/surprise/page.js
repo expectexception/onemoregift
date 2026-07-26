@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import MediaReviewer from "@/app/components/MediaReviewer";
 import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
 import { Gift, Clock, CheckCircle, XCircle, AlertTriangle, Eye, Filter, Search, FileText } from "lucide-react";
 
@@ -213,34 +214,14 @@ function SurpriseAdminPage() {
                                 {selected.assignedGift && <InfoRow label="Assigned Gift" value={selected.assignedGift?.name || "Yes"} />}
                             </div>
 
-                            {selected.documents?.length > 0 ? (
-                                <div className="mb-6">
-                                    <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-2">
-                                        Proof Documents ({selected.documents.length})
-                                    </p>
-                                    <div className="flex gap-2 overflow-x-auto pb-1">
-                                        {selected.documents.map((url, i) => {
-                                            const isPdf = /\.pdf($|\?)/i.test(url);
-                                            return (
-                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                                                    {isPdf ? (
-                                                        <div className="w-24 h-24 rounded-xl border border-white/10 hover:border-red-500/40 transition-colors flex flex-col items-center justify-center gap-1 bg-white/[0.02] text-neutral-400">
-                                                            <FileText className="w-6 h-6" />
-                                                            <span className="text-[9px] font-bold">Doc {i + 1}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <img src={url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/10 hover:border-red-500/40 transition-colors" />
-                                                    )}
-                                                </a>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="mb-6">
-                                    <InfoRow label="Documents" value="None uploaded" />
-                                </div>
-                            )}
+                            <div className="mb-6">
+                                <MediaReviewer
+                                    items={selected.documents}
+                                    label={`Proof documents (${selected.documents?.length || 0})`}
+                                    accent="amber"
+                                    emptyText="No proof documents were submitted with this application."
+                                />
+                            </div>
 
                             {/* Timeline */}
                             {selected.verificationTimeline?.length > 0 && (

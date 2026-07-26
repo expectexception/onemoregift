@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import api, { mediaUrl } from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import MediaReviewer from "@/app/components/MediaReviewer";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
@@ -290,14 +291,10 @@ function OrdersAdminPage() {
                                         </p>
                                     )}
                                     {Array.isArray(selected.paymentProofs) && selected.paymentProofs.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2">
-                                            {selected.paymentProofs.map((p, idx) => (
-                                                <a key={idx} href={mediaUrl(p.url)} target="_blank" rel="noopener noreferrer"
-                                                    className="block w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-neutral-900 hover:border-amber-500/50 transition-all">
-                                                    <img src={mediaUrl(p.url)} alt={`Payment proof ${idx + 1}`} className="w-full h-full object-cover" />
-                                                </a>
-                                            ))}
-                                        </div>
+                                        <MediaReviewer
+                                            items={selected.paymentProofs}
+                                            accent="amber"
+                                        />
                                     ) : (
                                         <p className="text-xs text-neutral-500">No proof screenshots attached.</p>
                                     )}

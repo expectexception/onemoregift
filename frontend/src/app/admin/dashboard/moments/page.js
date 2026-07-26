@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
+import MediaReviewer from "@/app/components/MediaReviewer";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import { EmptyGalleryIllustration } from "@/app/components/SVGIcons";
@@ -196,24 +197,22 @@ function MomentsAdminPage() {
                             <p className="text-sm text-neutral-400 mb-4">{selected.caption}</p>
                             <p className="text-xs text-neutral-500 mb-6">{selected.description}</p>
 
-                            {selected.media?.length > 0 && (
-                                <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                                    {selected.media.map((m, i) => (
-                                        <img key={i} src={m.url} alt="" className="w-24 h-24 rounded-xl object-cover border border-white/10 shrink-0" />
-                                    ))}
-                                </div>
-                            )}
+                            <div className="mb-4">
+                                <MediaReviewer
+                                    items={selected.media}
+                                    label="Shared media"
+                                    emptyText="No media attached to this moment."
+                                />
+                            </div>
 
-                            {selected.proofs?.length > 0 && (
-                                <div className="mb-4">
-                                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2">Verification Proofs (private)</p>
-                                    <div className="flex gap-2 overflow-x-auto pb-1">
-                                        {selected.proofs.map((url, i) => (
-                                            <img key={i} src={url} alt="" className="w-20 h-20 rounded-xl object-cover border border-amber-500/20 shrink-0" />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            <div className="mb-4">
+                                <MediaReviewer
+                                    items={selected.proofs}
+                                    label="Verification proofs (private)"
+                                    accent="amber"
+                                    emptyText="No verification proof was submitted."
+                                />
+                            </div>
 
                             {selected.reports?.length > 0 && (
                                 <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-xl">
