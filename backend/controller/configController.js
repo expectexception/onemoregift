@@ -124,16 +124,25 @@ const invalidateConfigCache = () => {
 
 // Phase and the day labels derived from it are time-dependent, so they are stamped
 // onto every read rather than cached with the rest of the config.
-const withDerived = (config) => ({
-    ...config,
-    shopPhase: resolvePhase(config),
-    shopPhases: {
-        pickup: { ...SHOP_PHASES.pickup, days: formatDays(parseDays(config.dropPickupDays, [1, 2])) },
-        reveal: { ...SHOP_PHASES.reveal, days: formatDays(parseDays(config.dropRevealDays, [3, 4])) },
-        sale: { ...SHOP_PHASES.sale, days: formatDays(parseDays(config.dropSaleDays, [5, 6])) },
-        prep: { ...SHOP_PHASES.prep, days: 'Remaining days' },
-    },
-});
+const withDerived = (config) => {
+    const pickup = parseDays(config.dropPickupDays, [1, 2]);
+    const reveal = parseDays(config.dropRevealDays, [3, 4]);
+    const sale = parseDays(config.dropSaleDays, [5, 6]);
+    // Prep isn't configured directly — it's whatever the other three windows leave over
+    const claimed = new Set([...pickup, ...reveal, ...sale]);
+    const prep = [0, 1, 2, 3, 4, 5, 6].filter(day => !claimed.has(day));
+
+    return {
+        ...config,
+        shopPhase: resolvePhase(config),
+        shopPhases: {
+            pickup: { ...SHOP_PHASES.pickup, days: formatDays(pickup) },
+            reveal: { ...SHOP_PHASES.reveal, days: formatDays(reveal) },
+            sale: { ...SHOP_PHASES.sale, days: formatDays(sale) },
+            prep: { ...SHOP_PHASES.prep, days: formatDays(prep) },
+        },
+    };
+};
 
 const getConfigHelper = async () => {
     if (_configCache && Date.now() - _configCacheAt < CONFIG_CACHE_TTL_MS) {
