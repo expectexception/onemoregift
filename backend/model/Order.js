@@ -38,11 +38,22 @@ const orderSchema = new Schema({
     couponCode: { type: String },
 
     // Payment
-    paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
+    paymentStatus: { type: String, enum: ['pending', 'verification_pending', 'paid', 'failed', 'refunded'], default: 'pending' },
     paymentMethod: { type: String },
     paymentGateway: { type: String },
     paymentId: { type: String }, // gateway transaction ID
     paidAt: { type: Date },
+
+    // Manual QR/UPI payment — user uploads proof, admin verifies
+    paymentProofs: [{
+        url: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now },
+    }],
+    paymentReference: { type: String }, // UPI transaction ID entered by user
+    paymentProofSubmittedAt: { type: Date },
+    paymentVerifiedAt: { type: Date },
+    paymentVerifiedBy: { type: Schema.Types.ObjectId, ref: 'admins' },
+    paymentRejectedReason: { type: String },
 
     // Pickup
     pickupStoreId: { type: Schema.Types.ObjectId, ref: 'Store' },

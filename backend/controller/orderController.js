@@ -4,6 +4,7 @@ const Order = require('../model/Order');
 const Product = require('../model/Product');
 const { ORDER_STATUSES, ORDER_STATUS_TRANSITIONS } = require('../model/Order');
 const { logAction } = require('../utils/auditLogger');
+const { emailPaymentVerified, emailPaymentRejected, emailOrderReady } = require('../utils/orderEmails');
 const crypto = require('crypto');
 
 // Restore stock for an order's items (used on refund/cancel)
@@ -105,6 +106,10 @@ const updateOrderStatus = async (req, res) => {
 
         await doc.save();
 
+        if (status === 'ready_for_pickup' && prev !== 'ready_for_pickup') {
+            emailOrderReady(doc).catch(() => {});
+        }
+
         await logAction({
             action: 'order.status_update',
             category: 'order',
@@ -188,6 +193,61 @@ const refundOrder = async (req, res) => {
     }
 };
 
+// PATCH /api/v1/admin/orders/:id/verify-payment — approve/reject a QR payment proof
+const verifyPayment = async (req, res) => {
+    try {
+        const { approve, note } = req.body;
+        const doc = await Order.findById(req.params.id);
+        if (!doc) return res.status(404).json({ error: true, msg: 'Order not found' });
+
+        if (doc.paymentStatus !== 'verification_pending') {
+            return res.status(400).json({ error: true, msg: 'No payment verification is pending on this order' });
+        }
+
+        if (approve === true) {
+            doc.paymentStatus = 'paid';
+            doc.status = 'paid';
+            doc.paidAt = new Date();
+            doc.paymentVerifiedAt = new Date();
+            doc.paymentVerifiedBy = req.adminDoc?._id;
+            if (!doc.pickupCode) {
+                doc.pickupCode = crypto.randomBytes(6).toString('hex').toUpperCase();
+            }
+            if (note) doc.adminNote = note;
+            await doc.save();
+
+            for (const item of doc.items) {
+                Product.findByIdAndUpdate(item.productId, { $inc: { totalOrders: item.quantity } }).exec().catch(() => {});
+            }
+            emailPaymentVerified(doc).catch(() => {});
+        } else {
+            doc.paymentStatus = 'failed';
+            doc.paymentRejectedReason = String(note || 'Payment proof could not be verified').slice(0, 300);
+            await doc.save();
+            emailPaymentRejected(doc).catch(() => {});
+        }
+
+        await logAction({
+            action: approve === true ? 'order.payment_approved' : 'order.payment_rejected',
+            category: 'order',
+            admin: req.user,
+            adminDoc: req.adminDoc,
+            entityType: 'Order',
+            entityId: doc._id,
+            newValue: { approve: approve === true, note },
+            req,
+        });
+
+        return res.json({
+            error: false,
+            msg: approve === true ? 'Payment verified — order confirmed' : 'Payment proof rejected',
+            data: doc,
+        });
+    } catch (err) {
+        return res.status(500).json({ error: true, msg: 'Failed to verify payment' });
+    }
+};
+
 // GET /api/v1/admin/orders/stats
 const getOrderStats = async (req, res) => {
     try {
@@ -206,4 +266,4 @@ const getOrderStats = async (req, res) => {
     }
 };
 
-module.exports = { listOrders, getOrder, updateOrderStatus, verifyPickup, refundOrder, getOrderStats };
+module.exports = { listOrders, getOrder, updateOrderStatus, verifyPickup, verifyPayment, refundOrder, getOrderStats, restoreStock };

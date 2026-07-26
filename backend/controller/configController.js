@@ -2,29 +2,177 @@
 
 const SystemConfig = require('../model/SystemConfig');
 
+// Env default helpers — env acts as the default; a SystemConfig row (set from the
+// admin panel) overrides it live without a server restart.
+const envBool = (name, fallback) => {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return fallback;
+    return String(raw).toLowerCase() === 'true';
+};
+const envStr = (name, fallback = '') => {
+    const raw = process.env[name];
+    return raw === undefined ? fallback : String(raw).trim();
+};
+
+// Weekly drop cycle phases. Which weekday belongs to which phase is admin-editable
+// (dropRevealDays / dropSaleDays / dropPickupDays) — any day left unassigned falls
+// through to "prep".
+const SHOP_PHASES = {
+    pickup: { key: 'pickup', label: 'Order Pickup' },
+    reveal: { key: 'reveal', label: 'Product & Price Reveal' },
+    sale: { key: 'sale', label: 'Sale Live' },
+    prep: { key: 'prep', label: 'Preparing Orders' },
+};
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// "3,4" -> [3,4]; junk and out-of-range values are dropped
+const parseDays = (raw, fallback) => {
+    const days = String(raw ?? '')
+        .split(',')
+        .map(part => Number(String(part).trim()))
+        .filter(n => Number.isInteger(n) && n >= 0 && n <= 6);
+    return days.length ? [...new Set(days)] : fallback;
+};
+
+const formatDays = (days) => {
+    if (!days.length) return '—';
+    return days.map(d => DAY_NAMES[d]).join(', ');
+};
+
+const getISTDay = (date = new Date()) =>
+    new Date(date.getTime() + 5.5 * 60 * 60 * 1000).getUTCDay(); // 0=Sun … 6=Sat
+
+// Phase for a given day, using the admin-configured day map.
+const resolvePhase = (config, date = new Date()) => {
+    const day = getISTDay(date);
+    if (parseDays(config.dropSaleDays, [5, 6]).includes(day)) return 'sale';
+    if (parseDays(config.dropRevealDays, [3, 4]).includes(day)) return 'reveal';
+    if (parseDays(config.dropPickupDays, [1, 2]).includes(day)) return 'pickup';
+    return 'prep';
+};
+
+// Boolean toggles: DB value ?? env default
+const BOOL_KEYS = {
+    showUpcoming: () => true,
+    showEnded: () => false,
+    requireSurpriseProof: () => true,
+    requireMomentProof: () => true,
+    homeShowSteps: () => true,
+    homeShowStats: () => true,
+    homeShowMoments: () => true,
+    homeShowShop: () => true,
+    shopEnabled: () => envBool('ENABLE_SHOP', true),
+    paymentGatewayEnabled: () => envBool('ENABLE_PAYMENT_GATEWAY', envBool('ENABLE_REAL_PAYMENTS', false)),
+    qrPaymentEnabled: () => envBool('ENABLE_QR_PAYMENTS', true),
+    codEnabled: () => envBool('ENABLE_COD', true),
+    weeklyDropEnabled: () => envBool('SHOP_WEEKLY_DROP', true),
+    surpriseOneActivePerUser: () => envBool('SURPRISE_ONE_ACTIVE_PER_USER', true),
+    // Whole-feature kill switches
+    giveawaysEnabled: () => envBool('ENABLE_GIVEAWAYS', true),
+    momentsEnabled: () => envBool('ENABLE_MOMENTS', true),
+    surpriseEnabled: () => envBool('ENABLE_SURPRISE', true),
+};
+
+// Numeric settings: DB value ?? env default
+const NUMBER_KEYS = {
+    // Auto-cancel unpaid pending orders after N hours (restores stock). 0 = off.
+    orderAutoCancelHours: () => {
+        const n = Number(process.env.ORDER_AUTO_CANCEL_HOURS);
+        return Number.isFinite(n) && n >= 0 ? n : 24;
+    },
+    // Hours a customer gets to upload payment proof before the order is chased/cancelled.
+    paymentProofWindowHours: () => {
+        const n = Number(process.env.PAYMENT_PROOF_WINDOW_HOURS);
+        return Number.isFinite(n) && n >= 0 ? n : 6;
+    },
+};
+
+// String settings: DB value ?? env default
+const STRING_KEYS = {
+    paymentUpiId: () => envStr('PAYMENT_UPI_ID'),
+    paymentPayeeName: () => envStr('PAYMENT_PAYEE_NAME', 'OneMoreGift'),
+    paymentWhatsapp: () => envStr('PAYMENT_WHATSAPP'),
+    paymentQrImage: () => '',
+    paymentInstructions: () => envStr(
+        'PAYMENT_INSTRUCTIONS',
+        'Pay on the QR, then send your order number with the payment screenshot on WhatsApp and upload the proof here. We verify and confirm your order.'
+    ),
+    // Weekly drop schedule — CSV weekday numbers (0=Sun … 6=Sat)
+    dropPickupDays: () => envStr('DROP_PICKUP_DAYS', '1,2'),
+    dropRevealDays: () => envStr('DROP_REVEAL_DAYS', '3,4'),
+    dropSaleDays: () => envStr('DROP_SALE_DAYS', '5,6'),
+    // Public contact details (footer, order emails, help sections)
+    contactEmail: () => envStr('CONTACT_EMAIL', 'contact@onemoregift.in'),
+    contactPhone: () => envStr('CONTACT_PHONE'),
+    contactWhatsapp: () => envStr('CONTACT_WHATSAPP'),
+    businessAddress: () => envStr('BUSINESS_ADDRESS'),
+    instagramUrl: () => envStr('INSTAGRAM_URL'),
+};
+
+// In-process cache — config is read on every hot request (public config endpoint,
+// requireShopEnabled middleware, order creation, giveaway listing). Without it every
+// read was a full DB roundtrip (500-1800ms against Atlas in the logs).
+const CONFIG_CACHE_TTL_MS = 15 * 1000;
+let _configCache = null;
+let _configCacheAt = 0;
+
+const invalidateConfigCache = () => {
+    _configCache = null;
+    _configCacheAt = 0;
+};
+
+// Phase and the day labels derived from it are time-dependent, so they are stamped
+// onto every read rather than cached with the rest of the config.
+const withDerived = (config) => ({
+    ...config,
+    shopPhase: resolvePhase(config),
+    shopPhases: {
+        pickup: { ...SHOP_PHASES.pickup, days: formatDays(parseDays(config.dropPickupDays, [1, 2])) },
+        reveal: { ...SHOP_PHASES.reveal, days: formatDays(parseDays(config.dropRevealDays, [3, 4])) },
+        sale: { ...SHOP_PHASES.sale, days: formatDays(parseDays(config.dropSaleDays, [5, 6])) },
+        prep: { ...SHOP_PHASES.prep, days: 'Remaining days' },
+    },
+});
+
 const getConfigHelper = async () => {
-    const configs = await SystemConfig.find({});
-    const showUpcoming = configs.find(c => c.key === 'showUpcoming')?.value ?? true;
-    const showEnded = configs.find(c => c.key === 'showEnded')?.value ?? false;
-    const requireSurpriseProof = configs.find(c => c.key === 'requireSurpriseProof')?.value ?? true;
-    const requireMomentProof = configs.find(c => c.key === 'requireMomentProof')?.value ?? true;
+    if (_configCache && Date.now() - _configCacheAt < CONFIG_CACHE_TTL_MS) {
+        return withDerived(_configCache);
+    }
 
-    // Homepage section visibility (DB-backed, default visible)
-    const homeShowSteps = configs.find(c => c.key === 'homeShowSteps')?.value ?? true;
-    const homeShowStats = configs.find(c => c.key === 'homeShowStats')?.value ?? true;
-    const homeShowMoments = configs.find(c => c.key === 'homeShowMoments')?.value ?? true;
-    const homeShowShop = configs.find(c => c.key === 'homeShowShop')?.value ?? true;
+    const configs = await SystemConfig.find({}).lean();
+    const byKey = new Map(configs.map(c => [c.key, c.value]));
 
-    // Env-driven flags (require a server restart to change, unlike the DB-backed ones above)
-    const shopEnabled = (process.env.ENABLE_SHOP || 'true').toLowerCase() !== 'false';
-    const realPaymentsEnabled = (process.env.ENABLE_REAL_PAYMENTS || 'false').toLowerCase() === 'true';
-    const paymentsProvider = (process.env.PAYMENTS_PROVIDER || 'sandbox').toLowerCase();
+    const config = {};
+    for (const [key, getDefault] of Object.entries(BOOL_KEYS)) {
+        const stored = byKey.get(key);
+        config[key] = stored === undefined ? getDefault() : !!stored;
+    }
+    for (const [key, getDefault] of Object.entries(STRING_KEYS)) {
+        const stored = byKey.get(key);
+        config[key] = stored === undefined ? getDefault() : String(stored);
+    }
+    for (const [key, getDefault] of Object.entries(NUMBER_KEYS)) {
+        const stored = Number(byKey.get(key));
+        config[key] = Number.isFinite(stored) && stored >= 0 ? stored : getDefault();
+    }
 
-    return {
-        showUpcoming, showEnded, requireSurpriseProof, requireMomentProof,
-        homeShowSteps, homeShowStats, homeShowMoments, homeShowShop,
-        shopEnabled, realPaymentsEnabled, paymentsProvider,
-    };
+    // Read-only / computed values
+    config.realPaymentsEnabled = envBool('ENABLE_REAL_PAYMENTS', false);
+    config.paymentsProvider = envStr('PAYMENTS_PROVIDER', 'sandbox').toLowerCase();
+    // A real gateway is only "ready" when a non-sandbox provider is wired up AND
+    // switched on in env. Until then the online-payment toggle can be turned on in
+    // the admin panel but checkout must not treat it as a way to complete a payment.
+    config.onlinePaymentReady = config.paymentsProvider !== 'sandbox' && config.realPaymentsEnabled;
+    // Sandbox "mark as paid" shortcut — a developer convenience that must never be
+    // reachable on the live site, where it would hand out free orders.
+    config.sandboxPaymentsAllowed = process.env.NODE_ENV !== 'production'
+        && config.paymentsProvider === 'sandbox'
+        && envBool('ALLOW_SANDBOX_PAYMENTS', true);
+
+    _configCache = config;
+    _configCacheAt = Date.now();
+    return withDerived(config);
 };
 
 const getPublicConfig = async (req, res) => {
@@ -47,57 +195,84 @@ const getAdminConfig = async (req, res) => {
     }
 };
 
+// Day-map settings are stored as strings but must stay parseable, and the three
+// windows must not overlap — otherwise a day would resolve to two phases at once.
+const DAY_KEYS = ['dropPickupDays', 'dropRevealDays', 'dropSaleDays'];
+
+const validateDayWindows = (updates, current) => {
+    const resolved = {};
+    for (const key of DAY_KEYS) {
+        const raw = updates[key] !== undefined ? updates[key] : current[key];
+        const days = parseDays(raw, null);
+        if (days === null) {
+            return { error: `${key} must list at least one weekday (0=Sun … 6=Sat)` };
+        }
+        resolved[key] = days;
+    }
+
+    const seen = new Map();
+    for (const key of DAY_KEYS) {
+        for (const day of resolved[key]) {
+            if (seen.has(day)) {
+                return { error: `${DAY_NAMES[day]} is assigned to both ${seen.get(day)} and ${key}` };
+            }
+            seen.set(day, key);
+        }
+    }
+    return { values: resolved };
+};
+
 const updateConfig = async (req, res) => {
     try {
-        const {
-            showUpcoming, showEnded, requireSurpriseProof, requireMomentProof,
-            homeShowSteps, homeShowStats, homeShowMoments, homeShowShop,
-        } = req.body;
+        const updates = req.body || {};
 
-        // Persist any homepage section toggle that was provided
-        const homeToggles = { homeShowSteps, homeShowStats, homeShowMoments, homeShowShop };
-        for (const [key, value] of Object.entries(homeToggles)) {
-            if (value !== undefined) {
+        if (DAY_KEYS.some(key => updates[key] !== undefined)) {
+            const current = await getConfigHelper();
+            const check = validateDayWindows(updates, current);
+            if (check.error) {
+                return res.status(400).json({ error: true, msg: check.error });
+            }
+            // Store the normalised form so a stray "3, 4," never reaches the readers
+            for (const key of DAY_KEYS) {
+                if (updates[key] !== undefined) updates[key] = check.values[key].join(',');
+            }
+        }
+
+        for (const key of Object.keys(BOOL_KEYS)) {
+            if (updates[key] !== undefined) {
                 await SystemConfig.findOneAndUpdate(
                     { key },
-                    { value: !!value },
+                    { value: !!updates[key] },
                     { upsert: true, new: true }
                 );
             }
         }
 
-        if (showUpcoming !== undefined) {
-            await SystemConfig.findOneAndUpdate(
-                { key: 'showUpcoming' },
-                { value: !!showUpcoming },
-                { upsert: true, new: true }
-            );
+        for (const key of Object.keys(STRING_KEYS)) {
+            if (updates[key] !== undefined) {
+                const value = String(updates[key]).trim().slice(0, 500);
+                await SystemConfig.findOneAndUpdate(
+                    { key },
+                    { value },
+                    { upsert: true, new: true }
+                );
+            }
         }
 
-        if (showEnded !== undefined) {
-            await SystemConfig.findOneAndUpdate(
-                { key: 'showEnded' },
-                { value: !!showEnded },
-                { upsert: true, new: true }
-            );
+        for (const key of Object.keys(NUMBER_KEYS)) {
+            if (updates[key] !== undefined) {
+                const value = Number(updates[key]);
+                if (Number.isFinite(value) && value >= 0) {
+                    await SystemConfig.findOneAndUpdate(
+                        { key },
+                        { value },
+                        { upsert: true, new: true }
+                    );
+                }
+            }
         }
 
-        if (requireSurpriseProof !== undefined) {
-            await SystemConfig.findOneAndUpdate(
-                { key: 'requireSurpriseProof' },
-                { value: !!requireSurpriseProof },
-                { upsert: true, new: true }
-            );
-        }
-
-        if (requireMomentProof !== undefined) {
-            await SystemConfig.findOneAndUpdate(
-                { key: 'requireMomentProof' },
-                { value: !!requireMomentProof },
-                { upsert: true, new: true }
-            );
-        }
-
+        invalidateConfigCache();
         const config = await getConfigHelper();
         return res.status(200).json({ error: false, config, msg: 'Config updated successfully' });
     } catch (error) {
@@ -110,5 +285,9 @@ module.exports = {
     getConfigHelper,
     getPublicConfig,
     getAdminConfig,
-    updateConfig
+    updateConfig,
+    getISTDay,
+    parseDays,
+    resolvePhase,
+    invalidateConfigCache,
 };

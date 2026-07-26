@@ -31,7 +31,9 @@ function createApp() {
     ? configuredOrigins
     : Array.from(new Set([...configuredOrigins, ...devOrigins]));
 
-  app.use(express.json());
+  // Avatars are sent as base64 data URLs in profile updates — the express default
+  // of 100kb made larger avatars fail with PayloadTooLargeError.
+  app.use(express.json({ limit: '2mb' }));
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
@@ -48,14 +50,9 @@ function createApp() {
   app.set('trust proxy', 1);
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(cookieParser());
-  app.use(rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 300,
-    standardHeaders: true,
-    legacyHeaders: false,
-  }));
-  app.use(mongoSanitize());
 
+  // Static media is mounted BEFORE the rate limiter — a single gallery page loads
+  // dozens of images and was eating the per-IP API budget, causing surprise 429s.
   // Serve uploads from public/ with CORP header
   app.use('/uploads', (req, res, next) => {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -75,6 +72,16 @@ function createApp() {
       console.log(`[Media] Serving ${resolvedMedia} at /media`);
     }
   }
+
+  app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Image/video GETs served from MongoDB storage are media, not API calls
+    skip: (req) => req.method === 'GET' && req.path.startsWith('/api/v1/upload/'),
+  }));
+  app.use(mongoSanitize());
   app.use('/api/v1/auth', auth);
   app.use('/api/v1/admin', admin);
   app.use('/api/v1/giveaway', giveaway);

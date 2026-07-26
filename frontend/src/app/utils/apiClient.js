@@ -6,9 +6,11 @@ const baseURL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:9000/api/v
 const SERVER_ORIGIN = (process.env.NEXT_PUBLIC_SERVER_URL || baseURL.replace(/\/api\/v1\/?$/, "")).replace(/\/$/, "");
 
 // Resolves a possibly-relative media path (image/video) returned by the backend into an absolute URL.
+// data:/blob: URLs (e.g. base64 avatars) must pass through untouched.
 export const mediaUrl = (path) => {
     if (!path) return path;
-    return path.startsWith("http") ? path : `${SERVER_ORIGIN}${path}`;
+    if (/^(https?:|data:|blob:)/i.test(path)) return path;
+    return `${SERVER_ORIGIN}${path}`;
 };
 
 const api = axios.create({

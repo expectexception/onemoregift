@@ -288,8 +288,9 @@ const getGiveaways = async (req, res) => {
 // };
 const getSingleGiveaway = async (req, res) => {
     try {
+        // participants stays as raw ObjectIds — populating names decrypted every
+        // participant's user doc on each page view and leaked names publicly.
         const giveaway = await Giveaway.findById(req.params.id)
-            .populate("participants", "_id name")
             .populate("winners", "name")
             .lean(); // Make it plain JS object so we can add fields
 
@@ -324,6 +325,11 @@ const getSingleGiveaway = async (req, res) => {
 //participate
 const participate = async (req, res) => {
     try {
+        const cfg = await getConfigHelper();
+        if (!cfg.giveawaysEnabled) {
+            return res.status(503).json({ error: true, msg: "Giveaway entries are temporarily closed. Please check back later." });
+        }
+
         const giveaway = await Giveaway.findById(req.params.id);
         if (!giveaway) {
             return res.status(404).json({ error: true, msg: "Giveaway not found" });

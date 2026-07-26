@@ -484,8 +484,8 @@ function HomePage() {
                             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/10 shrink-0">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden flex items-center justify-center border border-white/15">
-                                        {selectedMoment.userId?.profilePic ? (
-                                            <img src={selectedMoment.userId.profilePic} alt="" className="w-full h-full object-cover" />
+                                        {selectedMoment.userId?.avatar ? (
+                                            <img src={selectedMoment.userId.avatar} alt="" className="w-full h-full object-cover" />
                                         ) : (
                                             <span className="text-xs font-bold text-neutral-300">{(selectedMoment.userId?.name || "U")[0]}</span>
                                         )}
@@ -523,8 +523,8 @@ function HomePage() {
                                     selectedMoment.comments.map((c) => (
                                         <div key={c._id} className="flex gap-3 items-start">
                                             <div className="w-7 h-7 rounded-full bg-white/10 overflow-hidden flex items-center justify-center shrink-0 border border-white/5">
-                                                {c.userId?.profilePic ? (
-                                                    <img src={c.userId.profilePic} alt="" className="w-full h-full object-cover" />
+                                                {c.userId?.avatar ? (
+                                                    <img src={c.userId.avatar} alt="" className="w-full h-full object-cover" />
                                                 ) : (
                                                     <span className="text-[10px] font-bold text-neutral-400">{(c.userId?.name || "U")[0]}</span>
                                                 )}

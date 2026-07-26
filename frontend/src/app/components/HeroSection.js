@@ -27,6 +27,12 @@ export default function HeroSection({ showStats = true }) {
     const [currentImage, setCurrentImage] = useState(0);
     const { stats, loading: statsLoading } = usePlatformStats({ refreshMs: 10000 });
 
+    // Between draws there is nothing running, and a hard "Active 0" reads as broken.
+    // Fall back to the upcoming count (relabelled) so the tile stays truthful.
+    const liveGiveaways = stats.activeGiveaways > 0 || stats.upcomingGiveaways === 0
+        ? { count: stats.activeGiveaways, label: "Active" }
+        : { count: stats.upcomingGiveaways, label: "Upcoming" };
+
     // Auto-change background images
     useEffect(() => {
         const interval = setInterval(() => {
@@ -165,7 +171,7 @@ export default function HeroSection({ showStats = true }) {
                 {showStats && (
                     <RevealOnScroll delayMs={290}>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-3xl mx-auto">
-                            <StatCard Icon={CheckIcon} target={stats.activeGiveaways} format={formatCompactNumber} loading={statsLoading} label="Active" />
+                            <StatCard Icon={CheckIcon} target={liveGiveaways.count} format={formatCompactNumber} loading={statsLoading} label={liveGiveaways.label} />
                             <StatCard Icon={TrophyIcon} target={stats.totalWinners} format={formatCompactNumber} loading={statsLoading} label="Winners" />
                             <StatCard Icon={VerificationIcon} target={stats.totalPrizeValue} format={formatIndianCurrency} loading={statsLoading} label="Prizes" />
                             <StatCard Icon={UsersIcon} target={stats.registeredUsers} format={formatCompactNumber} loading={statsLoading} label="Users" />

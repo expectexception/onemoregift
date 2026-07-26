@@ -1,10 +1,16 @@
 'use strict';
 
 const HappyMoment = require('../model/HappyMoment');
+const { getConfigHelper } = require('./configController');
 
 // POST /api/v1/happy-moment
 const createMoment = async (req, res) => {
     try {
+        const cfg = await getConfigHelper();
+        if (!cfg.momentsEnabled) {
+            return res.status(503).json({ error: true, msg: 'Sharing moments is temporarily disabled. Please check back later.' });
+        }
+
         const { caption, description, media, proofs, publishNow } = req.body;
         if (!caption) {
             return res.status(400).json({ error: true, msg: 'Caption is required' });
@@ -33,8 +39,8 @@ const listGallery = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
         const [data, total] = await Promise.all([
             HappyMoment.find({ isPublished: true })
-                .populate('userId', 'name profilePic')
-                .populate('comments.userId', 'name profilePic')
+                .populate('userId', 'name avatar')
+                .populate('comments.userId', 'name avatar')
                 .populate('assignedGift', 'name')
                 .sort({ isFeatured: -1, createdAt: -1 })
                 .skip(skip)
@@ -52,8 +58,8 @@ const listGallery = async (req, res) => {
 const listMyMoments = async (req, res) => {
     try {
         const data = await HappyMoment.find({ userId: req.user.data._id })
-            .populate('userId', 'name profilePic')
-            .populate('comments.userId', 'name profilePic')
+            .populate('userId', 'name avatar')
+            .populate('comments.userId', 'name avatar')
             .populate('assignedGift', 'name')
             .sort({ createdAt: -1 });
         return res.json({ error: false, data });
@@ -149,7 +155,7 @@ const addComment = async (req, res) => {
         await doc.save();
 
         const populatedDoc = await HappyMoment.findById(req.params.id)
-            .populate('comments.userId', 'name profilePic');
+            .populate('comments.userId', 'name avatar');
 
         return res.json({ error: false, data: populatedDoc.comments });
     } catch (err) {
@@ -185,7 +191,7 @@ const editComment = async (req, res) => {
         await doc.save();
 
         const populatedDoc = await HappyMoment.findById(req.params.id)
-            .populate('comments.userId', 'name profilePic');
+            .populate('comments.userId', 'name avatar');
 
         return res.json({ error: false, data: populatedDoc.comments });
     } catch (err) {
@@ -215,7 +221,7 @@ const deleteComment = async (req, res) => {
         await doc.save();
 
         const populatedDoc = await HappyMoment.findById(req.params.id)
-            .populate('comments.userId', 'name profilePic');
+            .populate('comments.userId', 'name avatar');
 
         return res.json({ error: false, data: populatedDoc.comments });
     } catch (err) {

@@ -349,8 +349,12 @@ function Home() {
                       <option key={i} value={i}>{a.label || `Address ${i + 1}`}{a.isDefault ? " (Default)" : ""}</option>
                     ))}
                   </select>
-                  <div className="premium-input px-4 py-3 rounded-xl text-neutral-300 text-sm">
-                    {[user.addresses[savedAddressIndex]?.line1, user.addresses[savedAddressIndex]?.line2, user.addresses[savedAddressIndex]?.city, user.addresses[savedAddressIndex]?.state, user.addresses[savedAddressIndex]?.country, user.addresses[savedAddressIndex]?.postalCode].filter(Boolean).join(", ")}
+                  <div className="premium-input px-4 py-3 rounded-xl text-neutral-300 text-sm space-y-1">
+                    <p>{[user.addresses[savedAddressIndex]?.line1, user.addresses[savedAddressIndex]?.line2, user.addresses[savedAddressIndex]?.city, user.addresses[savedAddressIndex]?.state, user.addresses[savedAddressIndex]?.postalCode].filter(Boolean).join(", ")}</p>
+                    <p className="text-xs text-neutral-500">
+                      {user.addresses[savedAddressIndex]?.fullName}
+                      {user.addresses[savedAddressIndex]?.phone ? ` · +91 ${user.addresses[savedAddressIndex].phone}` : ""}
+                    </p>
                   </div>
                 </div>
               ) : user.address ? (

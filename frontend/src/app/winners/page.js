@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useEffect, useMemo, useState } from "react";
 import api from "../utils/apiClient";
+import { usePlatformStats } from "../hooks/usePlatformStats";
 
 function TrophySvg({ className = "w-5 h-5" }) {
     return (
@@ -61,6 +62,7 @@ function getInitials(name) {
 export default function Winners() {
     const [giveaways, setGiveaways] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { stats } = usePlatformStats({ refreshMs: 30000 });
 
     const fetchData = async () => {
         try {
@@ -78,6 +80,13 @@ export default function Winners() {
     }, []);
 
     const totalWinners = useMemo(() => giveaways.reduce((sum, g) => sum + (g.winners?.length || 0), 0), [giveaways]);
+
+    // `giveaways` only holds draws that already have winners published, so it cannot
+    // answer "how many giveaways have closed" — that comes from the platform stats.
+    const closedCount = Math.max(stats.completedGiveaways, giveaways.length);
+    const declaredRate = closedCount > 0
+        ? Math.round((giveaways.length / closedCount) * 100)
+        : 100;
 
     return (
         <div className="min-h-screen flex flex-col bg-black">
@@ -100,9 +109,9 @@ export default function Winners() {
                         Celebrating real winners and delivered prizes with transparent, structured results.
                     </p>
                     <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto">
-                        <Metric label="Giveaways Closed" value={giveaways.length} />
-                        <Metric label="Total Winners" value={totalWinners} />
-                        <Metric label="Verification" value="100%" />
+                        <Metric label="Giveaways Closed" value={closedCount} />
+                        <Metric label="Total Winners" value={Math.max(totalWinners, stats.giveawayWinners)} />
+                        <Metric label="Results Declared" value={`${declaredRate}%`} />
                     </div>
                 </div>
             </section>

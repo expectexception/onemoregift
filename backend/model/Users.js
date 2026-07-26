@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema({
         unique: true,
         sparse: true,
     },
+    // Deterministic HMAC hash of phone for duplicate checks — the phone field itself
+    // is encrypted with random IVs, so its unique index can never catch duplicates.
+    phoneHash: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
     name: {
         type: String,
         required: true,
@@ -93,6 +100,11 @@ const userSchema = new mongoose.Schema({
 // ── Encryption: pre-save ──────────────────────────────────────────────────────
 userSchema.pre('save', function (next) {
     try {
+        // Phone hash for duplicate lookups — derived from the plain value before encryption
+        if (this.isModified('phone')) {
+            this.phoneHash = this.phone ? hmacHash(decrypt(this.phone)) : undefined;
+        }
+
         // Scalar fields
         for (const field of ENCRYPTED_SCALAR_FIELDS) {
             if (this.isModified(field) && this[field]) {
@@ -134,36 +146,48 @@ userSchema.pre('save', function (next) {
     }
 });
 
-// Handle findOneAndUpdate — encrypt fields in $set
+// Handle findOneAndUpdate — encrypt fields in the update.
+// IMPORTANT: the timestamps plugin injects `$set: { updatedAt }` into the update
+// BEFORE this hook runs, while the app's fields stay top-level. The old
+// `update.$set || update` logic then only saw `{ updatedAt }` and silently
+// skipped encryption for every profile update — so BOTH containers must be
+// processed here.
 userSchema.pre('findOneAndUpdate', function (next) {
     try {
         const update = this.getUpdate();
-        const setObj = update?.$set || update;
-        if (!setObj) return next();
+        if (!update) return next();
+        const targets = [update, update.$set].filter(o => o && typeof o === 'object');
 
-        // Scalar fields in update
-        for (const field of ['phone', 'address', 'name', 'fullName']) {
-            if (setObj[field]) {
-                setObj[field] = encrypt(setObj[field]);
+        for (const setObj of targets) {
+            // Phone hash for duplicate lookups (before the value gets encrypted below)
+            if (setObj.phone) {
+                setObj.phoneHash = hmacHash(decrypt(setObj.phone));
             }
-        }
 
-        // Email in update
-        if (setObj.email) {
-            const plain = decrypt(setObj.email);
-            setObj.emailHash = hmacHash(plain);
-            setObj.email = encrypt(plain);
-        }
-
-        // Addresses array in update
-        if (Array.isArray(setObj.addresses)) {
-            setObj.addresses = setObj.addresses.map((addr) => {
-                const copy = { ...addr };
-                for (const f of ENCRYPTED_ADDRESS_FIELDS) {
-                    if (copy[f]) copy[f] = encrypt(copy[f]);
+            // Scalar fields in update
+            for (const field of ['phone', 'address', 'name', 'fullName']) {
+                if (setObj[field]) {
+                    setObj[field] = encrypt(setObj[field]);
                 }
-                return copy;
-            });
+            }
+
+            // Email in update
+            if (setObj.email) {
+                const plain = decrypt(setObj.email);
+                setObj.emailHash = hmacHash(plain);
+                setObj.email = encrypt(plain);
+            }
+
+            // Addresses array in update
+            if (Array.isArray(setObj.addresses)) {
+                setObj.addresses = setObj.addresses.map((addr) => {
+                    const copy = { ...addr };
+                    for (const f of ENCRYPTED_ADDRESS_FIELDS) {
+                        if (copy[f]) copy[f] = encrypt(copy[f]);
+                    }
+                    return copy;
+                });
+            }
         }
 
         next();

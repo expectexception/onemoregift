@@ -2,7 +2,7 @@
 
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,12 +25,20 @@ const emptyAddress = () => ({
     line2: "",
     city: "",
     state: "",
-    country: "",
-    countryCode: "",
+    country: "India",
+    countryCode: "IN",
     postalCode: "",
     phone: "",
     isDefault: false,
 });
+
+// Strips +91 / leading 0 so pasted numbers don't get silently truncated to a wrong number
+const cleanPhone = (value) => {
+    let digits = String(value || "").replace(/\D/g, "");
+    if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2);
+    if (digits.length > 10 && digits.startsWith("0")) digits = digits.slice(1);
+    return digits.slice(0, 10);
+};
 
 const getApiErrorMessage = (error, fallback) => (
     error?.response?.data?.msg
@@ -54,8 +62,8 @@ function Home() {
     const [avatar, setAvatar] = useState("");
     const [canSetFirstPassword, setCanSetFirstPassword] = useState(false);
     const [addresses, setAddresses] = useState([{ ...emptyAddress(), isDefault: true }]);
-    const [countries, setCountries] = useState([]);
-    const [statesMap, setStatesMap] = useState({});
+    const [indianStates, setIndianStates] = useState([]);
+    const phoneInputRef = useRef(null);
 
     const handleAvatarChange = (e) => {
         const file = e.target.files[0];
@@ -146,9 +154,8 @@ function Home() {
 
     const fetchUserProfile = async () => {
         try {
-            const { Country, State } = await import("country-state-city");
-            const allCountries = Country.getAllCountries();
-            setCountries(allCountries);
+            const { State } = await import("country-state-city");
+            setIndianStates(State.getStatesOfCountry("IN"));
 
             const { data } = await api.get("profile/", { meta: { auth: "user" } });
             const profile = data.myProfile || {};
@@ -165,22 +172,12 @@ function Home() {
                     ? [{ ...emptyAddress(), line1: profile.address, fullName: profile.fullName || profile.name || "", phone: profile.phone || "", isDefault: true }]
                     : [{ ...emptyAddress(), isDefault: true }];
 
-            const mappedAddresses = incomingAddresses.map(addr => {
-                const c = allCountries.find(x => x.name.toLowerCase() === (addr.country || "").toLowerCase() || x.isoCode === addr.country);
-                return {
-                    ...addr,
-                    countryCode: c ? c.isoCode : "",
-                    country: c ? c.name : addr.country || "",
-                };
-            });
-
-            // Pre-populate statesMap for all loaded addresses
-            const uniqueCountryCodes = Array.from(new Set(mappedAddresses.map(a => a.countryCode).filter(Boolean)));
-            const newStatesMap = {};
-            for (const code of uniqueCountryCodes) {
-                newStatesMap[code] = State.getStatesOfCountry(code);
-            }
-            setStatesMap(newStatesMap);
+            // Country column removed — everything is India for now
+            const mappedAddresses = incomingAddresses.map(addr => ({
+                ...addr,
+                country: "India",
+                countryCode: "IN",
+            }));
 
             if (!mappedAddresses.some((item) => item.isDefault)) mappedAddresses[0].isDefault = true;
             setAddresses(mappedAddresses);
@@ -189,34 +186,11 @@ function Home() {
         }
     };
 
-    const handleCountryChange = async (idx, countryCode) => {
-        const { State, Country } = await import("country-state-city");
-        const countryObj = Country.getCountryByCode(countryCode);
-        const countryName = countryObj ? countryObj.name : "";
-        
-        if (countryCode && !statesMap[countryCode]) {
-            const countryStates = State.getStatesOfCountry(countryCode);
-            setStatesMap(prev => ({ ...prev, [countryCode]: countryStates }));
-        }
-
-        setAddresses(prev => prev.map((addr, index) => {
-            if (index === idx) {
-                return {
-                    ...addr,
-                    countryCode,
-                    country: countryName,
-                    state: "", // Reset state when country changes
-                };
-            }
-            return addr;
-        }));
-    };
-
     const saveProfile = async (e) => {
         e.preventDefault();
         const normalizedName = name.trim();
         const normalizedEmail = email.trim().toLowerCase();
-        const normalizedPhone = phone.replace(/\D/g, "").slice(0, 10);
+        const typedPhone = cleanPhone(phone);
 
         if (!normalizedName) {
             toast({ title: "Validation Error", description: "Name is required.", variant: "destructive" });
@@ -224,14 +198,6 @@ function Home() {
         }
         if (!normalizedEmail || !/\S+@\S+\.\S+/.test(normalizedEmail)) {
             toast({ title: "Validation Error", description: "Please enter a valid email address.", variant: "destructive" });
-            return;
-        }
-        if (!normalizedPhone) {
-            toast({ title: "Validation Error", description: "Phone number is required.", variant: "destructive" });
-            return;
-        }
-        if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
-            toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
             return;
         }
 
@@ -244,12 +210,13 @@ function Home() {
                 line2: (item.line2 || "").trim(),
                 city: (item.city || "").trim(),
                 state: (item.state || "").trim(),
-                country: (item.country || "").trim(),
+                country: "India",
+                countryCode: "IN",
                 postalCode: (item.postalCode || "").trim(),
-                phone: (item.phone || "").replace(/\D/g, "").slice(0, 10),
+                phone: cleanPhone(item.phone),
                 isDefault: Boolean(item.isDefault),
             }))
-            .filter((item) => item.line1 || item.city || item.state || item.country || item.postalCode);
+            .filter((item) => item.line1 || item.city || item.state || item.postalCode || item.phone);
 
         if (cleanedAddresses.length && !cleanedAddresses.some((item) => item.isDefault)) {
             cleanedAddresses[0].isDefault = true;
@@ -261,15 +228,36 @@ function Home() {
                 toast({ title: "Validation Error", description: `Receiver name is required for address ${addressNumber}.`, variant: "destructive" });
                 return;
             }
-            if (!address.line1 || !address.city || !address.state || !address.country || !address.postalCode) {
-                toast({ title: "Validation Error", description: `Complete address line, city, state, country, and pincode for address ${addressNumber}.`, variant: "destructive" });
+            if (!address.line1 || !address.city || !address.state || !address.postalCode) {
+                toast({ title: "Validation Error", description: `Complete address line, city, state, and pincode for address ${addressNumber}.`, variant: "destructive" });
                 return;
             }
-            if (address.phone && !/^[6-9]\d{9}$/.test(address.phone)) {
+            if (!address.phone) {
+                toast({ title: "Validation Error", description: `Receiver phone number is required for address ${addressNumber}.`, variant: "destructive" });
+                return;
+            }
+            if (!/^[6-9]\d{9}$/.test(address.phone)) {
                 toast({ title: "Validation Error", description: `Receiver phone must be a valid 10-digit Indian number for address ${addressNumber}.`, variant: "destructive" });
                 return;
             }
         }
+
+        // Contact phone falls back to the default address' receiver phone, so someone
+        // who only ever filled in an address is not blocked on a field they never saw.
+        const defaultAddress = cleanedAddresses.find((item) => item.isDefault) || cleanedAddresses[0];
+        const normalizedPhone = typedPhone || cleanPhone(defaultAddress?.phone);
+
+        if (!normalizedPhone) {
+            toast({ title: "Validation Error", description: "Please add your contact phone number.", variant: "destructive" });
+            phoneInputRef.current?.focus();
+            return;
+        }
+        if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+            toast({ title: "Validation Error", description: "Phone number must be a valid 10-digit number starting with 6-9.", variant: "destructive" });
+            phoneInputRef.current?.focus();
+            return;
+        }
+        if (normalizedPhone !== phone) setPhone(normalizedPhone);
 
         try {
             const { data } = await api.patch(
@@ -371,7 +359,7 @@ function Home() {
                                                 <Label className="text-neutral-300">Phone Number</Label>
                                                 <div className="flex items-center premium-input rounded-xl border border-white/[0.08] focus-within:border-red-500/70">
                                                     <span className="pl-3 pr-2 text-neutral-400 text-sm">+91</span>
-                                                    <Input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-11 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="10-digit phone number" />
+                                                    <Input ref={phoneInputRef} value={phone} onChange={(e) => setPhone(cleanPhone(e.target.value))} className="h-11 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="10-digit phone number" />
                                                 </div>
                                             </div>
                                         </div>
@@ -408,27 +396,23 @@ function Home() {
                                                         </div>
 
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                            <Input value={address.fullName} onChange={(e) => updateAddressField(idx, "fullName", e.target.value)} className="premium-input h-10 text-white" placeholder="Receiver name" />
-                                                            <Input value={address.phone} onChange={(e) => updateAddressField(idx, "phone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="premium-input h-10 text-white" placeholder="Receiver phone" />
+                                                            <Input value={address.fullName} onChange={(e) => updateAddressField(idx, "fullName", e.target.value)} className="premium-input h-10 text-white" placeholder="Receiver name *" />
+                                                            <div className="flex items-center premium-input rounded-xl border border-white/[0.08] focus-within:border-red-500/70">
+                                                                <span className="pl-3 pr-2 text-neutral-400 text-sm">+91</span>
+                                                                <Input value={address.phone} onChange={(e) => updateAddressField(idx, "phone", cleanPhone(e.target.value))} className="h-10 text-white bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-neutral-600" placeholder="Receiver phone *" />
+                                                            </div>
                                                         </div>
-                                                        <Input value={address.line1} onChange={(e) => updateAddressField(idx, "line1", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 1" />
+                                                        <Input value={address.line1} onChange={(e) => updateAddressField(idx, "line1", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 1 *" />
                                                         <Input value={address.line2} onChange={(e) => updateAddressField(idx, "line2", e.target.value)} className="premium-input h-10 text-white" placeholder="Address Line 2 (Optional)" />
-                                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                                            <SearchableSelect
-                                                                value={address.countryCode || ""}
-                                                                onChange={(val) => handleCountryChange(idx, val)}
-                                                                options={countries.map(c => ({ value: c.isoCode, label: c.name }))}
-                                                                placeholder="Country *"
-                                                            />
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                             <SearchableSelect
                                                                 value={address.state || ""}
                                                                 onChange={(val) => updateAddressField(idx, "state", val)}
-                                                                options={(statesMap[address.countryCode] || []).map(s => ({ value: s.name, label: s.name }))}
+                                                                options={indianStates.map(s => ({ value: s.name, label: s.name }))}
                                                                 placeholder="State *"
-                                                                disabled={!address.countryCode}
                                                             />
-                                                            <Input value={address.city} onChange={(e) => updateAddressField(idx, "city", e.target.value)} className="premium-input h-10 text-white" placeholder="City" />
-                                                            <Input value={address.postalCode} onChange={(e) => updateAddressField(idx, "postalCode", e.target.value)} className="premium-input h-10 text-white" placeholder="Pincode" />
+                                                            <Input value={address.city} onChange={(e) => updateAddressField(idx, "city", e.target.value)} className="premium-input h-10 text-white" placeholder="City *" />
+                                                            <Input value={address.postalCode} onChange={(e) => updateAddressField(idx, "postalCode", e.target.value.replace(/\D/g, "").slice(0, 6))} className="premium-input h-10 text-white" placeholder="Pincode *" />
                                                         </div>
                                                     </div>
                                                 ))}

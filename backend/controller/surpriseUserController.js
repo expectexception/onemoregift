@@ -1,6 +1,10 @@
 'use strict';
 
 const SurpriseRequest = require('../model/SurpriseRequest');
+const { getConfigHelper } = require('./configController');
+
+// Statuses that count as an "active" application for the 1-per-user rule
+const ACTIVE_STATUSES = ['submitted', 'under_review', 'verification_pending', 'approved', 'gift_assigned'];
 
 // POST /api/v1/surprise
 const createRequest = async (req, res) => {
@@ -8,6 +12,23 @@ const createRequest = async (req, res) => {
         const { eventName, eventType, eventDate, description, recipientName, recipientContact, documents } = req.body;
         if (!eventName || !eventType || !eventDate || !recipientName) {
             return res.status(400).json({ error: true, msg: 'Required fields missing: eventName, eventType, eventDate, recipientName' });
+        }
+
+        const cfg = await getConfigHelper();
+        if (!cfg.surpriseEnabled) {
+            return res.status(503).json({ error: true, msg: 'Surprise applications are temporarily closed. Please check back later.' });
+        }
+        if (cfg.surpriseOneActivePerUser) {
+            const active = await SurpriseRequest.findOne({
+                userId: req.user.data._id,
+                status: { $in: ACTIVE_STATUSES },
+            }).select('_id');
+            if (active) {
+                return res.status(400).json({
+                    error: true,
+                    msg: 'You already have an active surprise application. For now only 1 application per user is allowed — please wait for it to complete or cancel it first.',
+                });
+            }
         }
 
         const doc = await SurpriseRequest.create({

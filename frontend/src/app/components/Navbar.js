@@ -14,6 +14,7 @@ import AnimatedGiftSVG from "./AnimatedGiftSVG";
 import { UserIcon, LockIcon } from "./SVGIcons";
 import { ShoppingCart } from "lucide-react";
 import { readCartCount, CART_UPDATED_EVENT } from "../utils/cart";
+import { fetchSiteConfig } from "../utils/siteConfig";
 
 function CartButton({ count, onClick, className = "" }) {
     return (
@@ -37,6 +38,9 @@ export default function Navbar() {
     let isUserLoggedIn = !loadingUser && userAuthenticated
     const router = useRouter()
     const [cartCount, setCartCount] = useState(0);
+    // Feature switches — links for disabled features are hidden
+    const [features, setFeatures] = useState({ shopEnabled: true, giveawaysEnabled: true, momentsEnabled: true, surpriseEnabled: true });
+    const showJoyHub = features.momentsEnabled || features.surpriseEnabled;
 
     useEffect(() => {
         const refresh = () => setCartCount(readCartCount());
@@ -47,6 +51,17 @@ export default function Navbar() {
             window.removeEventListener(CART_UPDATED_EVENT, refresh);
             window.removeEventListener("storage", refresh);
         };
+    }, []);
+
+    useEffect(() => {
+        fetchSiteConfig()
+            .then((cfg) => setFeatures({
+                shopEnabled: cfg.shopEnabled !== false,
+                giveawaysEnabled: cfg.giveawaysEnabled !== false,
+                momentsEnabled: cfg.momentsEnabled !== false,
+                surpriseEnabled: cfg.surpriseEnabled !== false,
+            }))
+            .catch(() => {});
     }, []);
 
     const handleUserLogout = async () => {
@@ -73,9 +88,9 @@ export default function Navbar() {
                 {/* Desktop Navigation */}
                 <div className="hidden lg:flex items-center gap-5 xl:gap-8">
                     <NavLink href="/" label="Home" />
-                    <NavLink href="/giveaway" label="Giveaways" />
-                    <NavLink href="/surprise-me" label="Surprises & Moments" />
-                    <NavLink href="/shop" label="Shop" badge={cartCount} />
+                    {features.giveawaysEnabled && <NavLink href="/giveaway" label="Giveaways" />}
+                    {showJoyHub && <NavLink href="/surprise-me" label="Surprises & Moments" />}
+                    {features.shopEnabled && <NavLink href="/shop" label="Shop" badge={cartCount} />}
                     <NavLink href="/winners" label="Winners" />
                     <NavLink href="/about-us" label="About" />
                 </div>
@@ -140,9 +155,9 @@ export default function Navbar() {
                                 {/* Mobile Nav Links */}
                                 <div className="space-y-1">
                                     <MobileNavLink href="/" label="Home" />
-                                    <MobileNavLink href="/giveaway" label="Giveaways" />
-                                    <MobileNavLink href="/surprise-me" label="Surprises & Moments" />
-                                    <MobileNavLink href="/shop" label="Shop" badge={cartCount} />
+                                    {features.giveawaysEnabled && <MobileNavLink href="/giveaway" label="Giveaways" />}
+                                    {showJoyHub && <MobileNavLink href="/surprise-me" label="Surprises & Moments" />}
+                                    {features.shopEnabled && <MobileNavLink href="/shop" label="Shop" badge={cartCount} />}
                                     <MobileNavLink href="/winners" label="Winners" />
                                     <MobileNavLink href="/about-us" label="About" />
                                 </div>

@@ -1,6 +1,7 @@
 const Giveaway = require("../model/Giveaway");
 const User = require("../model/Users");
 const bcrypt = require('bcryptjs')
+const { hmacHash } = require("../utils/crypto");
 
 const formatAddress = (addressObj = {}) => {
     return [
@@ -13,7 +14,13 @@ const formatAddress = (addressObj = {}) => {
     ].map((item) => (item || "").trim()).filter(Boolean).join(", ");
 };
 
-const normalizePhone = (value) => String(value || "").replace(/\D/g, "").slice(0, 10);
+const normalizePhone = (value) => {
+    let digits = String(value || "").replace(/\D/g, "");
+    // Strip country code / trunk prefix so "+91 98765 43210" doesn't get truncated to a wrong number
+    if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2);
+    if (digits.length > 10 && digits.startsWith("0")) digits = digits.slice(1);
+    return digits.slice(0, 10);
+};
 const isValidIndianPhone = (value) => /^[6-9]\d{9}$/.test(value);
 
 const normalizeAddresses = (addresses = []) => {
@@ -26,12 +33,13 @@ const normalizeAddresses = (addresses = []) => {
             line2: (item.line2 || "").trim(),
             city: (item.city || "").trim(),
             state: (item.state || "").trim(),
-            country: (item.country || "").trim(),
+            // Country column removed from the UI — everything is India for now
+            country: (item.country || "").trim() || "India",
             postalCode: (item.postalCode || "").trim(),
             phone: normalizePhone(item.phone),
             isDefault: Boolean(item.isDefault),
         }))
-        .filter((item) => item.line1 || item.city || item.state || item.country || item.postalCode);
+        .filter((item) => item.line1 || item.city || item.state || item.postalCode || item.phone);
 
     if (!cleaned.length) return { addresses: [] };
 
@@ -39,10 +47,13 @@ const normalizeAddresses = (addresses = []) => {
         if (!item.fullName) {
             return { error: `Receiver name is required for address ${index + 1}` };
         }
-        if (!item.line1 || !item.city || !item.state || !item.country || !item.postalCode) {
-            return { error: `Complete address line, city, state, country, and pincode for address ${index + 1}` };
+        if (!item.line1 || !item.city || !item.state || !item.postalCode) {
+            return { error: `Complete address line, city, state, and pincode for address ${index + 1}` };
         }
-        if (item.phone && !isValidIndianPhone(item.phone)) {
+        if (!item.phone) {
+            return { error: `Receiver phone number is required for address ${index + 1}` };
+        }
+        if (!isValidIndianPhone(item.phone)) {
             return { error: `Receiver phone must be a valid 10-digit Indian number for address ${index + 1}` };
         }
     }
@@ -111,9 +122,30 @@ const updateProfile = async (req, res) => {
         // Support partial updates (join flow sends only address on step 2).
         const resolvedName = typeof name === "string" ? name.trim() : existingUser.name;
         const resolvedEmail = typeof email === "string" ? email.trim().toLowerCase() : existingUser.email;
-        const resolvedPhone = phone === undefined
+
+        // Addresses are validated up-front because the account phone can be adopted
+        // from the default address below.
+        let normalizedAddresses = null;
+        if (addresses !== undefined) {
+            const normalizedResult = normalizeAddresses(addresses);
+            if (normalizedResult.error) {
+                return res.status(400).json({ error: true, msg: normalizedResult.error });
+            }
+            normalizedAddresses = normalizedResult.addresses;
+        }
+
+        // An account created before the phone field existed has none saved. Rather
+        // than refusing to save the address book over a field the user was never
+        // asked for, inherit the receiver phone from their default address.
+        const defaultAddressPhone = normalizedAddresses
+            ? (normalizedAddresses.find((item) => item.isDefault) || normalizedAddresses[0] || {}).phone
+            : "";
+        let resolvedPhone = phone === undefined
             ? existingUser.phone
             : normalizePhone(phone);
+        if (!resolvedPhone && defaultAddressPhone) {
+            resolvedPhone = defaultAddressPhone;
+        }
 
         if (!resolvedName) {
             return res.status(400).json({ error: true, msg: "Name is required" });
@@ -122,18 +154,24 @@ const updateProfile = async (req, res) => {
             return res.status(400).json({ error: true, msg: "A valid email is required" });
         }
         if (phone !== undefined && !resolvedPhone) {
-            return res.status(400).json({ error: true, msg: "Phone number is required" });
+            return res.status(400).json({ error: true, msg: "Please add your contact phone number" });
         }
         if (resolvedPhone && !isValidIndianPhone(resolvedPhone)) {
             return res.status(400).json({ error: true, msg: "Phone number must be a valid 10-digit number starting with 6-9" });
         }
 
+        // Email/phone are encrypted at rest with random IVs, so plaintext queries never
+        // match — duplicate checks must go through the deterministic hashes.
+        const emailHashVal = hmacHash(resolvedEmail);
         const duplicate = await User.findOne({
             _id: { $ne: userId },
-            $or: resolvedPhone ? [{ email: resolvedEmail }, { phone: resolvedPhone }] : [{ email: resolvedEmail }]
+            $or: [
+                { emailHash: emailHashVal },
+                ...(resolvedPhone ? [{ phoneHash: hmacHash(resolvedPhone) }] : []),
+            ],
         });
         if (duplicate) {
-            const msg = duplicate.email === resolvedEmail
+            const msg = duplicate.emailHash === emailHashVal
                 ? "A user with that email already exists"
                 : "This phone number is already linked to another account";
             return res.status(409).json({ error: true, msg });
@@ -147,12 +185,7 @@ const updateProfile = async (req, res) => {
         };
         if (address !== undefined) updates.address = address;
         if (avatar !== undefined) updates.avatar = avatar;
-        if (addresses !== undefined) {
-            const normalizedResult = normalizeAddresses(addresses);
-            if (normalizedResult.error) {
-                return res.status(400).json({ error: true, msg: normalizedResult.error });
-            }
-            const normalizedAddresses = normalizedResult.addresses;
+        if (normalizedAddresses) {
             updates.addresses = normalizedAddresses;
             const defaultAddress = normalizedAddresses.find((item) => item.isDefault) || normalizedAddresses[0];
             updates.address = defaultAddress ? formatAddress(defaultAddress) : "";

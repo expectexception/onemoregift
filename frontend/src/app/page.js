@@ -7,7 +7,7 @@ import HowItWorks from "./components/HowItWorks";
 import PopularMoments from "./components/PopularMoments";
 import FeaturedProducts from "./components/FeaturedProducts";
 import { useEffect, useState } from "react";
-import api from "./utils/apiClient";
+import { fetchSiteConfig } from "./utils/siteConfig";
 
 const DEFAULT_HOME_CONFIG = {
   homeShowSteps: true,
@@ -22,10 +22,10 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    api.get("config")
-      .then(({ data }) => {
-        if (!cancelled && data && !data.error && data.config) {
-          setConfig({ ...DEFAULT_HOME_CONFIG, ...data.config });
+    fetchSiteConfig()
+      .then((cfg) => {
+        if (!cancelled && cfg) {
+          setConfig({ ...DEFAULT_HOME_CONFIG, ...cfg });
         }
       })
       .catch(() => { /* fall back to defaults */ });

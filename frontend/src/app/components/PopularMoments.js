@@ -139,9 +139,9 @@ function MomentCard({ moment, onClick }) {
             <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-1.5">
                     <div className="w-6 h-6 rounded-full bg-white/10 border border-white/20 flex items-center justify-center shrink-0 overflow-hidden">
-                        {moment.userId?.profilePic ? (
+                        {moment.userId?.avatar ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={mediaUrl(moment.userId.profilePic)} alt="" className="w-full h-full object-cover" />
+                            <img src={mediaUrl(moment.userId.avatar)} alt="" className="w-full h-full object-cover" />
                         ) : (
                             <span className="text-[10px] font-bold text-neutral-300">{(moment.userId?.name || "U")[0]}</span>
                         )}

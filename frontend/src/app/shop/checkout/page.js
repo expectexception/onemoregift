@@ -5,20 +5,22 @@ import { useRouter } from "next/navigation";
 import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
+import PayOrderModal from "@/app/components/PayOrderModal";
+import { fetchSiteConfig, parseDropDays, nextDatesForDays, dropDaysLabel } from "@/app/utils/siteConfig";
+import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
 import { useAuth } from "@/app/context/AuthContext";
-import { 
-    ShoppingBag, 
-    MapPin, 
-    Calendar, 
-    Clock, 
-    FileText, 
+import {
+    ShoppingBag,
+    MapPin,
+    Calendar,
+    Clock,
+    FileText,
     CreditCard,
     ShieldCheck,
     AlertTriangle,
-    X,
-    CheckCircle2,
     Lock,
-    Banknote
+    Banknote,
+    QrCode
 } from "lucide-react";
 
 // Short codes must match the backend enum exactly (model/Store.js operatingHoursSchema.day)
@@ -32,32 +34,45 @@ function formatTodayHours(operatingHours) {
     return `${today.open}–${today.close} today`;
 }
 
+// Weekly drop cycle: the pickup weekdays are admin-configured, so the selectable
+// pickup dates are derived from the live config rather than a fixed Mon/Tue pair.
+function getNextPickupDates(dropPickupDays) {
+    return nextDatesForDays(parseDropDays(dropPickupDays, [1, 2]), 2);
+}
+
+const DEFAULT_PAY_CONFIG = {
+    shopEnabled: true,
+    qrPaymentEnabled: true,
+    paymentGatewayEnabled: false,
+    codEnabled: true,
+    weeklyDropEnabled: false,
+    shopPhase: "sale",
+};
+
 export default function CheckoutPage() {
     const router = useRouter();
     const { user, userAuthenticated, loadingUser } = useAuth();
 
     // Cart State
     const [cart, setCart] = useState([]);
-    
+
     // Store State
     const [stores, setStores] = useState([]);
     const [loadingStores, setLoadingStores] = useState(true);
-    const [shopEnabled, setShopEnabled] = useState(true);
+    const [config, setConfig] = useState(DEFAULT_PAY_CONFIG);
 
     // Form fields
     const [selectedStoreId, setSelectedStoreId] = useState("");
     const [pickupDate, setPickupDate] = useState("");
     const [pickupTime, setPickupTime] = useState("");
     const [customerNote, setCustomerNote] = useState("");
-    const [paymentMethod, setPaymentMethod] = useState("online"); // 'online' | 'cod'
+    const [paymentMethod, setPaymentMethod] = useState("qr"); // 'qr' | 'online' | 'cod'
 
     // Checkout Flow States
     const [submitting, setSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [createdOrder, setCreatedOrder] = useState(null);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-    const [paymentProcessing, setPaymentProcessing] = useState(false);
-    const [paymentSuccessStatus, setPaymentSuccessStatus] = useState(null); // 'success' or 'failed'
 
     // Load Cart and Stores
     useEffect(() => {
@@ -87,9 +102,18 @@ export default function CheckoutPage() {
 
         fetchStores();
 
-        api.get("config")
-            .then(({ data }) => {
-                if (!data.error && data.config?.shopEnabled === false) setShopEnabled(false);
+        fetchSiteConfig()
+            .then((cfg) => {
+                const merged = { ...DEFAULT_PAY_CONFIG, ...cfg };
+                setConfig(merged);
+                // Preselect the first enabled payment method
+                const first = [
+                    merged.qrPaymentEnabled && "qr",
+                    merged.paymentGatewayEnabled
+                        && (merged.onlinePaymentReady || merged.sandboxPaymentsAllowed) && "online",
+                    merged.codEnabled && "cod",
+                ].filter(Boolean)[0];
+                if (first) setPaymentMethod(first);
             })
             .catch(() => {});
     }, []);
@@ -136,12 +160,56 @@ export default function CheckoutPage() {
     const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
     const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
+    // Cart editing — keeps localStorage + navbar badge in sync
+    const persistCart = (next) => {
+        setCart(next);
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
+        notifyCartUpdated();
+    };
+
+    const changeQuantity = (cartKey, delta) => {
+        const next = cart
+            .map((item) => {
+                if (item.cartKey !== cartKey) return item;
+                const qty = item.quantity + delta;
+                if (qty <= 0) return null;
+                if (item.maxStock && qty > item.maxStock) return item;
+                return { ...item, quantity: qty };
+            })
+            .filter(Boolean);
+        persistCart(next);
+    };
+
+    const removeItem = (cartKey) => {
+        persistCart(cart.filter((item) => item.cartKey !== cartKey));
+    };
+
+    const shopEnabled = config.shopEnabled !== false;
+    const saleClosed = config.weeklyDropEnabled && config.shopPhase !== "sale";
+    const saleDays = config.shopPhases?.sale?.days || "Fri, Sat";
+    const pickupDates = getNextPickupDates(config.dropPickupDays);
+    // "Pay Online" is only a real option when a gateway can actually settle the
+    // payment — a sandbox provider on the live site cannot, so it stays hidden
+    // instead of handing out orders that were never paid for.
+    const onlinePayUsable = config.paymentGatewayEnabled
+        && (config.onlinePaymentReady || config.sandboxPaymentsAllowed);
+    const paymentOptions = [
+        config.qrPaymentEnabled && { key: "qr", label: "Pay via UPI QR", sub: "Scan, pay & upload proof", icon: QrCode },
+        onlinePayUsable && { key: "online", label: "Pay Online", sub: "Card / UPI gateway", icon: CreditCard },
+        config.codEnabled && { key: "cod", label: "Cash on Pickup", sub: "Pay when you collect", icon: Banknote },
+    ].filter(Boolean);
+
     const handleSubmitOrder = async (e) => {
         e.preventDefault();
         setErrorMsg("");
 
         if (!shopEnabled) {
             setErrorMsg("Shop checkout is temporarily unavailable. Please check back later.");
+            return;
+        }
+
+        if (saleClosed) {
+            setErrorMsg(`Orders open only during the sale window (${saleDays}).`);
             return;
         }
 
@@ -188,10 +256,11 @@ export default function CheckoutPage() {
 
             if (!data.error && data.data) {
                 setCreatedOrder(data.data);
+                // Stock is reserved and the order exists — clear the cart for every method
+                localStorage.removeItem("omg_cart");
+                setCart([]);
                 if (paymentMethod === "cod") {
                     // COD order is confirmed immediately — no online payment step.
-                    localStorage.removeItem("omg_cart");
-                    setCart([]);
                     router.push("/shop/orders");
                 } else {
                     setPaymentModalOpen(true);
@@ -204,52 +273,6 @@ export default function CheckoutPage() {
             setErrorMsg(err.response?.data?.msg || "Failed to create order. Please try again.");
         } finally {
             setSubmitting(false);
-        }
-    };
-
-    // Simulate Payment
-    const handleSimulatePayment = async (success) => {
-        if (!createdOrder) return;
-        setPaymentProcessing(true);
-        setErrorMsg("");
-
-        try {
-            const { data } = await api.post("shop/orders/simulate-payment", {
-                orderId: createdOrder._id,
-                success
-            }, {
-                meta: { auth: "user" }
-            });
-
-            if (!data.error) {
-                setPaymentSuccessStatus(success ? 'success' : 'failed');
-                if (success) {
-                    // Empty Cart on success
-                    localStorage.removeItem("omg_cart");
-                    setCart([]);
-                    
-                    // Redirect after delay
-                    setTimeout(() => {
-                        setPaymentModalOpen(false);
-                        router.push("/shop/orders");
-                    }, 2000);
-                } else {
-                    // On failure, close modal and show error so they can retry payment later
-                    setTimeout(() => {
-                        setPaymentModalOpen(false);
-                        setErrorMsg("Payment simulation failed. Order is in pending status. You can pay from your orders page.");
-                    }, 1500);
-                }
-            } else {
-                setErrorMsg("Simulation API failed.");
-                setPaymentModalOpen(false);
-            }
-        } catch (err) {
-            console.error(err);
-            setErrorMsg("Payment processing error.");
-            setPaymentModalOpen(false);
-        } finally {
-            setPaymentProcessing(false);
         }
     };
 
@@ -271,6 +294,16 @@ export default function CheckoutPage() {
                     <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/20 text-amber-400 text-xs flex gap-3 items-center mb-8">
                         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                         <span>Shop checkout is temporarily unavailable. You can browse products, but orders cannot be placed right now.</span>
+                    </div>
+                )}
+
+                {shopEnabled && saleClosed && (
+                    <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-500/20 text-blue-300 text-xs flex gap-3 items-center mb-8">
+                        <Clock className="w-5 h-5 flex-shrink-0" />
+                        <span>
+                            <strong>Sale window closed.</strong> Orders can only be placed on <strong>{saleDays}</strong>.
+                            Products & prices reveal {dropDaysLabel(config, "reveal")}, and order pickups happen {dropDaysLabel(config, "pickup")}.
+                        </span>
                     </div>
                 )}
 
@@ -353,17 +386,39 @@ export default function CheckoutPage() {
                                     2. Schedule Collection Time
                                 </h3>
 
+                                {config.weeklyDropEnabled && (
+                                    <p className="text-[11px] text-neutral-500 -mt-2">
+                                        Pickups happen on <span className="text-neutral-300 font-semibold">Monday & Tuesday</span> after the weekend sale.
+                                    </p>
+                                )}
+
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-semibold text-neutral-400 mb-2 uppercase tracking-wider">Pickup Date</label>
-                                        <input
-                                            type="date"
-                                            value={pickupDate}
-                                            min={new Date().toISOString().split("T")[0]}
-                                            onChange={(e) => setPickupDate(e.target.value)}
-                                            required
-                                            className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
-                                        />
+                                        {config.weeklyDropEnabled ? (
+                                            <select
+                                                value={pickupDate}
+                                                onChange={(e) => setPickupDate(e.target.value)}
+                                                required
+                                                className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
+                                            >
+                                                <option value="" className="bg-black">Select pickup day...</option>
+                                                {pickupDates.map((d) => (
+                                                    <option key={d.toISOString()} value={d.toLocaleDateString("en-CA")} className="bg-black">
+                                                        {d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="date"
+                                                value={pickupDate}
+                                                min={new Date().toISOString().split("T")[0]}
+                                                onChange={(e) => setPickupDate(e.target.value)}
+                                                required
+                                                className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-sm focus:outline-none focus:border-red-600 transition-colors"
+                                            />
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-neutral-400 mb-2 uppercase tracking-wider">Estimated Time</label>
@@ -420,9 +475,22 @@ export default function CheckoutPage() {
                                                 </div>
                                                 <div>
                                                     <h4 className="text-xs font-bold text-white line-clamp-1">{item.name}</h4>
-                                                    <p className="text-[10px] text-neutral-500 mt-0.5">
-                                                        Qty: {item.quantity} {item.variant && `| Option: ${item.variant.name}`}
-                                                    </p>
+                                                    {item.variant && (
+                                                        <p className="text-[10px] text-neutral-500 mt-0.5">Option: {item.variant.name}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <div className="flex items-center border border-neutral-800 rounded-lg overflow-hidden bg-neutral-900">
+                                                            <button type="button" onClick={() => changeQuantity(item.cartKey, -1)}
+                                                                className="px-2 py-0.5 text-neutral-400 hover:text-white hover:bg-neutral-800 text-xs cursor-pointer">−</button>
+                                                            <span className="px-2 text-[11px] font-bold text-white select-none">{item.quantity}</span>
+                                                            <button type="button" onClick={() => changeQuantity(item.cartKey, 1)}
+                                                                className="px-2 py-0.5 text-neutral-400 hover:text-white hover:bg-neutral-800 text-xs cursor-pointer">+</button>
+                                                        </div>
+                                                        <button type="button" onClick={() => removeItem(item.cartKey)}
+                                                            className="text-[10px] text-neutral-600 hover:text-red-400 uppercase font-bold tracking-wider transition-colors cursor-pointer">
+                                                            Remove
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <span className="text-xs font-bold text-neutral-300">₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
@@ -452,43 +520,44 @@ export default function CheckoutPage() {
                                 {/* Payment method selection */}
                                 <div className="pt-4 border-t border-neutral-900">
                                     <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Payment Method</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod("online")}
-                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${paymentMethod === "online"
-                                                ? "border-red-500 bg-red-500/10"
-                                                : "border-white/10 bg-white/[0.02] hover:border-white/20"}`}
-                                        >
-                                            <CreditCard className={`w-6 h-6 ${paymentMethod === "online" ? "text-red-400" : "text-neutral-400"}`} />
-                                            <span className="text-xs font-semibold text-white">Pay Online</span>
-                                            <span className="text-[10px] text-neutral-500">Card / UPI (sandbox)</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod("cod")}
-                                            className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${paymentMethod === "cod"
-                                                ? "border-red-500 bg-red-500/10"
-                                                : "border-white/10 bg-white/[0.02] hover:border-white/20"}`}
-                                        >
-                                            <Banknote className={`w-6 h-6 ${paymentMethod === "cod" ? "text-red-400" : "text-neutral-400"}`} />
-                                            <span className="text-xs font-semibold text-white">Cash on Pickup</span>
-                                            <span className="text-[10px] text-neutral-500">Pay when you collect</span>
-                                        </button>
-                                    </div>
+                                    {paymentOptions.length === 0 ? (
+                                        <p className="text-xs text-amber-400">No payment methods are enabled right now. Please try again later.</p>
+                                    ) : (
+                                        <div className={`grid gap-3 ${paymentOptions.length >= 3 ? "grid-cols-3" : paymentOptions.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                                            {paymentOptions.map(({ key, label, sub, icon: Icon }) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setPaymentMethod(key)}
+                                                    className={`flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl border text-center transition-all cursor-pointer ${paymentMethod === key
+                                                        ? "border-red-500 bg-red-500/10"
+                                                        : "border-white/10 bg-white/[0.02] hover:border-white/20"}`}
+                                                >
+                                                    <Icon className={`w-6 h-6 ${paymentMethod === key ? "text-red-400" : "text-neutral-400"}`} />
+                                                    <span className="text-xs font-semibold text-white">{label}</span>
+                                                    <span className="text-[10px] text-neutral-500">{sub}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button
                                     type="submit"
-                                    disabled={submitting || !shopEnabled}
+                                    disabled={submitting || !shopEnabled || saleClosed || paymentOptions.length === 0}
                                     className="w-full py-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                    {submitting ? "Placing Order..." : !shopEnabled ? "Checkout Unavailable" : paymentMethod === "cod" ? "Place Order (Pay on Pickup)" : "Place Order & Pay"}
+                                    {submitting ? "Placing Order..."
+                                        : !shopEnabled ? "Checkout Unavailable"
+                                        : saleClosed ? "Sale Opens Friday"
+                                        : paymentMethod === "cod" ? "Place Order (Pay on Pickup)"
+                                        : paymentMethod === "qr" ? "Place Order & Pay via QR"
+                                        : "Place Order & Pay"}
                                 </button>
 
                                 <div className="flex justify-center items-center gap-1.5 text-[10px] text-neutral-500">
                                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                    SSL Secured Checkout Sandbox
+                                    Secure checkout — payments verified by our team
                                 </div>
                             </div>
                         </div>
@@ -498,67 +567,20 @@ export default function CheckoutPage() {
 
             <Footer />
 
-            {/* Sandbox Payment Simulator Modal */}
+            {/* Payment Modal — QR proof upload + optional sandbox gateway */}
             {paymentModalOpen && createdOrder && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    {/* Backdrop */}
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-
-                    {/* Modal Content */}
-                    <div className="bg-neutral-950 border border-neutral-800 rounded-3xl max-w-md w-full p-8 relative z-10 text-center space-y-6 shadow-2xl animate-scale-in">
-                        <div className="w-12 h-12 bg-red-950/30 border border-red-500/20 text-red-500 rounded-xl flex items-center justify-center mx-auto">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-
-                        <div>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/30">
-                                Sandbox Gateway
-                            </span>
-                            <h3 className="text-xl font-bold mt-3 text-white">Simulate Payment</h3>
-                            <p className="text-xs text-neutral-400 mt-1">
-                                Order ID: <span className="font-mono text-neutral-200">{createdOrder.orderSerialNumber || createdOrder._id}</span>
-                            </p>
-                        </div>
-
-                        <div className="py-4 border-y border-neutral-900 my-2 space-y-1.5">
-                            <p className="text-xs text-neutral-500">Amount Payable</p>
-                            <p className="text-3xl font-extrabold text-white">₹{createdOrder.total.toLocaleString("en-IN")}</p>
-                        </div>
-
-                        {paymentSuccessStatus === 'success' ? (
-                            <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 text-xs flex gap-3 items-center justify-center animate-pulse">
-                                <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                                <span className="font-bold">Payment Approved! Redirecting...</span>
-                            </div>
-                        ) : paymentSuccessStatus === 'failed' ? (
-                            <div className="p-4 rounded-xl bg-red-950/30 border border-red-500/20 text-red-400 text-xs flex gap-3 items-center justify-center">
-                                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                                <span className="font-bold">Payment Simulation Refused.</span>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => handleSimulatePayment(true)}
-                                    disabled={paymentProcessing}
-                                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
-                                >
-                                    {paymentProcessing ? "Authorizing..." : "Simulate Success (Pay)"}
-                                </button>
-                                <button
-                                    onClick={() => handleSimulatePayment(false)}
-                                    disabled={paymentProcessing}
-                                    className="w-full py-3 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-40 cursor-pointer"
-                                >
-                                    Simulate Failure
-                                </button>
-                            </div>
-                        )}
-                        
-                        <p className="text-[10px] text-neutral-500">
-                            This is a secure local playground simulation. No real money will be charged.
-                        </p>
-                    </div>
-                </div>
+                <PayOrderModal
+                    order={createdOrder}
+                    config={config}
+                    onClose={() => {
+                        setPaymentModalOpen(false);
+                        router.push("/shop/orders");
+                    }}
+                    onDone={() => {
+                        setPaymentModalOpen(false);
+                        router.push("/shop/orders");
+                    }}
+                />
             )}
         </div>
     );

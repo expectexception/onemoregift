@@ -9,6 +9,8 @@ import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import OrderStatusTimeline from "@/app/components/OrderStatusTimeline";
+import PayOrderModal from "@/app/components/PayOrderModal";
+import { fetchSiteConfig } from "@/app/utils/siteConfig";
 import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
 import {
     ShoppingBag,
@@ -20,8 +22,13 @@ import {
     CheckCircle2,
     Clock,
     HelpCircle,
-    CreditCard
+    Hourglass
 } from "lucide-react";
+
+const DEFAULT_PAY_CONFIG = {
+    qrPaymentEnabled: true,
+    paymentGatewayEnabled: false,
+};
 
 export default function MyOrdersPage() {
     const router = useRouter();
@@ -32,11 +39,10 @@ export default function MyOrdersPage() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState("");
+    const [config, setConfig] = useState(DEFAULT_PAY_CONFIG);
 
-    // Payment Retry Modal States
+    // Payment Modal state
     const [retryOrder, setRetryOrder] = useState(null);
-    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-    const [paymentProcessing, setPaymentProcessing] = useState(false);
 
     // Fetch user's orders
     const fetchOrders = useCallback(async () => {
@@ -62,6 +68,12 @@ export default function MyOrdersPage() {
         }
     }, [loadingUser, userAuthenticated, fetchOrders]);
 
+    useEffect(() => {
+        fetchSiteConfig()
+            .then((cfg) => setConfig({ ...DEFAULT_PAY_CONFIG, ...cfg }))
+            .catch(() => {});
+    }, []);
+
     // Cancel order handler
     const handleCancelOrder = async (orderId) => {
         const ok = await confirm({
@@ -85,39 +97,6 @@ export default function MyOrdersPage() {
         } catch (err) {
             console.error(err);
             toast({ title: "Error", description: "Something went wrong cancelling the order.", variant: "destructive" });
-        }
-    };
-
-    // Retry payment handler
-    const handleRetryPayment = async (success) => {
-        if (!retryOrder) return;
-        setPaymentProcessing(true);
-
-        try {
-            const { data } = await api.post("shop/orders/simulate-payment", {
-                orderId: retryOrder._id,
-                success
-            }, {
-                meta: { auth: "user" }
-            });
-
-            if (!data.error) {
-                if (success) {
-                    toast({ title: "Payment successful", description: "Your order has been marked as paid." });
-                } else {
-                    toast({ title: "Payment failed", description: "Payment simulation marked as failed.", variant: "destructive" });
-                }
-                setPaymentModalOpen(false);
-                setRetryOrder(null);
-                fetchOrders();
-            } else {
-                toast({ title: "Simulation error", description: "Payment simulation API failed.", variant: "destructive" });
-            }
-        } catch (err) {
-            console.error(err);
-            toast({ title: "Error", description: "Payment simulation error.", variant: "destructive" });
-        } finally {
-            setPaymentProcessing(false);
         }
     };
 
@@ -226,7 +205,7 @@ export default function MyOrdersPage() {
                                         <div className="space-y-1">
                                             <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Order Reference</p>
                                             <h3 className="text-sm sm:text-base font-bold text-white font-mono uppercase">
-                                                #{order.orderSerialNumber || order._id.slice(-8)}
+                                                #{order.orderNumber || order._id.slice(-8)}
                                             </h3>
                                         </div>
 
@@ -248,7 +227,7 @@ export default function MyOrdersPage() {
 
                                     {/* Status Timeline */}
                                     <div className="px-6 sm:px-10 pt-6">
-                                        <OrderStatusTimeline status={order.status} />
+                                        <OrderStatusTimeline status={order.status} paymentStatus={order.paymentStatus} />
                                     </div>
 
                                     {/* Order items grid list */}
@@ -340,7 +319,19 @@ export default function MyOrdersPage() {
                                                 </div>
                                             ) : (
                                                 <div className="space-y-4 w-full flex flex-col items-center justify-center py-6">
-                                                    {order.status === "pending" ? (
+                                                    {order.status === "pending" && order.paymentStatus === "verification_pending" ? (
+                                                        <>
+                                                            <div className="w-10 h-10 bg-blue-950/20 text-blue-400 rounded-full flex items-center justify-center">
+                                                                <Hourglass className="w-5 h-5 animate-pulse" />
+                                                            </div>
+                                                            <div>
+                                                                <h5 className="text-xs font-bold text-blue-300">Payment Under Verification</h5>
+                                                                <p className="text-[10px] text-neutral-500 mt-1 leading-normal">
+                                                                    We received your payment proof{order.paymentProofSubmittedAt ? ` on ${new Date(order.paymentProofSubmittedAt).toLocaleDateString("en-IN")}` : ""}. Our team will verify it and confirm your order shortly.
+                                                                </p>
+                                                            </div>
+                                                        </>
+                                                    ) : order.status === "pending" ? (
                                                         <>
                                                             <div className="w-10 h-10 bg-amber-950/20 text-amber-500 rounded-full flex items-center justify-center">
                                                                 <Clock className="w-5 h-5 animate-pulse" />
@@ -348,14 +339,16 @@ export default function MyOrdersPage() {
                                                             <div>
                                                                 <h5 className="text-xs font-bold text-neutral-300">Awaiting Payment</h5>
                                                                 <p className="text-[10px] text-neutral-500 mt-1 leading-normal">
-                                                                    Complete your sandbox payment simulation to generate collection codes.
+                                                                    Complete your payment to generate collection codes.
                                                                 </p>
+                                                                {order.paymentStatus === "failed" && order.paymentRejectedReason && (
+                                                                    <p className="text-[10px] text-red-400 mt-1.5 leading-normal">
+                                                                        Last proof rejected: {order.paymentRejectedReason}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                             <button
-                                                                onClick={() => {
-                                                                    setRetryOrder(order);
-                                                                    setPaymentModalOpen(true);
-                                                                }}
+                                                                onClick={() => setRetryOrder(order)}
                                                                 className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-black text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer"
                                                             >
                                                                 Pay Now
@@ -413,48 +406,17 @@ export default function MyOrdersPage() {
 
             <Footer />
 
-            {/* Sandbox Payment Simulator Modal */}
-            {paymentModalOpen && retryOrder && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPaymentModalOpen(false)} />
-                    <div className="bg-neutral-950 border border-neutral-800 rounded-3xl max-w-md w-full p-8 relative z-10 text-center space-y-6 shadow-2xl animate-scale-in">
-                        <div className="w-12 h-12 bg-red-950/30 border border-red-500/20 text-red-500 rounded-xl flex items-center justify-center mx-auto">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-
-                        <div>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 bg-red-950/20 px-2 py-0.5 rounded border border-red-900/30">
-                                Sandbox Retry Gateway
-                            </span>
-                            <h3 className="text-xl font-bold mt-3 text-white">Retry Payment</h3>
-                            <p className="text-xs text-neutral-400 mt-1 font-mono">
-                                Order #{retryOrder.orderSerialNumber || retryOrder._id}
-                            </p>
-                        </div>
-
-                        <div className="py-4 border-y border-neutral-900 my-2">
-                            <p className="text-xs text-neutral-500">Amount Payable</p>
-                            <p className="text-3xl font-extrabold text-white">₹{retryOrder.total.toLocaleString("en-IN")}</p>
-                        </div>
-
-                        <div className="space-y-3">
-                            <button
-                                onClick={() => handleRetryPayment(true)}
-                                disabled={paymentProcessing}
-                                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                            >
-                                {paymentProcessing ? "Authorizing..." : "Simulate Success (Pay)"}
-                            </button>
-                            <button
-                                onClick={() => handleRetryPayment(false)}
-                                disabled={paymentProcessing}
-                                className="w-full py-3 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-neutral-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                            >
-                                Simulate Failure
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {/* Payment Modal — QR proof upload + optional sandbox gateway */}
+            {retryOrder && (
+                <PayOrderModal
+                    order={retryOrder}
+                    config={config}
+                    onClose={() => setRetryOrder(null)}
+                    onDone={() => {
+                        setRetryOrder(null);
+                        fetchOrders();
+                    }}
+                />
             )}
 
             {ConfirmDialog}

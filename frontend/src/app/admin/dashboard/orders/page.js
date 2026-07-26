@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import api from "@/app/utils/apiClient";
+import api, { mediaUrl } from "@/app/utils/apiClient";
 import withAdminAuth from "@/app/components/withAdminAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import { EmptyTimelineIllustration } from "@/app/components/SVGIcons";
-import { Package, Search, Eye, CheckCircle, QrCode } from "lucide-react";
+import { Package, Search, Eye, CheckCircle, QrCode, BadgeCheck, XCircle } from "lucide-react";
 
 const STATUS_COLORS = {
     pending: "bg-neutral-800 text-neutral-400",
@@ -17,7 +17,16 @@ const STATUS_COLORS = {
     refunded: "bg-orange-500/10 text-orange-400",
 };
 
+const PAYMENT_COLORS = {
+    paid: "bg-green-500/10 text-green-400",
+    verification_pending: "bg-amber-500/10 text-amber-400",
+    failed: "bg-red-500/10 text-red-400",
+    refunded: "bg-orange-500/10 text-orange-400",
+    pending: "bg-neutral-800 text-neutral-400",
+};
+
 const STATUS_OPTIONS = ["", "pending", "paid", "ready_for_pickup", "collected", "cancelled", "refunded"];
+const PAYMENT_OPTIONS = ["", "pending", "verification_pending", "paid", "failed", "refunded"];
 
 function OrdersAdminPage() {
     const { toast } = useToast();
@@ -28,7 +37,9 @@ function OrdersAdminPage() {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [status, setStatus] = useState("");
+    const [paymentStatus, setPaymentStatus] = useState("");
     const [search, setSearch] = useState(searchParams.get("search") || "");
+    const [verifyNote, setVerifyNote] = useState("");
     const [stats, setStats] = useState({});
     const [selected, setSelected] = useState(null);
     const [newStatus, setNewStatus] = useState("");
@@ -50,12 +61,13 @@ function OrdersAdminPage() {
         try {
             const params = { page, limit };
             if (status) params.status = status;
+            if (paymentStatus) params.paymentStatus = paymentStatus;
             if (search) params.search = search;
             const { data } = await api.get("admin/orders", { params, meta: { auth: "admin" } });
             if (!data.error) { setOrders(data.data || []); setTotal(data.total || 0); }
         } catch (_) {}
         setLoading(false);
-    }, [page, status, search]);
+    }, [page, status, paymentStatus, search]);
 
     useEffect(() => { fetchStats(); }, [fetchStats]);
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
@@ -70,6 +82,32 @@ function OrdersAdminPage() {
             fetchOrders(); fetchStats();
         } catch (err) {
             toast({ title: "Update failed", description: err?.response?.data?.msg, variant: "destructive" });
+        }
+        setActionLoading(false);
+    };
+
+    const handleVerifyPayment = async (approve) => {
+        if (!selected) return;
+        if (!approve) {
+            const ok = await confirm({
+                title: "Reject payment proof?",
+                description: "The order will go back to 'awaiting payment' and the user can re-submit proof.",
+                confirmText: "Reject Proof",
+                danger: true,
+            });
+            if (!ok) return;
+        }
+        setActionLoading(true);
+        try {
+            await api.patch(`admin/orders/${selected._id}/verify-payment`, { approve, note: verifyNote }, { meta: { auth: "admin" } });
+            toast({
+                title: approve ? "Payment verified" : "Payment rejected",
+                description: approve ? "Order confirmed — pickup code generated." : "User will see the rejection reason.",
+            });
+            setSelected(null);
+            fetchOrders(); fetchStats();
+        } catch (err) {
+            toast({ title: "Action failed", description: err?.response?.data?.msg, variant: "destructive" });
         }
         setActionLoading(false);
     };
@@ -143,6 +181,10 @@ function OrdersAdminPage() {
                         value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}>
                         {STATUS_OPTIONS.map(s => <option key={s} value={s} className="bg-black">{s || "All Statuses"}</option>)}
                     </select>
+                    <select className="bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                        value={paymentStatus} onChange={e => { setPaymentStatus(e.target.value); setPage(1); }}>
+                        {PAYMENT_OPTIONS.map(s => <option key={s} value={s} className="bg-black">{s ? `Payment: ${s.replace(/_/g, " ")}` : "All Payments"}</option>)}
+                    </select>
                 </div>
 
                 {/* Table */}
@@ -171,8 +213,8 @@ function OrdersAdminPage() {
                                         <td className="px-4 py-3 text-sm text-neutral-400">{o.items?.length || 0}</td>
                                         <td className="px-4 py-3 text-sm text-white">₹{o.total?.toLocaleString("en-IN")}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`text-xs px-2 py-1 rounded-full ${o.paymentStatus === "paid" ? "bg-green-500/10 text-green-400" : "bg-neutral-800 text-neutral-400"}`}>
-                                                {o.paymentStatus}
+                                            <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${PAYMENT_COLORS[o.paymentStatus] || "bg-neutral-800 text-neutral-400"}`}>
+                                                {o.paymentStatus?.replace(/_/g, " ")}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
@@ -182,7 +224,7 @@ function OrdersAdminPage() {
                                         </td>
                                         <td className="px-4 py-3 text-xs text-neutral-500">{new Date(o.createdAt).toLocaleDateString("en-IN")}</td>
                                         <td className="px-4 py-3">
-                                            <button onClick={() => { setSelected(o); setNewStatus(o.status); setAdminNote(o.adminNote || ""); setPickupCode(""); setRefundReason(""); }}
+                                            <button onClick={() => { setSelected(o); setNewStatus(o.status); setAdminNote(o.adminNote || ""); setPickupCode(""); setRefundReason(""); setVerifyNote(""); }}
                                                 className="text-xs px-3 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-lg text-white transition-colors flex items-center gap-1">
                                                 <Eye className="w-3 h-3" /> Manage
                                             </button>
@@ -220,7 +262,7 @@ function OrdersAdminPage() {
                                 {[
                                     { label: "Customer", value: selected.userId?.name },
                                     { label: "Total", value: `₹${selected.total?.toLocaleString("en-IN")}` },
-                                    { label: "Payment", value: selected.paymentStatus },
+                                    { label: "Payment", value: `${selected.paymentStatus?.replace(/_/g, " ")}${selected.paymentMethod ? ` (${selected.paymentMethod})` : ""}` },
                                     { label: "Pickup Store", value: selected.pickupStoreId?.name || "—" },
                                     { label: "Pickup Code", value: selected.pickupCode || "—" },
                                 ].map(r => (
@@ -230,6 +272,49 @@ function OrdersAdminPage() {
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Payment Proof Verification */}
+                            {selected.paymentStatus === "verification_pending" && (
+                                <div className="border border-amber-500/25 bg-amber-500/[0.04] rounded-xl p-4 mb-6 space-y-3">
+                                    <h3 className="text-sm font-semibold text-amber-400 flex items-center gap-2">
+                                        <BadgeCheck className="w-4 h-4" /> Verify QR Payment
+                                    </h3>
+                                    {selected.paymentReference && (
+                                        <p className="text-xs text-neutral-400">
+                                            UPI Ref: <span className="text-white font-mono">{selected.paymentReference}</span>
+                                        </p>
+                                    )}
+                                    {selected.paymentProofSubmittedAt && (
+                                        <p className="text-xs text-neutral-500">
+                                            Submitted: {new Date(selected.paymentProofSubmittedAt).toLocaleString("en-IN")}
+                                        </p>
+                                    )}
+                                    {Array.isArray(selected.paymentProofs) && selected.paymentProofs.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {selected.paymentProofs.map((p, idx) => (
+                                                <a key={idx} href={mediaUrl(p.url)} target="_blank" rel="noopener noreferrer"
+                                                    className="block w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-neutral-900 hover:border-amber-500/50 transition-all">
+                                                    <img src={mediaUrl(p.url)} alt={`Payment proof ${idx + 1}`} className="w-full h-full object-cover" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-neutral-500">No proof screenshots attached.</p>
+                                    )}
+                                    <input className="w-full bg-white/[0.04] border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+                                        placeholder="Note / rejection reason (optional)..." value={verifyNote} onChange={e => setVerifyNote(e.target.value)} />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => handleVerifyPayment(true)} disabled={actionLoading}
+                                            className="py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-xl disabled:opacity-60 flex items-center justify-center gap-1.5">
+                                            <CheckCircle className="w-3.5 h-3.5" /> Approve & Confirm
+                                        </button>
+                                        <button onClick={() => handleVerifyPayment(false)} disabled={actionLoading}
+                                            className="py-2 bg-red-600/80 hover:bg-red-700 text-white text-xs font-semibold rounded-xl disabled:opacity-60 flex items-center justify-center gap-1.5">
+                                            <XCircle className="w-3.5 h-3.5" /> Reject Proof
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Status Update */}
                             <div className="space-y-3 mb-4">

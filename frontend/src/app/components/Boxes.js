@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRouter, usePathname } from "next/navigation";
 import api from "../utils/apiClient";
+import { fetchSiteConfig } from "../utils/siteConfig";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { VerificationIcon, UserIcon, ShieldIcon } from "./SVGIcons";
@@ -55,14 +56,12 @@ export default function Giveaways() {
 
     const fetchItems = useCallback(async () => {
         try {
-            const [gwRes, configRes] = await Promise.all([
+            const [gwRes, cfg] = await Promise.all([
                 api.get("giveaway"),
-                api.get("config")
+                fetchSiteConfig()
             ]);
             setItems(gwRes.data.data || []);
-            if (configRes.data && configRes.data.config) {
-                setConfig(configRes.data.config);
-            }
+            if (cfg) setConfig(cfg);
         } catch (error) {
             console.error("Error fetching giveaways or config:", error);
         }

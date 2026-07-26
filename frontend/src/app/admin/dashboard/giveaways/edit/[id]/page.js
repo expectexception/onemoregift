@@ -26,6 +26,7 @@ import withAdminAuth from "../../../../../components/withAdminAuth";
 import api from "@/app/utils/apiClient";
 import { compressImage } from "@/app/utils/imageCompressor";
 import { TimePicker } from "@/app/components/TimePicker";
+import { DatePicker } from "@/app/components/DatePicker";
 import dayjs from "@/app/utils/dayjs";
 import { useRouter } from "next/navigation";
 
@@ -330,22 +331,14 @@ function EditGiveaway({ params }) {
                                     <SectionTitle icon={CalendarClock} title="Schedule in IST" />
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-neutral-500 ml-1 flex items-center gap-2">
-                                                    <Calendar className="w-3 h-3 text-emerald-500" />
-                                                    Start Date
-                                                </Label>
-                                                <div className="relative group/input">
-                                                    <Input
-                                                        type="date"
-                                                        value={startDate}
-                                                        onChange={(e) => setStartDate(e.target.value)}
-                                                        min={istToday}
-                                                        className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs focus-visible:ring-red-500/40"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
+                                            <DatePicker
+                                                label="Start date"
+                                                value={startDate}
+                                                onChange={setStartDate}
+                                                min={istToday}
+                                                testId="giveaway-start-date"
+                                                required
+                                            />
                                             <TimePicker
                                                 label="Start time"
                                                 value={startTime}
@@ -354,22 +347,14 @@ function EditGiveaway({ params }) {
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-xs font-semibold text-neutral-500 ml-1 flex items-center gap-2">
-                                                    <Calendar className="w-3 h-3 text-red-500" />
-                                                    End Date
-                                                </Label>
-                                                <div className="relative group/input">
-                                                    <Input
-                                                        type="date"
-                                                        value={endDate}
-                                                        onChange={(e) => setEndDate(e.target.value)}
-                                                        min={startDate || istToday}
-                                                        className="h-10 bg-white/[0.03] border-white/[0.08] text-white rounded-xl font-mono text-xs focus-visible:ring-red-500/40"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
+                                            <DatePicker
+                                                label="End date"
+                                                value={endDate}
+                                                onChange={setEndDate}
+                                                min={startDate || istToday}
+                                                testId="giveaway-end-date"
+                                                required
+                                            />
                                             <TimePicker
                                                 label="End time"
                                                 value={endTime}

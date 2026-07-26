@@ -42,6 +42,11 @@ const ALLOWED_VIDEO_TYPES = new Map([
     ['video/quicktime', '.mov'],
 ]);
 
+// Document proofs (surprise applications, payment proofs)
+const ALLOWED_DOC_TYPES = new Map([
+    ['application/pdf', '.pdf'],
+]);
+
 console.log(`[Upload] IMAGE_STORAGE=${IMAGE_STORAGE} | ${IMAGE_STORAGE === 'disk' ? `MEDIA_DIR=${MEDIA_DIR}` : 'MongoDB'}`);
 
 if (IMAGE_STORAGE === 'disk') {
@@ -67,13 +72,16 @@ const hasAllowedSignature = (buf, mimetype) => {
     // Ogg — "OggS" capture pattern
     if (mimetype === 'video/ogg')
         return buf.length >= 4 && buf.subarray(0, 4).toString('ascii') === 'OggS';
+    // PDF — "%PDF" header
+    if (mimetype === 'application/pdf')
+        return buf.length >= 4 && buf.subarray(0, 4).toString('ascii') === '%PDF';
     return false;
 };
 
 // ── Multer — always use memory storage so we can compress before saving ───────
 const fileFilter = (req, file, cb) => {
-    if (!ALLOWED_IMAGE_TYPES.has(file.mimetype) && !ALLOWED_VIDEO_TYPES.has(file.mimetype)) {
-        return cb(new Error('Only JPG, PNG, WEBP, GIF images, or MP4, WEBM, OGG, MOV videos are allowed'));
+    if (!ALLOWED_IMAGE_TYPES.has(file.mimetype) && !ALLOWED_VIDEO_TYPES.has(file.mimetype) && !ALLOWED_DOC_TYPES.has(file.mimetype)) {
+        return cb(new Error('Only JPG, PNG, WEBP, GIF images, MP4, WEBM, OGG, MOV videos, or PDF documents are allowed'));
     }
     cb(null, true);
 };
@@ -117,9 +125,12 @@ async function compressBuffer(buffer, mimetype) {
 // ── Save to disk ──────────────────────────────────────────────────────────────
 async function saveToDisk(file) {
     const isVid = ALLOWED_VIDEO_TYPES.has(file.mimetype);
-    const ext = isVid ? ALLOWED_VIDEO_TYPES.get(file.mimetype) : (ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg');
+    const isDoc = ALLOWED_DOC_TYPES.has(file.mimetype);
+    const ext = isVid ? ALLOWED_VIDEO_TYPES.get(file.mimetype)
+        : isDoc ? ALLOWED_DOC_TYPES.get(file.mimetype)
+        : (ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg');
     const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-    const dataToWrite = isVid ? file.buffer : await compressBuffer(file.buffer, file.mimetype);
+    const dataToWrite = (isVid || isDoc) ? file.buffer : await compressBuffer(file.buffer, file.mimetype);
     const filePath = path.join(MEDIA_DIR, filename);
     await fs.promises.writeFile(filePath, dataToWrite);
 
@@ -132,15 +143,18 @@ async function saveToDisk(file) {
         ? `/uploads/images/${filename}`
         : `/media/${filename}`;
 
-    return { filename, url, size: dataToWrite.length, originalSize: file.size, type: isVid ? 'video' : 'image' };
+    return { filename, url, size: dataToWrite.length, originalSize: file.size, type: isVid ? 'video' : isDoc ? 'file' : 'image' };
 }
 
 // ── Save to MongoDB ───────────────────────────────────────────────────────────
 async function saveToMongo(file) {
     const isVid = ALLOWED_VIDEO_TYPES.has(file.mimetype);
-    const ext = isVid ? ALLOWED_VIDEO_TYPES.get(file.mimetype) : (ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg');
+    const isDoc = ALLOWED_DOC_TYPES.has(file.mimetype);
+    const ext = isVid ? ALLOWED_VIDEO_TYPES.get(file.mimetype)
+        : isDoc ? ALLOWED_DOC_TYPES.get(file.mimetype)
+        : (ALLOWED_IMAGE_TYPES.get(file.mimetype) || '.jpg');
     const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-    const dataToWrite = isVid ? file.buffer : await compressBuffer(file.buffer, file.mimetype);
+    const dataToWrite = (isVid || isDoc) ? file.buffer : await compressBuffer(file.buffer, file.mimetype);
 
     const doc = await ImageStore.create({
         filename,
@@ -153,8 +167,9 @@ async function saveToMongo(file) {
     console.log(`[Upload/mongo] ${filename} | ${file.size}B → ${dataToWrite.length}B | id=${doc._id}`);
 
     // Relative URL — proxied through Next.js in dev, same-origin in prod
+    // (the /image/:id route serves any stored file with its correct Content-Type)
     const url = isVid ? `/api/v1/upload/video/${doc._id}` : `/api/v1/upload/image/${doc._id}`;
-    return { filename, url, size: dataToWrite.length, originalSize: file.size, id: doc._id, type: isVid ? 'video' : 'image' };
+    return { filename, url, size: dataToWrite.length, originalSize: file.size, id: doc._id, type: isVid ? 'video' : isDoc ? 'file' : 'image' };
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -204,7 +219,7 @@ router.get('/media/:filename', async (req, res) => {
 const isValidFile = (file) => {
     if (!hasAllowedSignature(file.buffer, file.mimetype)) return false;
     const isVid = ALLOWED_VIDEO_TYPES.has(file.mimetype);
-    const cap = isVid ? MAX_VIDEO_SIZE_BYTES : MAX_IMAGE_SIZE_BYTES;
+    const cap = isVid ? MAX_VIDEO_SIZE_BYTES : MAX_IMAGE_SIZE_BYTES; // PDFs use the image cap
     return file.size <= cap;
 };
 

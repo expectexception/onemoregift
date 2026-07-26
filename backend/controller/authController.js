@@ -242,10 +242,17 @@ const register = async (req, res) => {
         // If OTP verification is disabled globally, auto-verify all registrations
         const skipOtp = !OTP_VERIFICATION_ENABLED || isTest;
 
+        // Both lookups go through deterministic hashes — email/phone are encrypted
+        // at rest with random IVs, so plaintext queries can never match.
         const emailHashVal = hmacHash(normalizedEmail);
-        const existingUser = await Users.findOne({ $or: [{ emailHash: emailHashVal }, { phone: normalizedPhone }] });
+        const existingUser = await Users.findOne({
+            $or: [
+                { emailHash: emailHashVal },
+                ...(normalizedPhone ? [{ phoneHash: hmacHash(normalizedPhone) }] : []),
+            ],
+        });
         if (existingUser && existingUser.isVerified !== false) {
-            const errorMessage = existingUser.email === normalizedEmail
+            const errorMessage = existingUser.emailHash === emailHashVal
                 ? 'A user with that email already exists'
                 : 'A user with that phone number already exists';
             return res.status(409).json({ error: true, msg: errorMessage });
@@ -776,7 +783,7 @@ const checkUser = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Phone no is required.' });
         }
 
-        const findUser = await Users.findOne({ phone }).select('-_id blocked');
+        const findUser = await Users.findOne({ phoneHash: hmacHash(String(phone).replace(/\D/g, '').slice(-10)) }).select('-_id blocked');
         if (findUser) {
             return res.status(200).json({ error: false, msg: 'User exists', user: findUser });
         }
@@ -837,7 +844,12 @@ const verifyRegistrationOtp = async (req, res) => {
                 return res.status(400).json({ error: true, msg: 'Invalid OTP' });
             }
 
-            const existingUser = await Users.findOne({ $or: [{ emailHash: hmacHash(pending.email) }, { phone: pending.phone }] });
+            const existingUser = await Users.findOne({
+                $or: [
+                    { emailHash: hmacHash(pending.email) },
+                    ...(pending.phone ? [{ phoneHash: hmacHash(pending.phone) }] : []),
+                ],
+            });
             if (existingUser && existingUser.isVerified !== false) {
                 await PendingRegistration.deleteOne({ _id: pending._id });
                 return res.status(409).json({ error: true, msg: 'A user with these details already exists' });
@@ -947,5 +959,6 @@ module.exports = {
     googleSignin,
     me,
     logout,
-    sendEmail
+    sendEmail,
+    generateEmailTemplate
 };

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import api, { mediaUrl } from "@/app/utils/apiClient";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
+import WeeklyDropStrip from "@/app/components/WeeklyDropStrip";
 import { useToast } from "@/hooks/use-toast";
 import { EmptyBoxIllustration, EmptyCartIllustration } from "@/app/components/SVGIcons";
 import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
+import { fetchSiteConfig, dropDaysLabel } from "@/app/utils/siteConfig";
 import {
     ShoppingBag,
     Search,
@@ -44,6 +46,22 @@ export default function ShopPage() {
     const [cart, setCart] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [brokenImages, setBrokenImages] = useState(() => new Set());
+
+    // Weekly drop cycle config
+    const [config, setConfig] = useState({ weeklyDropEnabled: false, shopPhase: "sale", shopPhases: null });
+    const saleClosed = config.weeklyDropEnabled && config.shopPhase !== "sale";
+
+    useEffect(() => {
+        fetchSiteConfig()
+            .then((cfg) => {
+                setConfig({
+                    weeklyDropEnabled: cfg.weeklyDropEnabled === true,
+                    shopPhase: cfg.shopPhase || "sale",
+                    shopPhases: cfg.shopPhases || null,
+                });
+            })
+            .catch(() => {});
+    }, []);
 
     // Fetch categories
     const fetchCategories = useCallback(async () => {
@@ -117,6 +135,14 @@ export default function ShopPage() {
 
     // Cart Handlers
     const addToCart = (product, variant = null) => {
+        if (saleClosed) {
+            toast({
+                title: "Sale window closed",
+                description: `Orders open on ${dropDaysLabel(config, "sale")} only. Products & prices reveal ${dropDaysLabel(config, "reveal")}.`,
+                variant: "destructive",
+            });
+            return;
+        }
         const cartKey = variant ? `${product._id}-${variant._id}` : product._id;
         const existingItemIndex = cart.findIndex(item => item.cartKey === cartKey);
 
@@ -191,10 +217,13 @@ export default function ShopPage() {
                         Exquisite Gift Shop
                     </h1>
                     <p className="text-neutral-400 text-base sm:text-lg sm:leading-relaxed">
-                        Redeem premium merchandise, high-end gadgets, and custom gifts. 
-                        Purchase directly or claim rewards. Select your items and choose direct pickup.
+                        Quick limited-quantity weekly drops. Products & prices reveal {dropDaysLabel(config, "reveal")},
+                        sale goes live {dropDaysLabel(config, "sale")}, and you pick up your order {dropDaysLabel(config, "pickup")}.
                     </p>
                 </div>
+
+                {/* Weekly drop cycle strip */}
+                {config.weeklyDropEnabled && <WeeklyDropStrip phase={config.shopPhase} shopPhases={config.shopPhases} />}
 
                 {/* Search & Main Action Controls */}
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
@@ -432,10 +461,12 @@ export default function ShopPage() {
                                                         Details
                                                     </button>
                                                     {prod.stock > 0 && (
-                                                        <button 
+                                                        <button
                                                             onClick={() => addToCart(prod)}
-                                                            className="px-3.5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
-                                                            title="Add to Cart"
+                                                            className={`px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer ${saleClosed
+                                                                ? "bg-neutral-900 border border-neutral-800 text-neutral-600"
+                                                                : "bg-red-600 hover:bg-red-700 text-white"}`}
+                                                            title={saleClosed ? "Sale opens Friday" : "Add to Cart"}
                                                         >
                                                             <ShoppingCart className="w-4 h-4" />
                                                         </button>

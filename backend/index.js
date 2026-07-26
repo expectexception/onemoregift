@@ -10,6 +10,7 @@ const connectDb = async () => {
     try {
         await mongoose.connect(mongoURI);
         console.log("Database connected");
+        require('./utils/orderJanitor').startOrderJanitor();
     } catch (error) {
         console.log("Database connection failed", error.message);
         process.exit(1);

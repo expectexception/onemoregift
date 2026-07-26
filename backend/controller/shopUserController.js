@@ -4,6 +4,8 @@ const Product = require('../model/Product');
 const Order = require('../model/Order');
 const Store = require('../model/Store');
 const crypto = require('crypto');
+const { getConfigHelper, getISTDay, parseDays } = require('./configController');
+const { emailOrderPlaced } = require('../utils/orderEmails');
 
 // Get active categories
 const getCategories = async (req, res) => {
@@ -67,12 +69,52 @@ const getProduct = async (req, res) => {
 const createOrder = async (req, res) => {
     try {
         const { items, pickupStoreId, scheduledPickupTime, customerNote, paymentMethod } = req.body;
-        const method = String(paymentMethod || 'online').toLowerCase() === 'cod' ? 'cod' : 'online';
+        const cfg = await getConfigHelper();
+
+        // Weekly drop cycle: orders can only be placed during the Fri–Sat sale window
+        if (cfg.weeklyDropEnabled && cfg.shopPhase !== 'sale') {
+            return res.status(400).json({
+                error: true,
+                msg: 'Orders open only during the Friday–Saturday sale window. Products & prices reveal Wed–Thu, pickup happens Mon–Tue.',
+            });
+        }
+
+        const requested = String(paymentMethod || '').toLowerCase();
+        const allowedMethods = [
+            cfg.qrPaymentEnabled && 'qr',
+            cfg.paymentGatewayEnabled && 'online',
+            cfg.codEnabled && 'cod',
+        ].filter(Boolean);
+        if (!allowedMethods.length) {
+            return res.status(503).json({ error: true, msg: 'No payment methods are currently enabled. Please try again later.' });
+        }
+        const method = allowedMethods.includes(requested) ? requested : allowedMethods[0];
+
         if (!items || !items.length) {
             return res.status(400).json({ error: true, msg: 'Order items cannot be empty' });
         }
         if (!pickupStoreId) {
             return res.status(400).json({ error: true, msg: 'Please select a pickup store' });
+        }
+
+        if (scheduledPickupTime) {
+            const pickupAt = new Date(scheduledPickupTime);
+            if (Number.isNaN(pickupAt.getTime())) {
+                return res.status(400).json({ error: true, msg: 'Invalid pickup time' });
+            }
+            if (pickupAt.getTime() < Date.now()) {
+                return res.status(400).json({ error: true, msg: 'Pickup time cannot be in the past' });
+            }
+            // Weekly drop cycle: pickup must land inside the configured pickup window
+            if (cfg.weeklyDropEnabled) {
+                const pickupDays = parseDays(cfg.dropPickupDays, [1, 2]);
+                if (!pickupDays.includes(getISTDay(pickupAt))) {
+                    return res.status(400).json({
+                        error: true,
+                        msg: `Pickup must be scheduled during the pickup window (${cfg.shopPhases?.pickup?.days || 'Mon, Tue'}).`,
+                    });
+                }
+            }
         }
 
         // Validate store
@@ -185,6 +227,9 @@ const createOrder = async (req, res) => {
                 orderData.paymentMethod = 'COD';
                 orderData.status = 'ready_for_pickup';
                 orderData.pickupCode = crypto.randomBytes(6).toString('hex').toUpperCase();
+            } else if (method === 'qr') {
+                // Order stays pending until the user uploads payment proof and admin verifies it
+                orderData.paymentMethod = 'UPI QR';
             }
 
             const order = await Order.create(orderData);
@@ -194,6 +239,9 @@ const createOrder = async (req, res) => {
                     Product.findByIdAndUpdate(item.productId, { $inc: { totalOrders: item.quantity } }).exec().catch(() => {});
                 }
             }
+
+            // Fire-and-forget confirmation email
+            emailOrderPlaced(order, method).catch(() => {});
 
             return res.status(201).json({ error: false, data: order });
         } catch (createErr) {
@@ -206,17 +254,79 @@ const createOrder = async (req, res) => {
     }
 };
 
-// Simulate Payment API (or sandbox integration)
+// Submit UPI/QR payment proof for an order — admin verifies it manually
+const submitPaymentProof = async (req, res) => {
+    try {
+        const cfg = await getConfigHelper();
+        if (!cfg.qrPaymentEnabled) {
+            return res.status(503).json({ error: true, msg: 'QR payment is currently disabled' });
+        }
+
+        const { proofs, reference } = req.body;
+        const proofUrls = (Array.isArray(proofs) ? proofs : [])
+            .filter(u => typeof u === 'string' && (u.startsWith('/') || u.startsWith('http')))
+            .slice(0, 5);
+        if (!proofUrls.length) {
+            return res.status(400).json({ error: true, msg: 'Please upload at least one payment screenshot' });
+        }
+
+        const order = await Order.findOne({ _id: req.params.id, userId: req.user.data._id });
+        if (!order) {
+            return res.status(404).json({ error: true, msg: 'Order not found' });
+        }
+        if (order.status !== 'pending') {
+            return res.status(400).json({ error: true, msg: 'This order is already processed' });
+        }
+        if (order.paymentStatus === 'paid') {
+            return res.status(400).json({ error: true, msg: 'This order is already paid' });
+        }
+
+        order.paymentMethod = 'UPI QR';
+        order.paymentStatus = 'verification_pending';
+        order.paymentProofs = proofUrls.map(url => ({ url, uploadedAt: new Date() }));
+        order.paymentReference = String(reference || '').trim().slice(0, 100);
+        order.paymentProofSubmittedAt = new Date();
+        order.paymentRejectedReason = undefined;
+        await order.save();
+
+        return res.json({
+            error: false,
+            msg: 'Payment proof submitted. We will verify it and confirm your order shortly.',
+            data: order,
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: true, msg: 'Failed to submit payment proof' });
+    }
+};
+
+// Sandbox payment completion — DEVELOPMENT ONLY.
+//
+// This endpoint marks an order paid on the caller's say-so, so it is gated three
+// ways: the gateway toggle must be on, the provider must still be the sandbox, and
+// `sandboxPaymentsAllowed` must be true (false whenever NODE_ENV=production). On the
+// live site it always refuses — an unpaid order can only become paid through QR proof
+// verification by an admin, or by being collected as cash on pickup.
 const simulatePayment = async (req, res) => {
     try {
-        const provider = (process.env.PAYMENTS_PROVIDER || 'sandbox').toLowerCase();
-        const realPaymentsEnabled = (process.env.ENABLE_REAL_PAYMENTS || 'false').toLowerCase() === 'true';
-        if (provider !== 'sandbox' && !realPaymentsEnabled) {
-            return res.status(503).json({ error: true, msg: `Payment provider '${provider}' is not yet enabled` });
+        const cfg = await getConfigHelper();
+        if (!cfg.paymentGatewayEnabled) {
+            return res.status(503).json({ error: true, msg: 'Online payment gateway is currently disabled' });
         }
+
+        const provider = cfg.paymentsProvider;
         if (provider !== 'sandbox') {
+            if (!cfg.realPaymentsEnabled) {
+                return res.status(503).json({ error: true, msg: `Payment provider '${provider}' is not yet enabled` });
+            }
             // Real gateway integration point — not implemented yet
             return res.status(501).json({ error: true, msg: `Payment provider '${provider}' integration is not implemented` });
+        }
+        if (!cfg.sandboxPaymentsAllowed) {
+            return res.status(503).json({
+                error: true,
+                msg: 'Online card payment is not available yet. Please pay via UPI QR and upload the payment screenshot, or choose cash on pickup.',
+            });
         }
 
         const { orderId, success } = req.body;
@@ -327,6 +437,7 @@ module.exports = {
     listProducts,
     getProduct,
     createOrder,
+    submitPaymentProof,
     simulatePayment,
     listMyOrders,
     getMyOrder,

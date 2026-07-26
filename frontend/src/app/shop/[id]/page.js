@@ -7,6 +7,7 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import { CART_STORAGE_KEY, notifyCartUpdated } from "@/app/utils/cart";
+import { fetchSiteConfig, dropDaysLabel } from "@/app/utils/siteConfig";
 import {
     ShoppingBag,
     Star,
@@ -84,6 +85,10 @@ export default function ProductDetailPage() {
         }
     };
 
+    // Weekly drop cycle config
+    const [dropConfig, setDropConfig] = useState({ weeklyDropEnabled: false, shopPhase: "sale", shopPhases: null });
+    const saleClosed = dropConfig.weeklyDropEnabled && dropConfig.shopPhase !== "sale";
+
     // Load cart on mount
     useEffect(() => {
         const storedCart = localStorage.getItem("omg_cart");
@@ -95,6 +100,16 @@ export default function ProductDetailPage() {
             }
         }
         fetchProduct();
+
+        fetchSiteConfig()
+            .then((cfg) => {
+                setDropConfig({
+                    weeklyDropEnabled: cfg.weeklyDropEnabled === true,
+                    shopPhase: cfg.shopPhase || "sale",
+                    shopPhases: cfg.shopPhases || null,
+                });
+            })
+            .catch(() => {});
     }, [id, fetchProduct]);
 
     const updateCart = (newCart) => {
@@ -105,6 +120,15 @@ export default function ProductDetailPage() {
 
     const handleAddToCart = (redirectToCheck = false) => {
         if (!product) return;
+
+        if (saleClosed) {
+            toast({
+                title: "Sale window closed",
+                description: `Orders open on ${dropDaysLabel(dropConfig, "sale")} only. Products & prices reveal ${dropDaysLabel(dropConfig, "reveal")}.`,
+                variant: "destructive",
+            });
+            return;
+        }
 
         const limitStock = product.hasVariants && selectedVariant ? selectedVariant.stock : product.stock;
 
@@ -352,11 +376,18 @@ export default function ProductDetailPage() {
                                 </div>
                             )}
 
+                            {/* Weekly drop notice */}
+                            {saleClosed && (
+                                <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/20 text-blue-300 text-[11px] leading-relaxed">
+                                    <strong>Sale window closed.</strong> Orders open <strong>{dropDaysLabel(dropConfig, "sale")}</strong> only — pickup happens {dropDaysLabel(dropConfig, "pickup")}.
+                                </div>
+                            )}
+
                             {/* Purchase Actions */}
                             <div className="flex flex-col sm:flex-row gap-3 pt-2">
                                 <button
                                     onClick={() => handleAddToCart(false)}
-                                    disabled={currentStock <= 0}
+                                    disabled={currentStock <= 0 || saleClosed}
                                     className="flex-1 py-3.5 rounded-xl border border-neutral-800 hover:bg-neutral-900 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                     <ShoppingCart className="w-4 h-4" />
@@ -364,10 +395,10 @@ export default function ProductDetailPage() {
                                 </button>
                                 <button
                                     onClick={() => handleAddToCart(true)}
-                                    disabled={currentStock <= 0}
+                                    disabled={currentStock <= 0 || saleClosed}
                                     className="flex-1 py-3.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                    Buy It Now
+                                    {saleClosed ? "Sale Opens Friday" : "Buy It Now"}
                                 </button>
                             </div>
                         </div>

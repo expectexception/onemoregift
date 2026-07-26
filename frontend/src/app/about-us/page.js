@@ -70,12 +70,12 @@ export default function AboutUs() {
                 <div className="relative max-w-6xl mx-auto">
                     <div className="text-center mb-8">
                         <h3 className="text-2xl md:text-3xl font-bold text-white">Platform Highlights</h3>
-                        <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing giveaway community.</p>
+                        <p className="text-neutral-400 mt-2 text-sm md:text-base">Real numbers from our growing gifting community.</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCounter icon={<UsersMetricSvg className="w-5 h-5" />} target={platformStats.registeredUsers} suffix="" label="Registered Users" color="from-blue-400 to-cyan-400" startWhen={statsVisible} />
-                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.activeGiveaways} suffix="" label="Active Giveaways" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
-                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.totalWinners} suffix="" label="Winners Announced" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
+                        <StatCounter icon={<GiveawayMetricSvg className="w-5 h-5" />} target={platformStats.totalGiveaways} suffix="" label="Giveaways Hosted" color="from-purple-400 to-fuchsia-400" startWhen={statsVisible} />
+                        <StatCounter icon={<WinnerMetricSvg className="w-5 h-5" />} target={platformStats.totalWinners} suffix="" label="Gifts & Wins Delivered" color="from-amber-400 to-orange-400" startWhen={statsVisible} />
                         <StatCounter icon={<TrustMetricSvg className="w-5 h-5" />} target={platformStats.totalPrizeValue} prefix="₹" suffix="+" label="Total Prize Value" color="from-emerald-400 to-teal-400" startWhen={statsVisible} />
                     </div>
                 </div>

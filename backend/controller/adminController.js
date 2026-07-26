@@ -6,6 +6,9 @@ const crypto = require('crypto')
 const axios = require('axios')
 const Giveaway = require('../model/Giveaway')
 const JoinedGiveaway = require('../model/JoinedGiveaways')
+const SurpriseRequest = require('../model/SurpriseRequest')
+const HappyMoment = require('../model/HappyMoment')
+const Order = require('../model/Order')
 const { getConfigHelper } = require('./configController')
 // env is loaded by utils/loadEnv at startup
 
@@ -563,8 +566,13 @@ const getPublicStats = async (req, res) => {
                 totalUsers: 0,
                 totalGiveaways: allGiveaways.length,
                 activeGiveaways,
-                completedGiveaways: showEnded ? allGiveaways.filter(g => g.endDate < now).length : 0,
+                upcomingGiveaways: allGiveaways.filter(g => g.startDate > now).length,
+                completedGiveaways: allGiveaways.filter(g => g.endDate < now).length,
                 totalWinners,
+                giveawayWinners: totalWinners,
+                giftsDelivered: 0,
+                momentsShared: 0,
+                ordersCompleted: 0,
                 totalPrizeValue,
                 giveawaysWithWinners: giveawaysWithWinners.length,
                 verifiedDrawRate: 0,
@@ -578,9 +586,13 @@ const getPublicStats = async (req, res) => {
             totalUsers,
             totalGiveaways,
             activeGiveaways,
+            upcomingGiveaways,
             completedGiveaways,
             winnerStats,
             prizeStats,
+            giftsDelivered,
+            momentsShared,
+            ordersCompleted,
         ] = await Promise.all([
             Users.countDocuments({ isVerified: { $ne: false } }),
             Users.countDocuments({}),
@@ -589,7 +601,10 @@ const getPublicStats = async (req, res) => {
                 startDate: { $lte: now },
                 endDate: { $gte: now }
             }),
-            showEnded ? Giveaway.countDocuments({ endDate: { $lt: now } }) : 0,
+            Giveaway.countDocuments({ startDate: { $gt: now } }),
+            // A stat, not a listing — how many giveaways have actually ended is true
+            // regardless of whether ended giveaways are shown in public lists.
+            Giveaway.countDocuments({ endDate: { $lt: now } }),
             Giveaway.aggregate([
                 { $match: visibleFilter },
                 {
@@ -622,14 +637,21 @@ const getPublicStats = async (req, res) => {
                     }
                 }
             ]),
+            // Platform-wide gifting activity — the site is no longer giveaway-only, so
+            // the public counters would sit at 0 between draws without these.
+            SurpriseRequest.countDocuments({ status: { $in: ['gift_assigned', 'completed'] } }),
+            HappyMoment.countDocuments({ status: { $in: ['approved', 'gift_assigned', 'published'] } }),
+            Order.countDocuments({ status: 'collected' }),
         ]);
 
-        const totalWinners = winnerStats[0]?.totalWinners || 0;
+        const giveawayWinners = winnerStats[0]?.totalWinners || 0;
         const giveawaysWithWinners = winnerStats[0]?.giveawaysWithWinners || 0;
         const totalPrizeValue = prizeStats[0]?.totalPrizeValue || 0;
-        const completedDivisor = showEnded ? completedGiveaways : (await Giveaway.countDocuments({ endDate: { $lt: now } }));
-        const verifiedDrawRate = completedDivisor > 0
-            ? Math.round((giveawaysWithWinners / completedDivisor) * 100)
+        // Everyone the platform has actually handed a gift to: declared giveaway
+        // winners plus verified surprise gifts.
+        const totalWinners = giveawayWinners + giftsDelivered;
+        const verifiedDrawRate = completedGiveaways > 0
+            ? Math.round((giveawaysWithWinners / completedGiveaways) * 100)
             : 0;
 
         return res.status(200).json({
@@ -638,8 +660,13 @@ const getPublicStats = async (req, res) => {
             totalUsers,
             totalGiveaways,
             activeGiveaways,
+            upcomingGiveaways,
             completedGiveaways,
             totalWinners,
+            giveawayWinners,
+            giftsDelivered,
+            momentsShared,
+            ordersCompleted,
             totalPrizeValue,
             giveawaysWithWinners,
             verifiedDrawRate,
@@ -682,6 +709,63 @@ const clearAllJoined = async (req, res) => {
         return res.status(500).json({ error: true, msg: error.message });
     }
 }
+
+// GET /api/v1/admin/maintenance/backup — streams a gzipped JSON dump of every
+// collection. PII stays encrypted in the dump (we export raw stored values).
+// Binary media blobs (imagestores) are skipped unless ?includeMedia=1.
+const downloadBackup = async (req, res) => {
+    const mongoose = require('mongoose');
+    const zlib = require('zlib');
+    try {
+        const includeMedia = req.query.includeMedia === '1';
+        const db = mongoose.connection.db;
+        const collections = (await db.listCollections().toArray())
+            .map(c => c.name)
+            .filter(name => !name.startsWith('system.'))
+            .filter(name => includeMedia || name !== 'imagestores')
+            .sort();
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', `attachment; filename="omg-backup-${stamp}.json.gz"`);
+
+        const gzip = zlib.createGzip();
+        gzip.pipe(res);
+        const write = (chunk) => new Promise((resolve, reject) => {
+            gzip.write(chunk, (err) => err ? reject(err) : resolve());
+        });
+
+        // Buffers → base64 so the dump stays valid JSON and restorable
+        const serializeDoc = (doc) => JSON.stringify(doc, (key, value) => {
+            if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
+                return { $base64: Buffer.from(value.data).toString('base64') };
+            }
+            return value;
+        });
+
+        await write(`{"_meta":{"exportedAt":"${new Date().toISOString()}","db":"${db.databaseName}","collections":${collections.length}}`);
+        for (const name of collections) {
+            await write(`,"${name}":[`);
+            let first = true;
+            const cursor = db.collection(name).find({});
+            for await (const doc of cursor) {
+                await write((first ? '' : ',') + serializeDoc(doc));
+                first = false;
+            }
+            await write(']');
+        }
+        await write('}');
+        gzip.end();
+
+        console.log(`[Backup] Streamed ${collections.length} collections to admin ${req.user?.email || ''}`);
+    } catch (error) {
+        console.error('[Backup] Failed:', error.message);
+        if (!res.headersSent) {
+            return res.status(500).json({ error: true, msg: 'Backup failed: ' + error.message });
+        }
+        res.end();
+    }
+};
 
 const getDbStatus = async (req, res) => {
     try {
@@ -734,6 +818,7 @@ module.exports = {
     clearParticipants,
     clearAllJoined,
     changeAdminPassword,
-    getDbStatus
+    getDbStatus,
+    downloadBackup
 }
 

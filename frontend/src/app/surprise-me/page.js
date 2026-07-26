@@ -2,16 +2,63 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/app/utils/apiClient";
+import { fetchSiteConfig } from "@/app/utils/siteConfig";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import { useAuth } from "@/app/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/app/components/ConfirmDialog";
 import { EmptyGalleryIllustration, EmptyTimelineIllustration } from "@/app/components/SVGIcons";
+import ProcessSteps from "@/app/components/ProcessSteps";
 import {
     Gift, Calendar, User, FileText, Phone, Sparkles, Upload,
-    History, Info, Smile, Heart, Share2, AlertTriangle, Plus, Clock, Lock, Flag, X, ImageOff
+    History, Info, Smile, Heart, Share2, AlertTriangle, Plus, Clock, Lock, Flag, X, ImageOff,
+    ClipboardList, FileCheck2, PackageCheck, Camera, ShieldCheck, GalleryHorizontalEnd
 } from "lucide-react";
+
+// Same 3-step process strip as the homepage — surprise flow
+const SURPRISE_STEPS = [
+    {
+        title: "Fill The Form",
+        desc: "Tell us about your special day and submit your application.",
+        accent: "red",
+        icon: <ClipboardList className="w-7 h-7" />,
+    },
+    {
+        title: "Documents Approval",
+        desc: "Our team verifies your details and document proofs.",
+        accent: "blue",
+        icon: <FileCheck2 className="w-7 h-7" />,
+    },
+    {
+        title: "Gift Delivered",
+        desc: "Once approved, your surprise gift reaches your doorstep.",
+        accent: "amber",
+        icon: <PackageCheck className="w-7 h-7" />,
+    },
+];
+
+// Moments flow — share, approval, live
+const MOMENT_STEPS = [
+    {
+        title: "Share Your Moment",
+        desc: "Post your gift photos or videos with a caption.",
+        accent: "red",
+        icon: <Camera className="w-7 h-7" />,
+    },
+    {
+        title: "Moderator Approval",
+        desc: "Our moderators verify your proof and approve the post.",
+        accent: "blue",
+        icon: <ShieldCheck className="w-7 h-7" />,
+    },
+    {
+        title: "Live In Gallery",
+        desc: "Your moment goes live for the whole community to see.",
+        accent: "amber",
+        icon: <GalleryHorizontalEnd className="w-7 h-7" />,
+    },
+];
 
 const OCCASIONS = [
     { value: "birthday", label: "🎂 Birthday" },
@@ -141,7 +188,7 @@ export default function JoyHubPage() {
     const [uploadingMomentMedia, setUploadingMomentMedia] = useState(false);
     const [uploadingMomentProofs, setUploadingMomentProofs] = useState(false);
     const [submittingMoment, setSubmittingMoment] = useState(false);
-    const [config, setConfig] = useState({ requireSurpriseProof: true, requireMomentProof: true });
+    const [config, setConfig] = useState({ requireSurpriseProof: true, requireMomentProof: true, surpriseEnabled: true, momentsEnabled: true });
 
     // FULL VIEW MODAL STATE
     const [selectedMoment, setSelectedMoment] = useState(null);
@@ -187,19 +234,28 @@ export default function JoyHubPage() {
     }, [activeTab, surpriseSubTab, momentsSubTab, fetchRequests, fetchGallery]);
 
     useEffect(() => {
-        const fetchConfig = async () => {
-            try {
-                const { data } = await api.get("config");
-                if (!data.error && data.config) {
-                    setConfig({
-                        requireSurpriseProof: data.config.requireSurpriseProof ?? true,
-                        requireMomentProof: data.config.requireMomentProof ?? true,
-                    });
-                }
-            } catch (_) {}
-        };
-        fetchConfig();
+        fetchSiteConfig()
+            .then((cfg) => {
+                setConfig({
+                    requireSurpriseProof: cfg.requireSurpriseProof ?? true,
+                    requireMomentProof: cfg.requireMomentProof ?? true,
+                    surpriseEnabled: cfg.surpriseEnabled !== false,
+                    momentsEnabled: cfg.momentsEnabled !== false,
+                });
+            })
+            .catch(() => {});
     }, []);
+
+    // Disabled-feature notice card
+    const renderFeatureClosed = (text) => (
+        <div className="glass-dark border-white/10 border rounded-3xl p-8 text-center max-w-md mx-auto my-8 space-y-4">
+            <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto">
+                <Clock className="w-6 h-6 text-amber-400" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Temporarily Closed</h3>
+            <p className="text-sm text-neutral-400">{text}</p>
+        </div>
+    );
 
     useEffect(() => {
         if (selectedMoment || reportTarget || selectedRequest) {
@@ -404,14 +460,10 @@ export default function JoyHubPage() {
                     setJustLikedId(id);
                     setTimeout(() => setJustLikedId(null), 400);
                 }
-                setMoments(prev => {
-                    const copy = [...prev];
-                    const targetIdx = index !== undefined ? index : copy.findIndex(m => m._id === id);
-                    if (targetIdx > -1) {
-                        copy[targetIdx].reactions = data.data;
-                    }
-                    return copy;
-                });
+                setMoments(prev => prev.map((m, i) => {
+                    const isTarget = index !== undefined ? i === index : m._id === id;
+                    return isTarget ? { ...m, reactions: data.data } : m;
+                }));
                 if (selectedMoment && selectedMoment._id === id) {
                     setSelectedMoment(prev => ({
                         ...prev,
@@ -451,14 +503,7 @@ export default function JoyHubPage() {
                     ...prev,
                     comments: data.data
                 }));
-                setMoments(prev => {
-                    const copy = [...prev];
-                    const idx = copy.findIndex(m => m._id === selectedMoment._id);
-                    if (idx > -1) {
-                        copy[idx].comments = data.data;
-                    }
-                    return copy;
-                });
+                setMoments(prev => prev.map(m => m._id === selectedMoment._id ? { ...m, comments: data.data } : m));
                 toast({ title: "Comment added" });
             } else {
                 toast({ title: "Error", description: data.msg, variant: "destructive" });
@@ -486,14 +531,7 @@ export default function JoyHubPage() {
                     ...prev,
                     comments: data.data
                 }));
-                setMoments(prev => {
-                    const copy = [...prev];
-                    const idx = copy.findIndex(m => m._id === selectedMoment._id);
-                    if (idx > -1) {
-                        copy[idx].comments = data.data;
-                    }
-                    return copy;
-                });
+                setMoments(prev => prev.map(m => m._id === selectedMoment._id ? { ...m, comments: data.data } : m));
                 toast({ title: "Comment deleted" });
             } else {
                 toast({ title: "Error", description: data.msg, variant: "destructive" });
@@ -617,6 +655,9 @@ export default function JoyHubPage() {
                 {/* ── SURPRISE TAB VIEW ────────────────────────────────────────── */}
                 {activeTab === "surprise" && (
                     <div className="space-y-6">
+                        {/* How it works — same steps style as the homepage */}
+                        <ProcessSteps steps={SURPRISE_STEPS} note="For now: only 1 application per user" />
+
                         {/* Sub-tabs */}
                         <div className="flex justify-center gap-3">
                             <button
@@ -633,7 +674,9 @@ export default function JoyHubPage() {
                             </button>
                         </div>
 
-                        {!userAuthenticated ? (
+                        {!config.surpriseEnabled && surpriseSubTab === "apply" ? (
+                            renderFeatureClosed("New surprise applications are closed right now. Check back soon — you can still track your existing applications in the other tab.")
+                        ) : !userAuthenticated ? (
                             renderAuthGuard("submit surprise requests and track status timeline")
                         ) : (
                             <>
@@ -839,6 +882,9 @@ export default function JoyHubPage() {
                 {/* ── HAPPY MOMENTS TAB VIEW ───────────────────────────────────── */}
                 {activeTab === "moments" && (
                     <div className="space-y-6">
+                        {/* How it works — same steps style as the homepage */}
+                        <ProcessSteps steps={MOMENT_STEPS} />
+
                         {/* Sub-tabs */}
                         <div className="flex justify-center gap-3">
                             <button
@@ -878,8 +924,8 @@ export default function JoyHubPage() {
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-3">
                                                             <div className="w-7 h-7 rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                                                                {m.userId?.profilePic ? (
-                                                                    <img src={m.userId.profilePic} alt="" className="w-full h-full object-cover" />
+                                                                {m.userId?.avatar ? (
+                                                                    <img src={m.userId.avatar} alt="" className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <span className="text-xs font-semibold text-neutral-400">{(m.userId?.name || "U")[0]}</span>
                                                                 )}
@@ -925,7 +971,9 @@ export default function JoyHubPage() {
 
                         {momentsSubTab === "share" && (
                             <>
-                                {!userAuthenticated ? (
+                                {!config.momentsEnabled ? (
+                                    renderFeatureClosed("Sharing new moments is paused right now. The gallery is still open — check back soon to post yours.")
+                                ) : !userAuthenticated ? (
                                     renderAuthGuard("share your winner experience with the community")
                                 ) : (
                                     <form onSubmit={handleMomentSubmit} className="glass-dark border-white/10 rounded-3xl p-6 sm:p-8 border space-y-6 max-w-3xl mx-auto">
@@ -1174,8 +1222,8 @@ export default function JoyHubPage() {
                             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/10 shrink-0">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-full bg-white/10 overflow-hidden flex items-center justify-center border border-white/15">
-                                        {selectedMoment.userId?.profilePic ? (
-                                            <img src={selectedMoment.userId.profilePic} alt="" className="w-full h-full object-cover" />
+                                        {selectedMoment.userId?.avatar ? (
+                                            <img src={selectedMoment.userId.avatar} alt="" className="w-full h-full object-cover" />
                                         ) : (
                                             <span className="text-xs font-bold text-neutral-300">{(selectedMoment.userId?.name || "U")[0]}</span>
                                         )}
@@ -1213,8 +1261,8 @@ export default function JoyHubPage() {
                                     selectedMoment.comments.map((c) => (
                                         <div key={c._id} className="flex gap-3 items-start">
                                             <div className="w-7 h-7 rounded-full bg-white/10 overflow-hidden flex items-center justify-center shrink-0 border border-white/5">
-                                                {c.userId?.profilePic ? (
-                                                    <img src={c.userId.profilePic} alt="" className="w-full h-full object-cover" />
+                                                {c.userId?.avatar ? (
+                                                    <img src={c.userId.avatar} alt="" className="w-full h-full object-cover" />
                                                 ) : (
                                                     <span className="text-[10px] font-bold text-neutral-400">{(c.userId?.name || "U")[0]}</span>
                                                 )}
