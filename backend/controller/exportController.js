@@ -97,7 +97,7 @@ const exportUsers = async (req, res) => {
             { label: 'Email', value: u => u.email || '' },
             { label: 'Phone', value: u => u.phone || '' },
             { label: 'Verified', value: u => (u.isVerified === false ? 'No' : 'Yes') },
-            { label: 'Blocked', value: u => (u.isBlocked ? 'Yes' : 'No') },
+            { label: 'Blocked', value: u => (u.blocked ? 'Yes' : 'No') },
             { label: 'Default Address', value: u => u.address || '' },
             { label: 'Joined (IST)', value: u => istDate(u.createdAt) },
         ];

@@ -138,11 +138,16 @@ const deleteProduct = async (req, res) => {
 const adjustStock = async (req, res) => {
     try {
         const { adjustment, reason } = req.body; // positive or negative integer
+        const adj = Number(adjustment);
+        // A missing or non-numeric adjustment would turn stock into NaN.
+        if (!Number.isInteger(adj) || adj === 0) {
+            return res.status(400).json({ error: true, msg: 'Adjustment must be a non-zero whole number' });
+        }
         const doc = await Product.findById(req.params.id);
         if (!doc) return res.status(404).json({ error: true, msg: 'Product not found' });
 
         const prev = doc.stock;
-        doc.stock = Math.max(0, doc.stock + Number(adjustment));
+        doc.stock = Math.max(0, doc.stock + adj);
         await doc.save();
 
         await logAction({

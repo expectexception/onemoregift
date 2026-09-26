@@ -11,6 +11,8 @@ const HappyMoment = require('../model/HappyMoment')
 const Order = require('../model/Order')
 const { getConfigHelper } = require('./configController')
 const { applyOverrides } = require('../utils/statOverrides')
+const { hmacHash } = require('../utils/crypto')
+const { ROLES } = require('../model/Admin')
 // env is loaded by utils/loadEnv at startup
 
 const JWT_SECRET = process.env.JWT_SECRET
@@ -83,6 +85,11 @@ const register = async (req, res) => {
 
         const normalizedEmail = email.trim().toLowerCase();
 
+        // Never trust a client-supplied role blindly: reject anything not in the enum.
+        if (role !== undefined && !ROLES.includes(role)) {
+            return res.status(400).json({ error: true, msg: `Invalid role. Must be one of: ${ROLES.join(', ')}` });
+        }
+
         let createAdmin = async () => {
             try {
                 const salt = await bcrypt.genSalt(10);
@@ -118,23 +125,42 @@ const register = async (req, res) => {
         const tokenExists = Boolean(authHeader);
 
         if (!tokenExists) {
-            const isRootEmail = ROOT_ADMIN_EMAILS.includes(normalizedEmail);
+            // Bootstrap only: the very first admin can be created without a token.
+            // Once any admin exists, creating more requires a root-admin token.
+            // (Previously any ROOT_ADMIN_EMAILS address could self-register a
+            // super_admin with no authentication at all.)
             const isAdminExists = await Admin.collection.countDocuments({});
-            if (isAdminExists === 0 || isRootEmail) {
+            if (isAdminExists === 0) {
                 return await createAdmin();
             }
-            return res.status(400).json({ error: true, msg: 'Admin already exists' });
+            return res.status(401).json({ error: true, msg: 'Authentication required to create an admin' });
         } else {
             const parts = authHeader.split(' ');
             if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer' || !parts[1]) {
                 return res.status(401).json({ error: true, msg: 'Malformed authorization header' });
             }
-            const token = parts[1];
-            const verify = jwt.verify(token, JWT_SECRET);
-            const isAdmin = verify.user.isAdmin;
-            if (!isAdmin) {
+            let verify;
+            try {
+                verify = jwt.verify(parts[1], JWT_SECRET);
+            } catch (_) {
+                return res.status(401).json({ error: true, msg: 'Invalid or expired token' });
+            }
+            if (!verify?.user?.isAdmin) {
                 return res.status(403).json({ error: true, msg: 'You are not an Admin' });
             }
+
+            // Only a root admin may create new admin accounts. Without this any
+            // admin (even a low-privilege role) could mint a super_admin.
+            const callerEmail = (verify.user.email || '').toLowerCase();
+            let isRoot = ROOT_ADMIN_EMAILS.includes(callerEmail);
+            if (!isRoot) {
+                const firstAdmin = await Admin.findOne({ isAdmin: true }).sort({ createdAt: 1 }).select('email');
+                isRoot = firstAdmin?.email?.toLowerCase() === callerEmail;
+            }
+            if (!isRoot) {
+                return res.status(403).json({ error: true, msg: 'Only a root admin can create admin accounts' });
+            }
+
             const findAdmin = await Admin.findOne({ email: normalizedEmail });
             if (findAdmin) {
                 return res.status(400).json({ error: true, msg: 'Email already exists' });
@@ -261,21 +287,26 @@ const allUsers = async (req, res) => {
         let queryObj = {}
         let { email, phone, blocked } = req.query;
 
-        if (blocked) {
-            queryObj.blocked = blocked
+        // `blocked` arrives as a query string ("true"/"false"); the schema field is
+        // a boolean, so coerce it or the filter silently matches nothing.
+        if (blocked !== undefined && blocked !== "") {
+            queryObj.blocked = String(blocked).toLowerCase() === "true";
         }
+        // email/phone are encrypted at rest with random IVs, so equality on the
+        // plaintext never matches. Search through the deterministic lookup hashes.
         if (email) {
-            queryObj.email = email
+            queryObj.emailHash = hmacHash(String(email).trim().toLowerCase());
         }
         if (phone) {
-            queryObj.phone = phone
+            queryObj.phoneHash = hmacHash(String(phone).replace(/\D/g, "").slice(-10));
         }
 
         const page = Number(req.query.page) || 1;
         const limit = Number(req.query.limit) || 10;
         const skip = (page - 1) * limit;
         const total = await Users.countDocuments(queryObj);
-        let users = await Users.find(queryObj).sort({ createdAt: -1 }).skip(skip).limit(limit).select("-password");
+        // Never expose secrets (password hash, live reset token, OTP hash) in the list.
+        let users = await Users.find(queryObj).sort({ createdAt: -1 }).skip(skip).limit(limit).select("-password -resetToken -loginOtp");
         return res.status(200).json({ error: false, data: users, total: total })
 
     } catch (error) {
@@ -452,7 +483,7 @@ const getUserById = async (req, res) => {
         if (!userId) {
             return res.status(400).json({ error: true, msg: "UserId is required.." })
         }
-        let getUser = await Users.findById(userId).select('-password');
+        let getUser = await Users.findById(userId).select('-password -resetToken -loginOtp');
         if (!getUser) {
             return res.status(404).json({ error: true, msg: "User not found" });
         }
@@ -786,7 +817,7 @@ const getDbStatus = async (req, res) => {
             Giveaway.countDocuments({}),
             JoinedGiveaway.countDocuments({}),
             Admin.countDocuments({}),
-            Users.countDocuments({ isBanned: true })
+            Users.countDocuments({ blocked: true })
         ]);
 
         return res.status(200).json({
