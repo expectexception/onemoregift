@@ -1,0 +1,107 @@
+name: Deploy production → DreamHost
+
+# Push to the `production` branch runs the CI gate (backend tests + frontend
+# build). Only if that passes does it SSH into the DreamHost server and run the
+# server-side deploy script. Also runnable manually from the Actions tab.
+on:
+  push:
+    branches: [production]
+  workflow_dispatch: {}
+
+# Never let two deploys run at once; a queued push waits for the current one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Test & build (gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ---- Backend ----
+      - name: Backend · install
+        working-directory: backend
+        run: npm ci
+
+      - name: Backend · test
+        working-directory: backend
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      # ---- Frontend ----
+      - name: Frontend · install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend · build
+        working-directory: frontend
+        run: npm run build
+        env:
+          # Set these as repository Variables (Settings → Secrets and variables →
+          # Actions → Variables) so the build bakes the right public API origin.
+          NEXT_PUBLIC_BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_ALTCHA_CHALLENGE_URL: ${{ vars.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL }}
+
+  deploy:
+    name: Deploy to DreamHost
+    needs: ci
+    runs-on: ubuntu-latest
+    # Optional: create a "production" Environment in GitHub to add approval gates.
+    environment: production
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      APP_DIR: ${{ secrets.APP_DIR }}
+      RESTART_MODE: ${{ vars.RESTART_MODE }}
+      API_HOST: ${{ vars.API_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Don't hard-fail the very first push before secrets exist: skip with a
+      # warning instead, so setting the branch up doesn't look like a red build.
+      - name: Check deploy secrets
+        id: gate
+        run: |
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::warning::SSH_HOST/SSH_USER/SSH_KEY not set — skipping deploy. See deploy/dreamhost/README.md."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure SSH
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${SSH_PORT:-22}" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy over SSH
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          # Pipe the freshly-checked-out deploy script to the server and run it
+          # under a login shell so PATH/nvm (node, npm, git) are available.
+          ssh -i ~/.ssh/id_deploy -p "${SSH_PORT:-22}" \
+              -o StrictHostKeyChecking=accept-new \
+              "$SSH_USER@$SSH_HOST" \
+              "DEPLOY_BRANCH=production APP_DIR='${APP_DIR}' RESTART_MODE='${RESTART_MODE}' API_HOST='${API_HOST}' bash -ls" \
+              < deploy/dreamhost/deploy.sh
+
+      - name: Post-deploy health check
+        if: steps.gate.outputs.enabled == 'true' && vars.HEALTHCHECK_URL != ''
+        run: |
+          echo "Checking ${{ vars.HEALTHCHECK_URL }}"
+          curl --fail --silent --show-error --max-time 25 "${{ vars.HEALTHCHECK_URL }}" >/dev/null \
+            && echo "health ok" \
+            || { echo "::error::Health check failed"; exit 1; }
