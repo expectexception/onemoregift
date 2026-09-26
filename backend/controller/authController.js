@@ -27,7 +27,12 @@ const EMAIL_SERVICE_REQUIRED = process.env.EMAIL_SERVICE_REQUIRED === 'true';
 const EMAIL_SERVICE_TIMEOUT_MS = Number(process.env.EMAIL_SERVICE_TIMEOUT_MS || 15000);
 const EMAIL_SERVICE_SIGNING_ENABLED = process.env.EMAIL_SERVICE_SIGNING_ENABLED !== 'false';
 const EMAIL_SERVICE_SIGNING_SECRET = process.env.EMAIL_SERVICE_SIGNING_SECRET;
-const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test' || process.env.NODE_ENV !== 'production';
+// The fixed "123456" OTP is a test convenience only. It is ALWAYS off in
+// production, and off elsewhere unless ALLOW_TEST_OTP=true is set explicitly.
+// (Previously it was on for every non-production NODE_ENV, so any dev/staging
+// deploy accepted 123456 as a valid OTP for any account.)
+const TEST_OTP_BYPASS_ENABLED = process.env.NODE_ENV === 'test'
+    || (process.env.NODE_ENV !== 'production' && process.env.ALLOW_TEST_OTP === 'true');
 const OTP_DEBUG_LOGGING = process.env.NODE_ENV !== 'production' && process.env.LOG_OTP_DEBUG === 'true';
 // Feature flag: set OTP_VERIFICATION_ENABLED=false to skip email OTP for user registration
 const OTP_VERIFICATION_ENABLED = process.env.OTP_VERIFICATION_ENABLED !== 'false';
@@ -102,16 +107,21 @@ const signEmailServiceRequest = ({ method, path, body }) => {
  * Send email exclusively via the email-service (Brevo API).
  * No SMTP / nodemailer fallback.
  */
-const sendEmail = async ({ to, subject, html, template, data }) => {
+const sendEmail = async ({ to, subject, html, template, data, critical = false }) => {
     console.log(`[EmailService] Sending to: ${to} | Subject: ${subject}`);
+
+    // `critical` sends (registration OTP, login OTP, password reset) must report a
+    // real failure so the caller can surface an error, instead of pretending the
+    // mail went out because EMAIL_SERVICE_REQUIRED happens to be false.
+    const onFailure = () => (critical ? false : !EMAIL_SERVICE_REQUIRED);
 
     if (!EMAIL_SERVICE_ENABLED) {
         console.warn('[EmailService] Disabled, skipping send');
-        return !EMAIL_SERVICE_REQUIRED;
+        return onFailure();
     }
     if (!EMAIL_SERVICE_URL || !EMAIL_SERVICE_API_KEY) {
         console.error('[EmailService] EMAIL_SERVICE_URL or EMAIL_SERVICE_API_KEY not set');
-        return !EMAIL_SERVICE_REQUIRED;
+        return onFailure();
     }
 
     try {
@@ -136,7 +146,7 @@ const sendEmail = async ({ to, subject, html, template, data }) => {
         return false;
     } catch (error) {
         console.error('[EmailService] Failed:', error?.response?.data || error.message);
-        return !EMAIL_SERVICE_REQUIRED;
+        return onFailure();
     }
 };
 
@@ -238,7 +248,11 @@ const register = async (req, res) => {
         const otpExpiry = Date.now() + 5 * 60 * 1000; // 5 minutes
         logOtpForLocalDebug('registration', normalizedEmail, otpCode);
 
-        let isTest = process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com');
+        // Auto-verify without email OTP only under the same guarded test bypass.
+        // The "@test.com skips verification" shortcut used to apply in production
+        // too, letting anyone register a verified account with no email check.
+        let isTest = TEST_OTP_BYPASS_ENABLED
+            && (process.env.NODE_ENV === 'test' || normalizedEmail.endsWith('@test.com'));
         // If OTP verification is disabled globally, auto-verify all registrations
         const skipOtp = !OTP_VERIFICATION_ENABLED || isTest;
 
@@ -306,6 +320,7 @@ const register = async (req, res) => {
 
         const sent = await sendEmail({
             to: normalizedEmail,
+            critical: true,
             subject: 'Verify your OneMoreGift account',
             template: 'otp',
             data: {
@@ -351,12 +366,14 @@ const login = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Invalid email/username or password' });
         }
 
-        // Look up by email hash (encrypted field) or by name (less sensitive, plain text)
-        const emailHashVal = hmacHash(identifier);
+        // Look up by email hash or name hash. Both source fields are encrypted with
+        // random IVs, so a direct/regex query on them can never match; the
+        // deterministic hashes are what make the lookup work.
+        const identifierHash = hmacHash(identifier);
         const user = await Users.findOne({
             $or: [
-                { emailHash: emailHashVal },
-                { name: { $regex: `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+                { emailHash: identifierHash },
+                { nameHash: identifierHash },
             ]
         });
         if (!user) {
@@ -420,6 +437,7 @@ const requestOtp = async (req, res) => {
 
         const sent = await sendEmail({
             to: normalizedEmail,
+            critical: true,
             subject: 'Your One-Time Login Code',
             template: 'otp',
             data: {
@@ -688,6 +706,7 @@ const resetPass = async (req, res) => {
 
         const emailSent = await sendEmail({
             to: normalizedEmail,
+            critical: true,
             subject: 'Password Reset Request',
             template: 'reset-password',
             data: {

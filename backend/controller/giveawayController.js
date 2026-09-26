@@ -317,6 +317,10 @@ const getSingleGiveaway = async (req, res) => {
             }
         }
 
+        // Never expose the raw participant id list on this public endpoint; only the
+        // count and the caller's own joined flag are meant to be visible.
+        delete giveaway.participants;
+
         return res.status(200).json({ error: false, giveaway });
     } catch (error) {
         return res.status(500).json({ error: true, msg: error.message });

@@ -30,3 +30,7 @@ frontend/coverage/
 
 # Local build artifacts
 dist/
+
+# Committed-by-mistake secrets (untracked 2026-09-26; rotate keys, they remain in history)
+frontend/cookies.txt
+ecosystem.backend-only.config.cjs

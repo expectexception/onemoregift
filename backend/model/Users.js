@@ -41,6 +41,13 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    // Deterministic HMAC hash of the (lowercased) name for username login lookups.
+    // The name field itself is encrypted with random IVs, so a plaintext/regex
+    // query can never match it. Not unique: names may legitimately repeat.
+    nameHash: {
+        type: String,
+        index: true,
+    },
     fullName: {
         type: String,
         default: '',
@@ -105,6 +112,11 @@ userSchema.pre('save', function (next) {
             this.phoneHash = this.phone ? hmacHash(decrypt(this.phone)) : undefined;
         }
 
+        // Name hash for username login: derived from the plain value before encryption
+        if (this.isModified('name')) {
+            this.nameHash = this.name ? hmacHash(decrypt(this.name)) : undefined;
+        }
+
         // Scalar fields
         for (const field of ENCRYPTED_SCALAR_FIELDS) {
             if (this.isModified(field) && this[field]) {
@@ -162,6 +174,11 @@ userSchema.pre('findOneAndUpdate', function (next) {
             // Phone hash for duplicate lookups (before the value gets encrypted below)
             if (setObj.phone) {
                 setObj.phoneHash = hmacHash(decrypt(setObj.phone));
+            }
+
+            // Name hash for username login (before the value gets encrypted below)
+            if (setObj.name) {
+                setObj.nameHash = hmacHash(decrypt(setObj.name));
             }
 
             // Scalar fields in update

@@ -13,6 +13,22 @@ const jwt = require("jsonwebtoken");
 
 const app = createApp();
 
+// The giveaway/stats controllers now read live site config via getConfigHelper,
+// which calls SystemConfig.find().lean(). These contract tests run without a DB
+// connection, so stub that one query to return no rows (getConfigHelper then
+// falls back to env defaults) and invalidate the cache around each test.
+const SystemConfigModel = require("../model/SystemConfig");
+const configController = require("../controller/configController");
+const originalFind = SystemConfigModel.find.bind(SystemConfigModel);
+const stubConfig = () => {
+  SystemConfigModel.find = () => ({ lean: async () => [] });
+  configController.invalidateConfigCache();
+};
+const restoreConfig = () => {
+  SystemConfigModel.find = originalFind;
+  configController.invalidateConfigCache();
+};
+
 test("auth/login contract: invalid payload returns error schema", async () => {
   const res = await request(app).post("/api/v1/auth/login").send({});
   assert.equal(res.status, 400);
@@ -41,25 +57,30 @@ test("admin/login contract: bad credentials return 401 schema", async () => {
 
 test("giveaway list contract: response includes error/data/total and participantCount", async () => {
   const originalCount = Giveaway.countDocuments;
-  const originalFind = Giveaway.find;
+  const originalFindGiveaway = Giveaway.find;
 
   Giveaway.countDocuments = async () => 1;
   Giveaway.find = () => ({
-    sort: () => ({
-      skip: () => ({
-        limit: () => ({
-          lean: async () => ([
-            {
-              _id: "507f1f77bcf86cd799439011",
-              title: "Contract Giveaway",
-              participants: ["u1", "u2"],
-            },
-          ]),
+    populate: () => ({
+      sort: () => ({
+        skip: () => ({
+          limit: () => ({
+            lean: async () => ([
+              {
+                _id: "507f1f77bcf86cd799439011",
+                title: "Contract Giveaway",
+                startDate: new Date(Date.now() - 3600000),
+                endDate: new Date(Date.now() + 3600000),
+                participants: ["u1", "u2"],
+              },
+            ]),
+          }),
         }),
       }),
     }),
   });
 
+  stubConfig();
   try {
     const res = await request(app).get("/api/v1/giveaway?page=1&limit=10");
     assert.equal(res.status, 200);
@@ -69,13 +90,14 @@ test("giveaway list contract: response includes error/data/total and participant
     assert.equal(typeof res.body.data[0].participantCount, "number");
   } finally {
     Giveaway.countDocuments = originalCount;
-    Giveaway.find = originalFind;
+    Giveaway.find = originalFindGiveaway;
+    restoreConfig();
   }
 });
 
 test("admin stats contract: returns numeric metrics schema", async () => {
   const originalCount = Giveaway.countDocuments;
-  const originalFind = Giveaway.find;
+  const originalFindGiveaway = Giveaway.find;
 
   Giveaway.countDocuments = async () => 3;
   Giveaway.find = async (query) => {
@@ -85,6 +107,7 @@ test("admin stats contract: returns numeric metrics schema", async () => {
     return [{ prizeValue: 1000 }, { prizeValue: 2000 }];
   };
 
+  stubConfig();
   try {
     const res = await request(app).get("/api/v1/admin/stats");
     assert.equal(res.status, 200);
@@ -95,7 +118,8 @@ test("admin stats contract: returns numeric metrics schema", async () => {
     assert.equal(typeof res.body.verifiedLegit, "number");
   } finally {
     Giveaway.countDocuments = originalCount;
-    Giveaway.find = originalFind;
+    Giveaway.find = originalFindGiveaway;
+    restoreConfig();
   }
 });
 
