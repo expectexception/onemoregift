@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OneMoreGift · deploy to DreamHost shared hosting (runs locally or in CI)
+#
+#     bash deploy/dreamhost/shared/deploy.sh               # build + ship HEAD
+#     TARBALL=dist/release/x.tar.gz bash deploy/...        # ship a prebuilt one
+#
+# Env:
+#   SSH_TARGET   ssh destination (an ~/.ssh/config alias works)  (dreamhost)
+#   SSH_OPTS     extra ssh/scp options, e.g. "-i key -o UserKnownHostsFile=f"
+#   NODE_MAJOR   Node.js major installed on the server            (22)
+#   TARBALL      skip the build and ship this tarball
+#   + everything build-release.sh reads (PUBLIC_ORIGIN, ports, ...)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SSH_TARGET="${SSH_TARGET:-dreamhost}"
+SSH_OPTS="${SSH_OPTS:-}"
+NODE_MAJOR="${NODE_MAJOR:-22}"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+log() { printf '\n\033[1;35m[deploy]\033[0m %s\n' "$*"; }
+
+if [ -z "${TARBALL:-}" ]; then
+  bash "$HERE/build-release.sh"
+  TARBALL="$(cat "$(git rev-parse --show-toplevel)/dist/release/LATEST")"
+fi
+NAME="$(basename "$TARBALL" .tar.gz)"
+
+log "Upload $NAME to $SSH_TARGET"
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$SSH_TARGET" 'mkdir -p ~/onemoregift/releases ~/onemoregift/incoming'
+# shellcheck disable=SC2086
+scp $SSH_OPTS "$TARBALL" "$SSH_TARGET:onemoregift/incoming/$NAME.tar.gz"
+
+log "Activate on server"
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$SSH_TARGET" "NAME='$NAME' NODE_MAJOR='$NODE_MAJOR' bash -s" <<'REMOTE'
+set -euo pipefail
+cd ~/onemoregift
+
+# Node.js lives in ~/opt (shared hosting only ships an old system node).
+if ! ~/opt/node/bin/node -v 2>/dev/null | grep -q "^v$NODE_MAJOR\."; then
+  echo "[server] installing Node.js $NODE_MAJOR"
+  base="https://nodejs.org/dist/latest-v$NODE_MAJOR.x"
+  file="$(curl -fsS "$base/SHASUMS256.txt" | awk '/linux-x64.tar.xz$/{print $2}')"
+  mkdir -p ~/opt && cd ~/opt
+  curl -fsSO "$base/$file"
+  curl -fsS "$base/SHASUMS256.txt" | grep " $file\$" | sha256sum -c -
+  tar -xJf "$file" && rm -f "$file"
+  ln -sfn "$HOME/opt/${file%.tar.xz}" ~/opt/node
+  cd ~/onemoregift
+fi
+echo "[server] node $(~/opt/node/bin/node -v)"
+
+tar -xzf "incoming/$NAME.tar.gz" -C releases
+rm -f "incoming/$NAME.tar.gz"
+"releases/$NAME/bin/omg" activate "releases/$NAME"
+
+# Bring the apps back whenever DreamHost's process monitor kills them.
+line='*/5 * * * * $HOME/onemoregift/current/bin/omg ensure >> $HOME/onemoregift/logs/ensure.log 2>&1'
+if ! crontab -l 2>/dev/null | grep -qF 'onemoregift/current/bin/omg ensure'; then
+  ( crontab -l 2>/dev/null; echo "$line" ) | crontab -
+  echo "[server] cron keepalive installed"
+fi
+~/onemoregift/current/bin/omg status
+REMOTE
+
+log "Deployed $NAME"

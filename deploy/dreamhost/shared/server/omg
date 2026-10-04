@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OneMoreGift · process control on DreamHost shared hosting (runs ON the server)
+#
+#   omg start|stop|restart|status     manage the API + Next.js processes
+#   omg ensure                        start whatever isn't answering (cron)
+#   omg activate <release-dir>        switch `current` to a release + restart
+#   omg logs [backend|frontend]       tail the logs
+#
+# Layout under $OMG_HOME (default ~/onemoregift):
+#   releases/<id>/   unpacked release tarballs (newest 3 kept)
+#   current          symlink to the live release
+#   shared/backend.env, shared/frontend.env   production secrets (never shipped)
+#   shared/uploads/  user uploads, linked into every release
+#   run/ logs/       pid files and logs
+#
+# Shared hosting kills long-running processes without warning, so cron calls
+# `omg ensure` every few minutes to bring them back.
+# ─────────────────────────────────────────────────────────────────────────────
+
+OMG_HOME="${OMG_HOME:-$HOME/onemoregift}"
+NODE_BIN="${NODE_BIN:-$HOME/opt/node/bin}"
+WEB_DIR="${WEB_DIR:-$HOME/onemoregift.in}"
+export PATH="$NODE_BIN:$PATH"
+
+CURRENT="$OMG_HOME/current"
+RUN="$OMG_HOME/run"; LOGS="$OMG_HOME/logs"; SHARED="$OMG_HOME/shared"
+mkdir -p "$RUN" "$LOGS" "$SHARED/uploads/images"
+
+log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+
+load_release() {
+  [ -f "$CURRENT/RELEASE" ] || { log "no live release at $CURRENT"; return 1; }
+  # shellcheck disable=SC1091
+  . "$CURRENT/RELEASE"
+}
+
+port_of() { [ "$1" = backend ] && echo "$BACKEND_PORT" || echo "$FRONTEND_PORT"; }
+
+healthy() {
+  local url
+  if [ "$1" = backend ]; then url="http://127.0.0.1:$BACKEND_PORT/api/v1/health"
+  else url="http://127.0.0.1:$FRONTEND_PORT/"; fi
+  curl -fsS -o /dev/null --max-time 8 "$url"
+}
+
+pid_alive() {
+  local f="$RUN/$1.pid"
+  [ -f "$f" ] && kill -0 "$(cat "$f")" 2>/dev/null
+}
+
+start_one() {
+  local name="$1" dir cmd
+  if pid_alive "$name"; then log "$name already running (pid $(cat "$RUN/$name.pid"))"; return 0; fi
+  if [ "$name" = backend ]; then dir="$CURRENT/backend"; cmd="index.js"
+  else dir="$CURRENT/frontend"; cmd="server.js"; fi
+  # Rotate big logs instead of letting them fill the quota.
+  local lf="$LOGS/$name.log"
+  [ -f "$lf" ] && [ "$(stat -c %s "$lf")" -gt 10485760 ] && mv -f "$lf" "$lf.1"
+  (
+    cd "$dir" || exit 1
+    # PORT/HOSTNAME set here win over the .env files (dotenv never overrides).
+    # HOSTNAME must be explicit: the shell sets it to the machine name, and Next
+    # would bind to that public address instead of loopback.
+    NODE_ENV=production PORT="$(port_of "$name")" HOSTNAME=127.0.0.1 \
+      setsid nohup node "$cmd" >>"$lf" 2>&1 </dev/null &
+    echo $! > "$RUN/$name.pid"
+  )
+  log "started $name (pid $(cat "$RUN/$name.pid"), port $(port_of "$name"))"
+}
+
+stop_one() {
+  local name="$1" f="$RUN/$1.pid" pid
+  [ -f "$f" ] || return 0
+  pid="$(cat "$f")"
+  if kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null
+    for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
+    kill -9 "$pid" 2>/dev/null || true
+    log "stopped $name (pid $pid)"
+  fi
+  rm -f "$f"
+}
+
+wait_healthy() {
+  local name="$1"
+  for _ in $(seq 1 40); do healthy "$name" && { log "$name healthy"; return 0; }; sleep 1; done
+  log "$name NOT healthy after 40s; last log lines:"; tail -n 20 "$LOGS/$name.log"
+  return 1
+}
+
+install_htaccess() {
+  [ -f "$CURRENT/htaccess" ] || return 0
+  mkdir -p "$WEB_DIR"
+  sed "s/__FRONTEND_PORT__/$FRONTEND_PORT/g" "$CURRENT/htaccess" > "$WEB_DIR/.htaccess.new"
+  mv -f "$WEB_DIR/.htaccess.new" "$WEB_DIR/.htaccess"
+}
+
+cmd="${1:-status}"; shift || true
+case "$cmd" in
+  start)
+    load_release || exit 1
+    start_one backend; start_one frontend
+    wait_healthy backend; b=$?; wait_healthy frontend; f=$?
+    exit $(( b || f )) ;;
+  stop)
+    stop_one frontend; stop_one backend ;;
+  restart)
+    "$0" stop; "$0" start ;;
+  status)
+    load_release || exit 1
+    echo "release: $RELEASE_ID ($GIT_SHA)"
+    for n in backend frontend; do
+      p="-"; pid_alive "$n" && p="$(cat "$RUN/$n.pid")"
+      h="down"; healthy "$n" && h="healthy"
+      printf '  %-9s pid=%-8s port=%-6s %s\n' "$n" "$p" "$(port_of "$n")" "$h"
+    done ;;
+  ensure)
+    load_release >/dev/null || exit 0
+    for n in backend frontend; do
+      if ! healthy "$n"; then
+        log "$n not answering; restarting"
+        stop_one "$n"; start_one "$n"
+      fi
+    done ;;
+  activate)
+    rel="${1:?usage: omg activate <release-dir>}"
+    rel="$(cd "$rel" && pwd)"
+    [ -f "$rel/RELEASE" ] || { log "$rel is not a release"; exit 1; }
+    [ -f "$SHARED/backend.env" ] || { log "missing $SHARED/backend.env (production secrets)"; exit 1; }
+    ln -sfn "$SHARED/backend.env" "$rel/backend/.env"
+    [ -f "$SHARED/frontend.env" ] && ln -sfn "$SHARED/frontend.env" "$rel/frontend/.env.production"
+    mkdir -p "$rel/backend/public"
+    ln -sfn "$SHARED/uploads" "$rel/backend/public/uploads"
+    prev="$(readlink "$CURRENT" 2>/dev/null || true)"
+    "$0" stop
+    ln -sfn "$rel" "$CURRENT"
+    load_release
+    if "$0" start; then
+      install_htaccess
+      log "live: $RELEASE_ID"
+      # Keep the newest 3 releases.
+      ls -1dt "$OMG_HOME"/releases/*/ 2>/dev/null | tail -n +4 | xargs -r rm -rf
+    else
+      log "new release failed health checks"
+      if [ -n "$prev" ] && [ -d "$prev" ]; then
+        log "rolling back to $prev"
+        "$0" stop; ln -sfn "$prev" "$CURRENT"; "$0" start
+      fi
+      exit 1
+    fi ;;
+  logs)
+    tail -n 100 -f "$LOGS/${1:-backend}.log" ;;
+  *)
+    echo "usage: omg start|stop|restart|status|ensure|activate <dir>|logs [backend|frontend]"; exit 2 ;;
+esac
