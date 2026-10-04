@@ -43,7 +43,7 @@ healthy() {
   local url
   if [ "$1" = backend ]; then url="http://127.0.0.1:$BACKEND_PORT/api/v1/health"
   else url="http://127.0.0.1:$FRONTEND_PORT/"; fi
-  curl -fsS -o /dev/null --max-time 8 "$url"
+  curl -fs -o /dev/null --max-time 8 "$url"
 }
 
 pid_alive() {
