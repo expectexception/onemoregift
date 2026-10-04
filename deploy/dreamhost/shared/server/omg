@@ -21,7 +21,11 @@ set -uo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 
 OMG_HOME="${OMG_HOME:-$HOME/onemoregift}"
-NODE_BIN="${NODE_BIN:-$HOME/opt/node/bin}"
+# DreamHost's own Node 18 (/usr/bin/node) is the only build that runs here:
+# official Node 20/22 binaries abort at the first JIT compile because the
+# server refuses their executable-memory mprotect (ENOMEM). Only `--jitless`
+# gets around that, and it is far slower. The app supports Node >= 18.18.
+NODE_BIN="${NODE_BIN:-/usr/bin}"
 WEB_DIR="${WEB_DIR:-$HOME/onemoregift.in}"
 export PATH="$NODE_BIN:$PATH"
 
@@ -127,7 +131,7 @@ case "$cmd" in
     done ;;
   activate)
     rel="${1:?usage: omg activate <release-dir>}"
-    rel="$(cd "$rel" && pwd)"
+    rel="$(cd "$rel" && pwd -P)"   # resolve symlinks, or `current` could point at itself
     [ -f "$rel/RELEASE" ] || { log "$rel is not a release"; exit 1; }
     [ -f "$SHARED/backend.env" ] || { log "missing $SHARED/backend.env (production secrets)"; exit 1; }
     ln -sfn "$SHARED/backend.env" "$rel/backend/.env"

@@ -1,5 +1,9 @@
 # CI/CD: push `production` → auto-deploy to DreamHost
 
+> **Production currently runs on DreamHost shared hosting:** see
+> [`shared/README.md`](./shared/README.md). This file covers the Managed VPS +
+> PM2 setup, for if the plan is upgraded.
+
 Pushing to the **`production`** branch runs
 [`.github/workflows/deploy-production.yml`](../../.github/workflows/deploy-production.yml):
 

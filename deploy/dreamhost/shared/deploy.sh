@@ -10,14 +10,12 @@ set -euo pipefail
 # Env:
 #   SSH_TARGET   ssh destination (an ~/.ssh/config alias works)  (dreamhost)
 #   SSH_OPTS     extra ssh/scp options, e.g. "-i key -o UserKnownHostsFile=f"
-#   NODE_MAJOR   Node.js major installed on the server            (22)
 #   TARBALL      skip the build and ship this tarball
 #   + everything build-release.sh reads (PUBLIC_ORIGIN, ports, ...)
 # ─────────────────────────────────────────────────────────────────────────────
 
 SSH_TARGET="${SSH_TARGET:-dreamhost}"
 SSH_OPTS="${SSH_OPTS:-}"
-NODE_MAJOR="${NODE_MAJOR:-22}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 log() { printf '\n\033[1;35m[deploy]\033[0m %s\n' "$*"; }
@@ -36,23 +34,14 @@ scp $SSH_OPTS "$TARBALL" "$SSH_TARGET:onemoregift/incoming/$NAME.tar.gz"
 
 log "Activate on server"
 # shellcheck disable=SC2086
-ssh $SSH_OPTS "$SSH_TARGET" "NAME='$NAME' NODE_MAJOR='$NODE_MAJOR' bash -s" <<'REMOTE'
+ssh $SSH_OPTS "$SSH_TARGET" "NAME='$NAME' bash -s" <<'REMOTE'
 set -euo pipefail
 cd ~/onemoregift
 
-# Node.js lives in ~/opt (shared hosting only ships an old system node).
-if ! ~/opt/node/bin/node -v 2>/dev/null | grep -q "^v$NODE_MAJOR\."; then
-  echo "[server] installing Node.js $NODE_MAJOR"
-  base="https://nodejs.org/dist/latest-v$NODE_MAJOR.x"
-  file="$(curl -fsS "$base/SHASUMS256.txt" | awk '/linux-x64.tar.xz$/{print $2}')"
-  mkdir -p ~/opt && cd ~/opt
-  curl -fsSO "$base/$file"
-  curl -fsS "$base/SHASUMS256.txt" | grep " $file\$" | sha256sum -c -
-  tar -xJf "$file" && rm -f "$file"
-  ln -sfn "$HOME/opt/${file%.tar.xz}" ~/opt/node
-  cd ~/onemoregift
-fi
-echo "[server] node $(~/opt/node/bin/node -v)"
+# Runs on DreamHost's system Node 18 (see NODE_BIN in server/omg for why).
+node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>18||(a===18&&b>=18)?0:1)' \
+  || { echo "[server] need Node >= 18.18, found $(node -v)"; exit 1; }
+echo "[server] node $(node -v)"
 
 tar -xzf "incoming/$NAME.tar.gz" -C releases
 rm -f "incoming/$NAME.tar.gz"
