@@ -54,7 +54,7 @@ rm -f "incoming/$NAME.tar.gz"
 # Bring the apps back whenever DreamHost's process monitor kills them.
 line='*/5 * * * * $HOME/onemoregift/current/bin/omg ensure >> $HOME/onemoregift/logs/ensure.log 2>&1'
 if ! crontab -l 2>/dev/null | grep -qF 'onemoregift/current/bin/omg ensure'; then
-  ( crontab -l 2>/dev/null; echo "$line" ) | crontab -
+  { crontab -l 2>/dev/null || true; echo "$line"; } | crontab -   # no crontab yet → `crontab -l` fails
   echo "[server] cron keepalive installed"
 fi
 ~/onemoregift/current/bin/omg status
