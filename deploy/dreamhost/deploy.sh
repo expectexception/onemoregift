@@ -11,14 +11,17 @@ set -euo pipefail
 #
 # What it does: sync the production branch, install backend deps, build the
 # frontend, then restart the app(s). Two restart models are supported:
-#   - passenger (default): DreamHost shared/DreamPress — restart by touching
-#     tmp/restart.txt in each Passenger app directory.
-#   - pm2: DreamHost VPS/Dedicated where you run PM2 yourself.
+#   - pm2 (default): DreamHost Managed VPS/Dedicated. The panel's Proxy Server
+#     forwards the domain to FRONTEND_PORT and /api/v1 to the backend (9000).
+#     DreamHost shared hosting cannot run Node.js at all.
+#   - passenger: legacy; DreamHost no longer supports Passenger for Node 14+.
 #
 # Configuration (all optional; sane defaults). Set via env / GitHub secrets:
 #   APP_DIR           Repo checkout on the server        (default: $HOME/onemoregift)
 #   DEPLOY_BRANCH     Branch to deploy                   (default: production)
-#   RESTART_MODE      passenger | pm2                    (default: passenger)
+#   RESTART_MODE      pm2 | passenger                    (default: pm2)
+#   FRONTEND_PORT     Port Next.js listens on under pm2  (default: 8000; the
+#                     DreamHost Proxy Server only forwards to 8000-65535)
 #   API_HOST          Public API origin baked into the FE build
 #                                                        (default: https://onemoregift.in)
 #   BACKEND_APP_DIR   Passenger app dir for the API      (default: $HOME/api.onemoregift.in)
@@ -33,7 +36,8 @@ export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:$PATH"
 
 APP_DIR="${APP_DIR:-$HOME/onemoregift}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-production}"
-RESTART_MODE="${RESTART_MODE:-passenger}"
+RESTART_MODE="${RESTART_MODE:-pm2}"
+export FRONTEND_PORT="${FRONTEND_PORT:-8000}"
 API_HOST="${API_HOST:-https://onemoregift.in}"
 BACKEND_APP_DIR="${BACKEND_APP_DIR:-$HOME/api.onemoregift.in}"
 FRONTEND_APP_DIR="${FRONTEND_APP_DIR:-$HOME/onemoregift.in}"
@@ -70,12 +74,13 @@ else
   NEXT_PUBLIC_BASE_URL="$API_HOST/api/v1/" \
   NEXT_PUBLIC_API_URL="$API_HOST/api/v1" \
   NEXT_PUBLIC_ALTCHA_CHALLENGE_URL="$API_HOST/api/altcha/challenge" \
+  BACKEND_INTERNAL_URL="http://127.0.0.1:9000" \
   npm run build
 fi
 
 if [ "$RESTART_MODE" = "pm2" ]; then
   command -v pm2 >/dev/null || die "RESTART_MODE=pm2 but pm2 is not installed"
-  log "Restart via PM2"
+  log "Restart via PM2 (frontend on :$FRONTEND_PORT, backend on :9000)"
   cd "$APP_DIR"
   pm2 startOrReload ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
   pm2 save

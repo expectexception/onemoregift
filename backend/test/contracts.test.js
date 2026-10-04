@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret_change_me";
+// emailHash lookups need a field key; CI runs from a clean checkout with no .env.
+process.env.FIELD_ENCRYPTION_KEY = process.env.FIELD_ENCRYPTION_KEY || "0".repeat(64);
 
 const { createApp } = require("../app");
 const Admin = require("../model/Admin");

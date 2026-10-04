@@ -9,10 +9,16 @@ const nextConfig = {
         NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
         NEXT_PUBLIC_ALTCHA_CHALLENGE_URL: process.env.NEXT_PUBLIC_ALTCHA_CHALLENGE_URL,
     },
-    // In local dev, proxy API calls through Next.js to avoid CORS
+    // In local dev, proxy API calls through Next.js to avoid CORS.
+    // In production, set BACKEND_INTERNAL_URL at build time (e.g. on DreamHost,
+    // where the Proxy Server sends the whole domain to Next) to forward the API
+    // and media paths to the backend. Next passes X-Forwarded-For through
+    // untouched, so the backend's `trust proxy 1` still sees the client IP.
     async rewrites() {
-        if (!isDev) return [];
-        const LOCAL_API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000';
+        const LOCAL_API = isDev
+            ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9000'
+            : process.env.BACKEND_INTERNAL_URL;
+        if (!LOCAL_API) return [];
         return [
             {
                 source: '/api/v1/:path*',

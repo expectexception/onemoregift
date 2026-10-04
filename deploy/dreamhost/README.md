@@ -42,7 +42,7 @@ cd ~/onemoregift && git checkout production
 
 ### 4. Put the production env files on the server (never in git)
 ```bash
-# backend
+# backend: FIELD_ENCRYPTION_KEY must match the key the live database was written with
 cp ~/onemoregift/backend/.env.production.example ~/onemoregift/backend/.env
 $EDITOR ~/onemoregift/backend/.env         # real MONGO_URI, JWT_SECRET, keys, etc.
 # frontend
@@ -50,31 +50,31 @@ cp ~/onemoregift/frontend/.env.production.example ~/onemoregift/frontend/.env.pr
 $EDITOR ~/onemoregift/frontend/.env.production
 ```
 
-### 5. Node hosting on DreamHost — pick your model
+### 5. Node hosting on DreamHost: Managed VPS + PM2
 
-**A) Shared / DreamPress → Phusion Passenger (default, `RESTART_MODE=passenger`)**
+DreamHost **shared hosting cannot run Node.js**, and Passenger does not work
+with Node 14+. This app needs a **Managed VPS with at least 2 GB RAM**: the
+Next.js build alone peaks around 1.3 GB.
 
-In the DreamHost panel, host **two** domains as *Passenger (Node.js)* apps:
+On the VPS, as the shell user:
+```bash
+# Node via nvm (DreamHost's documented route), then PM2
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. ~/.nvm/nvm.sh && nvm install 20 && npm i -g pm2
+```
 
-| Domain | Web directory the panel points at |
-|--------|-----------------------------------|
-| `onemoregift.in` (frontend) | `/home/<user>/onemoregift.in/public` |
-| `api.onemoregift.in` (backend) | `/home/<user>/api.onemoregift.in/public` |
+PM2 runs the backend on **9000** and Next.js on **8000** (`deploy.sh` sets
+`FRONTEND_PORT=8000`; the Proxy Server only forwards to ports 8000-65535). In
+the panel, **Servers → VPS → Proxy Server**, add **one** proxy: domain
+`onemoregift.in`, path left **blank**, port **8000**.
 
-Enable **"Passenger (Ruby/NodeJS/Python apps only)"** for each. The deploy script
-creates `app.js`, `tmp/`, and the `public` link inside those two dirs on first run,
-so the first deploy must succeed once before the sites go live. Restart is
-automatic (`touch tmp/restart.txt`).
+Next.js then forwards `/api/v1`, `/uploads` and `/media` to the backend on
+`127.0.0.1:9000` (`deploy.sh` builds with `BACKEND_INTERNAL_URL`), and serves
+everything else itself, including its own `/api/altcha/*` and `/api/proxy/*`.
+Client IPs survive the hop, so the backend's rate limits still work per user.
 
-> Next.js SSR under Passenger needs a Node-capable plan with enough memory to run
-> `next build`. If builds get killed on a shared plan, either upgrade, or switch the
-> frontend to a static export, or build in CI and ship the artifact (see *Notes*).
-
-**B) VPS / Dedicated → PM2 (`RESTART_MODE=pm2`)**
-
-Install Node + PM2 and let the existing `ecosystem.config.cjs` run both apps behind
-your web server. Set the repo Variable `RESTART_MODE=pm2`. The script then runs
-`pm2 startOrReload ecosystem.config.cjs` instead of touching Passenger.
+Keep PM2 alive across reboots with DreamHost's *linger* setup (systemd user
+service), then `pm2 save` after the first deploy.
 
 ### 6. Add GitHub secrets and variables
 Repo → **Settings → Secrets and variables → Actions**.
@@ -91,7 +91,7 @@ Repo → **Settings → Secrets and variables → Actions**.
 **Variables:**
 | Name | Value |
 |------|-------|
-| `RESTART_MODE` | `passenger` (or `pm2`) |
+| `RESTART_MODE` | `pm2` (default; leave unset) |
 | `API_HOST` | `https://onemoregift.in` (public API origin baked into the FE build) |
 | `NEXT_PUBLIC_BASE_URL` | `https://onemoregift.in/api/v1/` |
 | `NEXT_PUBLIC_API_URL` | `https://onemoregift.in/api/v1` |

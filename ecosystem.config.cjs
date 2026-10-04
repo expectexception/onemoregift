@@ -1,8 +1,16 @@
+const path = require("path");
+
+// Paths resolve from this file, so the same config works wherever the repo is
+// checked out (/var/www on the droplet, ~/onemoregift on DreamHost).
+// DreamHost's Proxy Server only forwards to ports 8000-65535, so deploy.sh sets
+// FRONTEND_PORT=8000 there; the droplet's nginx still expects 3000.
+const FRONTEND_PORT = process.env.FRONTEND_PORT || 3000;
+
 module.exports = {
   apps: [
     {
       name: "onemoregift-backend",
-      cwd: "/var/www/onemoregift/backend",
+      cwd: path.join(__dirname, "backend"),
       script: "index.js",
       instances: 1,
       exec_mode: "fork",
@@ -19,16 +27,16 @@ module.exports = {
     },
     {
       name: "onemoregift-frontend",
-      cwd: "/var/www/onemoregift/frontend",
+      cwd: path.join(__dirname, "frontend"),
       script: "node_modules/next/dist/bin/next",
-      args: "start -p 3000",
+      args: `start -p ${FRONTEND_PORT}`,
       instances: 1,
       exec_mode: "fork",
       watch: false,
       max_memory_restart: "768M",
       env: {
         NODE_ENV: "production",
-        PORT: 3000,
+        PORT: FRONTEND_PORT,
       },
     },
   ],
