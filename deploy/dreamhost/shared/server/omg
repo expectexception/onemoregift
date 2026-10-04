@@ -68,8 +68,13 @@ start_one() {
     # PORT/HOSTNAME set here win over the .env files (dotenv never overrides).
     # HOSTNAME must be explicit: the shell sets it to the machine name, and Next
     # would bind to that public address instead of loopback.
+    # DreamHost puts every node process in a cgroup capped at 25 *threads*
+    # (pids.max), and a default node uses ~11. Past the cap, pthread_create
+    # fails and node aborts or hangs, so trim each process to ~6 threads: one
+    # V8 helper, two libuv workers, and one libvips thread for sharp uploads.
     NODE_ENV=production PORT="$(port_of "$name")" HOSTNAME=127.0.0.1 \
-      setsid nohup node "$cmd" >>"$lf" 2>&1 </dev/null &
+    UV_THREADPOOL_SIZE=2 VIPS_CONCURRENCY=1 \
+      setsid nohup node --v8-pool-size=1 "$cmd" >>"$lf" 2>&1 </dev/null &
     echo $! > "$RUN/$name.pid"
   )
   log "started $name (pid $(cat "$RUN/$name.pid"), port $(port_of "$name"))"

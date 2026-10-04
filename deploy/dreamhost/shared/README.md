@@ -16,6 +16,12 @@ browser ──https──▶ Apache (DreamHost) ──.htaccess [P]──▶ Nex
   binaries crash at their first JIT compile here (the server refuses their
   executable-memory `mprotect`, `ENOMEM`). The app supports Node ≥ 18.18, and
   CI tests the backend on 18.19.1.
+- **Thread budget:** DreamHost moves every `node` process into a cgroup with
+  3 GB RAM, 0.9 CPU and **25 threads** (`pids.max`). A default node process
+  uses ~11, so `omg` starts each with `--v8-pool-size=1`,
+  `UV_THREADPOOL_SIZE=2` and `VIPS_CONCURRENCY=1` (~6 threads). Past the cap,
+  new threads fail and node aborts or hangs. Keep this in mind before running
+  extra node scripts on the server while the apps are up.
 - **`~/onemoregift/current/bin/omg`** starts/stops both processes, and
   `omg activate` switches releases with a health check and automatic rollback.
 - **Cron runs `omg ensure` every 5 minutes** and restarts whatever stopped

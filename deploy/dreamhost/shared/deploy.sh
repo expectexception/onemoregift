@@ -39,9 +39,13 @@ set -euo pipefail
 cd ~/onemoregift
 
 # Runs on DreamHost's system Node 18 (see NODE_BIN in server/omg for why).
-node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>18||(a===18&&b>=18)?0:1)' \
-  || { echo "[server] need Node >= 18.18, found $(node -v)"; exit 1; }
-echo "[server] node $(node -v)"
+# Parse `node -v` rather than running a script: the live apps already hold most
+# of the 25-thread cap DreamHost puts on node processes, and `node -v` exits
+# before starting any threads.
+v="$(node -v </dev/null)"; IFS=. read -r maj min _ <<<"${v#v}"
+[ "$maj" -gt 18 ] || { [ "$maj" -eq 18 ] && [ "$min" -ge 18 ]; } \
+  || { echo "[server] need Node >= 18.18, found $v"; exit 1; }
+echo "[server] node $v"
 
 tar -xzf "incoming/$NAME.tar.gz" -C releases
 rm -f "incoming/$NAME.tar.gz"
