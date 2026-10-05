@@ -17,7 +17,7 @@ concurrency:
 jobs:
   test:
     name: Backend tests (Node 18, as on the server)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # same Ubuntu as the DreamHost server
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,7 @@ jobs:
   deploy:
     name: Build release & deploy
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # same Ubuntu as the DreamHost server
     # Optional: create a "production" Environment in GitHub to add approval gates.
     environment: production
     env:
@@ -90,3 +90,8 @@ jobs:
             echo "$code $path"
             [ "$code" = 200 ] || { echo "::error::$path returned $code"; exit 1; }
           done
+          # The health check reports the deployed commit; it must be this one.
+          expected=$(git rev-parse --short HEAD)
+          live=$(curl -s --max-time 30 "$PUBLIC_ORIGIN/api/v1/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('release'))")
+          echo "live release: $live (expected $expected)"
+          [ "$live" = "$expected" ] || { echo "::error::live site runs $live, not $expected"; exit 1; }

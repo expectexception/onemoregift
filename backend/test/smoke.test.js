@@ -20,6 +20,7 @@ test('GET /api/v1/health responds with JSON structure', async () => {
   assert.equal(typeof res.body.error, 'boolean');
   assert.equal(typeof res.body.service, 'string');
   assert.equal(typeof res.body.timestamp, 'string');
+  assert.ok(res.body.release === null || typeof res.body.release === 'string');
 });
 
 test.after(async () => {

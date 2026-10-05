@@ -72,7 +72,7 @@ start_one() {
     # (pids.max), and a default node uses ~11. Past the cap, pthread_create
     # fails and node aborts or hangs, so trim each process to ~6 threads: one
     # V8 helper, two libuv workers, and one libvips thread for sharp uploads.
-    NODE_ENV=production PORT="$(port_of "$name")" HOSTNAME=127.0.0.1 \
+    NODE_ENV=production PORT="$(port_of "$name")" HOSTNAME=127.0.0.1 GIT_SHA="$GIT_SHA" \
     UV_THREADPOOL_SIZE=2 VIPS_CONCURRENCY=1 \
       setsid nohup node --v8-pool-size=1 "$cmd" >>"$lf" 2>&1 </dev/null &
     echo $! > "$RUN/$name.pid"

@@ -115,6 +115,8 @@ function createApp() {
       status: dbReady ? 'ok' : 'degraded',
       service: 'giveaway-backend',
       db: dbReady ? 'connected' : 'disconnected',
+      // Commit this process runs (set by the deploy tooling), to confirm a deploy landed.
+      release: process.env.GIT_SHA || null,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
