@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const { clearPublicCacheOnWrite } = require('./middleware/publicCache');
 
 const auth = require('./routes/auth');
 const admin = require('./routes/admin');
@@ -50,6 +51,7 @@ function createApp() {
   app.set('trust proxy', 1);
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   app.use(cookieParser());
+  app.use(clearPublicCacheOnWrite);
 
   // Static media is mounted BEFORE the rate limiter, a single gallery page loads
   // dozens of images and was eating the per-IP API budget, causing surprise 429s.

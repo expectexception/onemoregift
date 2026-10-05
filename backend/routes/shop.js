@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { publicCache } = require('../middleware/publicCache');
 const isAuth = require('../middleware/isAuth');
 const {
     getCategories,
@@ -32,12 +33,12 @@ const requireShopEnabled = async (req, res, next) => {
 };
 
 // Public endpoints
-router.get('/products', listProducts);
+router.get('/products', publicCache(), listProducts);
 // Open to signed-out visitors: capturing interest during the reveal window is the point
 router.post('/notify-me', subscribe);
-router.get('/products/categories', getCategories);
-router.get('/products/:id', getProduct);
-router.get('/stores', listStores);
+router.get('/products/categories', publicCache(), getCategories);
+router.get('/products/:id', publicCache(), getProduct);
+router.get('/stores', publicCache(), listStores);
 
 // Auth protected endpoints
 router.post('/coupons/validate', isAuth, validateCoupon);

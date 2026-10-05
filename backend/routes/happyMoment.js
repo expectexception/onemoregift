@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { publicCache } = require('../middleware/publicCache');
 const isAuth = require('../middleware/isAuth');
 const { createMoment, listGallery, listMyMoments, reactToMoment, reportMoment, addComment, editComment, deleteComment } = require('../controller/momentsUserController');
 
-router.get('/gallery', listGallery);
+router.get('/gallery', publicCache(), listGallery);
 router.post('/', isAuth, createMoment);
 router.get('/my-moments', isAuth, listMyMoments);
 router.post('/:id/react', isAuth, reactToMoment);

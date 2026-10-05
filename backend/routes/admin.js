@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { publicCache } = require('../middleware/publicCache');
 const rateLimit = require('express-rate-limit');
 const isAdmin = require('../middleware/isAdmin');
 const isRootAdmin = require('../middleware/isRootAdmin');
@@ -17,7 +18,7 @@ const adminAuthLimiter = rateLimit({
 });
 
 // Public stats
-router.get('/stats', getPublicStats);
+router.get('/stats', publicCache(), getPublicStats);
 
 router.post('/register', adminAuthLimiter, register);
 router.post('/login', adminAuthLimiter, login);
