@@ -8,10 +8,9 @@ DirectoryIndex index.html index.php
 
 RewriteEngine On
 
-# HTTPS only. Enable once the Let's Encrypt certificate is active, or visitors
-# get a certificate warning:
-# RewriteCond %{HTTPS} !=on
-# RewriteRule ^ https://topfurnitures.in%{REQUEST_URI} [R=301,L]
+# HTTPS only (Let's Encrypt certificate via the DreamHost panel).
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://topfurnitures.in%{REQUEST_URI} [R=301,L]
 
 # One canonical host: www → bare domain.
 RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
