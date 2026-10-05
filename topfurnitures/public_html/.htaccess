@@ -1,0 +1,29 @@
+# topfurnitures.in · static site + contact form (send.php) on DreamHost
+DirectoryIndex index.html index.php
+
+# Never serve archives, backups, scripts or dotfiles.
+<FilesMatch "(\.(bak|zip|log|md|sh)|^\..*)$">
+  Require all denied
+</FilesMatch>
+
+RewriteEngine On
+
+# HTTPS only. Enable once the Let's Encrypt certificate is active, or visitors
+# get a certificate warning:
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://topfurnitures.in%{REQUEST_URI} [R=301,L]
+
+# One canonical host: www → bare domain.
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ %{REQUEST_SCHEME}://%1%{REQUEST_URI} [R=301,L]
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 1 hour"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType application/pdf "access plus 1 month"
+</IfModule>
