@@ -1,0 +1,56 @@
+name: Deploy topfurnitures.in → DreamHost
+
+# Static site + send.php, served by DreamHost from /home/dh_65ndjd/topfurnitures.in.
+# Runs when its files change on `production`, or manually from the Actions tab.
+on:
+  push:
+    branches: [production]
+    paths: ["topfurnitures/public_html/**"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-topfurnitures
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_KEY: ${{ secrets.DREAMHOST_SSH_KEY }}
+      SSH_TARGET: dh_65ndjd@sin1-shared-01.dreamhost.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PHP syntax
+        run: php -l topfurnitures/public_html/send.php
+
+      - name: Check deploy key
+        id: gate
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::warning::DREAMHOST_SSH_KEY secret not set — skipping deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # No --delete: DreamHost keeps its own files in the web dir (.dh-diag,
+      # .well-known for certificates), and those must survive a deploy.
+      - name: Upload with rsync
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          rsync -rlptvz --chmod=D755,F644 \
+            --exclude=Final/ --exclude=Final.zip --exclude='*.bak' \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$PWD/deploy/dreamhost/shared/known_hosts" \
+            topfurnitures/public_html/ "$SSH_TARGET:topfurnitures.in/"
+
+      - name: Smoke test
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          for path in / "/About%20us.html" /brochure.pdf; do
+            code=$(curl -sL -o /dev/null -w '%{http_code}' --max-time 30 "http://topfurnitures.in$path")
+            echo "$code $path"
+            [ "$code" = 200 ] || { echo "::error::$path returned $code"; exit 1; }
+          done
