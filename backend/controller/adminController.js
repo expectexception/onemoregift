@@ -13,7 +13,16 @@ const { getConfigHelper } = require('./configController')
 const { applyOverrides } = require('../utils/statOverrides')
 const { hmacHash } = require('../utils/crypto')
 const { ROLES } = require('../model/Admin')
+const { isWhitelistedAdminEmail, NOT_WHITELISTED_MSG, DEACTIVATED_MSG } = require('../utils/adminAccess')
 // env is loaded by utils/loadEnv at startup
+
+// Refuse at sign-in what isAdmin would refuse on every request afterwards;
+// otherwise the login "succeeds" and the dashboard bounces back on 403s.
+const panelAccessError = (admin) => {
+    if (!isWhitelistedAdminEmail(admin.email)) return NOT_WHITELISTED_MSG
+    if (admin.isActive === false) return DEACTIVATED_MSG
+    return null
+}
 
 const JWT_SECRET = process.env.JWT_SECRET
 const COOKIE_SECURE = process.env.NODE_ENV === 'production';
@@ -189,6 +198,12 @@ const login = async (req, res) => {
             return res.status(401).json({ error: true, msg: "Please try to login with correct credentials" });
         }
 
+        const accessError = panelAccessError(user);
+        if (accessError) {
+            console.warn(`[admin login] refused ${trimmedEmail}: ${accessError}`);
+            return res.status(403).json({ error: true, msg: accessError });
+        }
+
         // Admin 2FA OTP
         if (ADMIN_OTP_ENABLED) {
             const otpCode = `${Math.floor(100000 + Math.random() * 900000)}`;
@@ -251,6 +266,11 @@ const verifyAdminOtp = async (req, res) => {
         }
 
         await Admin.findByIdAndUpdate(user._id, { $unset: { loginOtp: '' } });
+
+        const accessError = panelAccessError(user);
+        if (accessError) {
+            return res.status(403).json({ error: true, msg: accessError });
+        }
 
         const data = { user: { id: user.id, isAdmin: user.isAdmin, email: user.email } };
         const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: '1d' });

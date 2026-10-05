@@ -2,14 +2,8 @@
 
 const jwt = require("jsonwebtoken");
 const Admin = require("../model/Admin");
+const { isWhitelistedAdminEmail, NOT_WHITELISTED_MSG, DEACTIVATED_MSG } = require("../utils/adminAccess");
 const JWT_SECRET = process.env.JWT_SECRET;
-
-// Feature flag: comma-separated list of admin emails allowed to access panel.
-// If empty/unset, all valid admin tokens are permitted.
-const ADMIN_EMAIL_WHITELIST = (process.env.ADMIN_EMAIL_WHITELIST || "")
-    .split(",")
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean);
 
 const isAdmin = async (req, res, next) => {
     const authHeader = req.header("Authorization");
@@ -31,12 +25,9 @@ const isAdmin = async (req, res, next) => {
         }
 
         // Email whitelist check
-        if (ADMIN_EMAIL_WHITELIST.length > 0) {
-            const adminEmail = (data.user.email || "").toLowerCase();
-            if (!ADMIN_EMAIL_WHITELIST.includes(adminEmail)) {
-                console.warn(`[isAdmin] Access denied for non-whitelisted email: ${adminEmail}`);
-                return res.status(403).json({ error: true, msg: "Access denied. Your account is not authorized for admin panel access." });
-            }
+        if (!isWhitelistedAdminEmail(data.user.email)) {
+            console.warn(`[isAdmin] Access denied for non-whitelisted email: ${data.user.email}`);
+            return res.status(403).json({ error: true, msg: NOT_WHITELISTED_MSG });
         }
 
         // Load full admin doc for RBAC (req.adminDoc used by hasRole middleware)
@@ -47,7 +38,7 @@ const isAdmin = async (req, res, next) => {
         try {
             const adminDoc = await Admin.findById(data.user.id);
             if (adminDoc && !adminDoc.isActive) {
-                return res.status(403).json({ error: true, msg: "Admin account is deactivated." });
+                return res.status(403).json({ error: true, msg: DEACTIVATED_MSG });
             }
             req.adminDoc = adminDoc;
         } catch (_) {
